@@ -1,5 +1,6 @@
 import { eq, desc } from "drizzle-orm";
-import { drizzle } from "drizzle-orm/mysql2";
+import { drizzle } from "drizzle-orm/neon-http";
+import { neon } from "@neondatabase/serverless";
 import { InsertUser, users, conversations, messages, InsertConversation, InsertMessage } from "../drizzle/schema";
 import { ENV } from './_core/env';
 
@@ -9,7 +10,8 @@ let _db: ReturnType<typeof drizzle> | null = null;
 export async function getDb() {
   if (!_db && process.env.DATABASE_URL) {
     try {
-      _db = drizzle(process.env.DATABASE_URL);
+      const sql = neon(process.env.DATABASE_URL);
+      _db = drizzle(sql);
     } catch (error) {
       console.warn("[Database] Failed to connect:", error);
       _db = null;
@@ -33,43 +35,32 @@ export async function upsertUser(user: InsertUser): Promise<void> {
     const values: InsertUser = {
       openId: user.openId,
     };
-    const updateSet: Record<string, unknown> = {};
-
-    const textFields = ["name", "email", "loginMethod"] as const;
-    type TextField = (typeof textFields)[number];
-
-    const assignNullable = (field: TextField) => {
-      const value = user[field];
-      if (value === undefined) return;
-      const normalized = value ?? null;
-      values[field] = normalized;
-      updateSet[field] = normalized;
-    };
-
-    textFields.forEach(assignNullable);
-
-    if (user.lastSignedIn !== undefined) {
-      values.lastSignedIn = user.lastSignedIn;
-      updateSet.lastSignedIn = user.lastSignedIn;
-    }
+    
+    if (user.name !== undefined) values.name = user.name;
+    if (user.email !== undefined) values.email = user.email;
+    if (user.loginMethod !== undefined) values.loginMethod = user.loginMethod;
+    if (user.lastSignedIn !== undefined) values.lastSignedIn = user.lastSignedIn;
+    
     if (user.role !== undefined) {
       values.role = user.role;
-      updateSet.role = user.role;
     } else if (user.openId === ENV.ownerOpenId) {
       values.role = 'admin';
-      updateSet.role = 'admin';
     }
 
     if (!values.lastSignedIn) {
       values.lastSignedIn = new Date();
     }
 
-    if (Object.keys(updateSet).length === 0) {
-      updateSet.lastSignedIn = new Date();
-    }
-
-    await db.insert(users).values(values).onDuplicateKeyUpdate({
-      set: updateSet,
+    await db.insert(users).values(values).onConflictDoUpdate({
+      target: users.openId,
+      set: {
+        name: values.name,
+        email: values.email,
+        loginMethod: values.loginMethod,
+        lastSignedIn: values.lastSignedIn,
+        role: values.role,
+        updatedAt: new Date(),
+      },
     });
   } catch (error) {
     console.error("[Database] Failed to upsert user:", error);
@@ -94,8 +85,8 @@ export async function getUserByOpenId(openId: string) {
 export async function createConversation(userId: number, title: string) {
   const db = await getDb();
   if (!db) throw new Error("Database not available");
-  const result = await db.insert(conversations).values({ userId, title });
-  return result[0].insertId;
+  const result = await db.insert(conversations).values({ userId, title }).returning({ id: conversations.id });
+  return result[0].id;
 }
 
 export async function getUserConversations(userId: number) {
@@ -149,6 +140,6 @@ export async function getConversationMessages(conversationId: number) {
 export async function addMessage(conversationId: number, role: string, content: string) {
   const db = await getDb();
   if (!db) throw new Error("Database not available");
-  const result = await db.insert(messages).values({ conversationId, role, content });
-  return result[0].insertId;
+  const result = await db.insert(messages).values({ conversationId, role, content }).returning({ id: messages.id });
+  return result[0].id;
 }
