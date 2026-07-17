@@ -22,7 +22,8 @@ Diretrizes:
 - Para código, forneça exemplos completos e funcionais quando possível.
 - Use markdown para formatação, incluindo blocos de código com a linguagem especificada.
 - Seja detalhado e preciso, mas conciso quando apropriado.
-- Se não souber algo, diga honestamente.`;
+- Se não souber algo, diga honestamente.
+- Quando o modo de raciocínio avançado estiver ativo, utilize uma abordagem passo a passo (chain-of-thought) para resolver problemas complexos, detalhando seu processo de pensamento antes de apresentar a resposta final. Priorize a profundidade da análise e a lógica estruturada.`;
 
 export const appRouter = router({
   system: systemRouter,
@@ -100,9 +101,12 @@ export const appRouter = router({
       .input(z.object({
         conversationId: z.number(),
         content: z.string().min(1),
+        useAdvancedReasoning: z.boolean().optional().default(false),
       }))
       .mutation(async ({ ctx, input }) => {
         if (!ctx.user) throw new TRPCError({ code: "UNAUTHORIZED" });
+
+        const { conversationId, content, useAdvancedReasoning } = input;
 
         // Verify conversation ownership
         const conv = await db.getConversation(input.conversationId, ctx.user.id);
@@ -126,9 +130,10 @@ export const appRouter = router({
         // Call LLM
         try {
           const response = await invokeLLM({
-            model: "gpt-5-mini",
+            model: useAdvancedReasoning ? "deepseek-reasoner" : "gpt-5-mini",
             messages: llmMessages,
             maxTokens: 4000,
+            thinking: useAdvancedReasoning ? { level: "high" } : undefined,
           });
 
           const rawContent = response.choices[0]?.message?.content;

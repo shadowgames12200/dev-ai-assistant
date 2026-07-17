@@ -53,6 +53,7 @@ export default function ChatView() {
   const [isLoading, setIsLoading] = useState(false);
   const [editingId, setEditingId] = useState<number | null>(null);
   const [editingTitle, setEditingTitle] = useState("");
+  const [useAdvancedReasoning, setUseAdvancedReasoning] = useState(false);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
   const scrollAreaRef = useRef<HTMLDivElement>(null);
 
@@ -146,7 +147,7 @@ export default function ChatView() {
             setActiveConversationId(data.id);
             setIsLoading(true);
             setInput("");
-            chatMutation.mutate({ conversationId: data.id, content });
+            chatMutation.mutate({ conversationId: data.id, content, useAdvancedReasoning });
           },
         }
       );
@@ -155,7 +156,7 @@ export default function ChatView() {
 
     setIsLoading(true);
     setInput("");
-    chatMutation.mutate({ conversationId: convId, content: content.trim() });
+    chatMutation.mutate({ conversationId: convId, content: content.trim(), useAdvancedReasoning });
   };
 
   const handleDeleteConversation = (id: number) => {
@@ -412,7 +413,7 @@ export default function ChatView() {
                   <div className="rounded-2xl bg-card border shadow-sm px-4 py-3">
                     <div className="flex items-center gap-2 text-muted-foreground">
                       <Loader2 className="h-4 w-4 animate-spin" />
-                      <span className="text-sm">Pensando...</span>
+                      <span className="text-sm">{useAdvancedReasoning ? "Raciocínio avançado em andamento..." : "Pensando..."}</span>
                     </div>
                   </div>
                 </div>
@@ -429,10 +430,26 @@ export default function ChatView() {
                 e.preventDefault();
                 handleSendMessage(input);
               }}
-              className="flex items-end gap-2"
+              className="flex flex-col gap-3"
             >
-              <div className="flex-1 relative">
-                <Textarea
+              <div className="flex items-center gap-2 px-1">
+                <div className="flex items-center gap-2 ml-auto">
+                  <Brain className="h-4 w-4 text-violet-500" />
+                  <label className="text-xs font-medium text-muted-foreground cursor-pointer">
+                    Raciocínio Avançado
+                  </label>
+                  <input
+                    type="checkbox"
+                    checked={useAdvancedReasoning}
+                    onChange={(e) => setUseAdvancedReasoning(e.target.checked)}
+                    disabled={isLoading}
+                    className="w-4 h-4 rounded border-gray-300 text-violet-500 focus:ring-violet-500 cursor-pointer"
+                  />
+                </div>
+              </div>
+              <div className="flex items-end gap-2">
+                <div className="flex-1 relative">
+                  <Textarea
                   ref={textareaRef}
                   value={input}
                   onChange={(e) => setInput(e.target.value)}
@@ -459,6 +476,7 @@ export default function ChatView() {
                   <Send className="h-4 w-4" />
                 )}
               </Button>
+              </div>
             </form>
             <p className="mt-1.5 text-center text-[11px] text-muted-foreground/70">
               DevAI pode cometer erros. Verifique informações importantes.
