@@ -1,4 +1,4 @@
-import { Tool } from "./llm";
+import { Tool } from "./llm.js";
 
 export const tools: Tool[] = [
   {
