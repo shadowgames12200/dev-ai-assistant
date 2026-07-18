@@ -106,7 +106,7 @@ export default function Login() {
             <Button
               variant="outline"
               className="w-full flex items-center justify-center gap-2"
-              onClick={() => handleSocialLogin('microsoft')}
+              onClick={() => handleSocialLogin('azure')}
               disabled={loading}
             >
               <img src="/microsoft-icon.svg" alt="Microsoft" className="h-5 w-5" />
