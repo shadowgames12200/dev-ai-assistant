@@ -113,4 +113,8 @@ temp/
 client/public/__manus__/version.json
 .project-config.json
 .vercel
-.env*
+.env
+.env.local
+.env.development.local
+.env.test.local
+.env.production.local
