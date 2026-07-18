@@ -70,6 +70,9 @@ export default function DashboardLayout({
               <p className="text-xs text-muted-foreground/50 italic mt-2">
                 Criada por: Charles Henrique
               </p>
+              <p className="text-xs text-muted-foreground/50 italic mt-2">
+                Para acesso administrativo, use o login de e-mail/senha com credenciais de administrador.
+              </p>
             </div>
           </div>
           <Login />

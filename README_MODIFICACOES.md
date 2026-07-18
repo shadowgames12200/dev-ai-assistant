@@ -1,197 +1,104 @@
 # Modificações no Projeto DevAI Assistant
 
-Este documento detalha as modificações realizadas no seu projeto DevAI Assistant para atender à sua solicitação de separar o login de administrador do fluxo de login de usuário comum.
+Este documento detalha as modificações realizadas no seu projeto DevAI Assistant para unificar o fluxo de login, remover a integração com Apple e implementar o reconhecimento de administrador via metadados do Supabase.
 
 ## Resumo das Alterações
 
-1.  **Criação de Página de Login de Administrador Dedicada**: Uma nova página (`AdminLogin.tsx`) foi criada para lidar exclusivamente com o login de administradores.
-2.  **Remoção do Login de Administrador da Tela Principal**: Os campos de usuário e senha, juntamente com o botão "Login Admin", foram removidos da tela inicial (`DashboardLayout.tsx`) que os usuários comuns veem.
-3.  **Nova Rota para Login de Administrador**: Uma nova rota (`/admin-login`) foi adicionada ao roteador da aplicação (`App.tsx`) para acessar a página de login de administrador.
-4.  **Indicação de Acesso Administrativo**: Uma pequena nota foi adicionada à tela principal para informar o administrador sobre a nova URL de acesso.
-5.  **Identificação de Problema no Login de Usuário Comum**: Foi identificado que o fluxo de login de usuário comum (`startLogin`) está inoperante devido à falta de configuração de variáveis de ambiente essenciais.
+1.  **Remoção do Login com Apple**: A opção de login com Apple foi removida da interface (`Login.tsx`) e o ícone correspondente (`apple-icon.svg`) foi excluído.
+2.  **Unificação do Fluxo de Login**: A lógica de login de administrador foi integrada ao `Login.tsx`, eliminando a necessidade de uma página `AdminLogin.tsx` separada e sua rota (`/admin-login`). Agora, o `Login.tsx` lida tanto com o login de usuário comum (via Supabase) quanto com o login de administrador (via e-mail/senha).
+3.  **Reconhecimento de Administrador via Supabase Metadados**: O backend (`server/_core/oauth.ts` e `server/db.ts`) foi atualizado para extrair a `role` do usuário dos metadados do Supabase (`user.app_metadata?.role`). Para que um usuário seja reconhecido como administrador, você deve configurar `role: 'admin'` nos metadados do seu usuário no painel do Supabase.
+4.  **Remoção de Credenciais Hardcoded**: As credenciais de administrador hardcoded em `server/routers.ts` foram removidas, garantindo um fluxo de autenticação mais seguro e flexível.
+5.  **Atualização de Variáveis de Ambiente**: O arquivo `.env.example` foi atualizado com placeholders para as variáveis de ambiente essenciais do Supabase, garantindo que o login de usuário comum funcione corretamente.
+6.  **Atualização da Mensagem de Guia**: A mensagem na tela inicial (`DashboardLayout.tsx`) foi ajustada para guiar os administradores a usarem o login de e-mail/senha com suas credenciais de administrador na tela unificada.
 
 ## Arquivos Modificados
 
--   `dev-ai-assistant/client/src/pages/AdminLogin.tsx` (NOVO ARQUIVO)
+-   `dev-ai-assistant/client/src/pages/Login.tsx`
+-   `dev-ai-assistant/client/public/apple-icon.svg` (REMOVIDO)
 -   `dev-ai-assistant/client/src/components/DashboardLayout.tsx`
--   `dev-ai-assistant/client/src/App.tsx`
--   `dev-ai-assistant/client/src/const.ts` (Variáveis de ambiente mencionadas)
+-   `dev-ai-assistant/server/_core/types/manusTypes.ts`
+-   `dev-ai-assistant/server/_core/oauth.ts`
+-   `dev-ai-assistant/server/db.ts`
+-   `dev-ai-assistant/server/routers.ts`
+-   `dev-ai-assistant/.env.example`
 
 ## Detalhes das Modificações
 
-### 1. `dev-ai-assistant/client/src/pages/AdminLogin.tsx`
+### 1. `dev-ai-assistant/client/src/pages/Login.tsx`
 
-Este é um novo componente que contém a lógica e a interface para o login de administrador. Ele utiliza os campos de usuário e senha para autenticar via `/api/trpc/auth.login`.
+-   Removido o botão "Continuar com Apple".
+-   A função `handleSocialLogin` foi atualizada para não incluir 'apple' como provedor.
+-   A lógica de login de administrador e usuário comum foi unificada, com o formulário de e-mail/senha agora tratando ambos os casos.
 
-```typescript
-import { useState } from "react";
-import { Button } from "@/components/ui/button";
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
-import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
-import { toast } from "sonner";
+### 2. `dev-ai-assistant/client/public/apple-icon.svg`
 
-export default function AdminLogin() {
-  const [username, setUsername] = useState("");
-  const [password, setPassword] = useState("");
-  const [loading, setLoading] = useState(false);
+-   O arquivo do ícone da Apple foi removido do projeto.
 
-  const handleAdminLogin = async (e: React.FormEvent) => {
-    e.preventDefault();
-    setLoading(true);
+### 3. `dev-ai-assistant/client/src/components/DashboardLayout.tsx`
 
-    try {
-      const response = await fetch("/api/trpc/auth.login", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ json: { username, password } }),
-      });
+-   A mensagem que guiava para `/admin-login` foi removida e substituída por uma instrução para usar o login de e-mail/senha na tela unificada.
 
-      if (response.ok) {
-        window.location.reload();
-      } else {
-        toast.error("Credenciais inválidas");
-      }
-    } catch (error: any) {
-      toast.error(error.message || "Erro ao conectar ao servidor");
-    } finally {
-      setLoading(false);
-    }
-  };
+### 4. `dev-ai-assistant/server/_core/types/manusTypes.ts`
 
-  return (
-    <div className="flex items-center justify-center min-h-screen bg-background p-4">
-      <Card className="w-full max-w-md">
-        <CardHeader className="space-y-1">
-          <CardTitle className="text-2xl font-bold text-center">Login do Administrador</CardTitle>
-          <CardDescription className="text-center">
-            Acesso restrito para administradores
-          </CardDescription>
-        </CardHeader>
-        <CardContent>
-          <form onSubmit={handleAdminLogin} className="space-y-4">
-            <div className="space-y-2">
-              <Label htmlFor="username">Usuário</Label>
-              <Input
-                id="username"
-                type="text"
-                placeholder="Nome de usuário"
-                value={username}
-                onChange={(e) => setUsername(e.target.value)}
-                required
-              />
-            </div>
-            <div className="space-y-2">
-              <Label htmlFor="password">Senha</Label>
-              <Input
-                id="password"
-                type="password"
-                placeholder="Sua senha"
-                value={password}
-                onChange={(e) => setPassword(e.target.value)}
-                required
-              />
-            </div>
-            <div className="pt-2">
-              <Button type="submit" className="w-full" disabled={loading}>
-                {loading ? "Carregando..." : "Login Admin"}
-              </Button>
-            </div>
-          </form>
-        </CardContent>
-      </Card>
-    </div>
-  );
-}
-```
+-   Adicionada a propriedade `role?: string | null;` à interface `GetUserInfoResponse` e `GetUserInfoWithJwtResponse` para suportar o reconhecimento de função.
 
-### 2. `dev-ai-assistant/client/src/components/DashboardLayout.tsx`
+### 5. `dev-ai-assistant/server/_core/oauth.ts`
 
-Os campos de login de administrador e o botão foram removidos. Uma linha de texto foi adicionada para guiar o administrador para a nova página de login.
+-   A função `registerOAuthRoutes` foi modificada para extrair `user.app_metadata?.role` e passá-lo para a função `db.upsertUser`.
 
-**Trecho Removido:**
+### 6. `dev-ai-assistant/server/db.ts`
 
-```html
-          <div className="w-full space-y-4">
-            <input id="admin-user" type="text" placeholder="Usuário" className="w-full p-2 border rounded bg-background" />
-            <input id="admin-pass" type="password" placeholder="Senha" className="w-full p-2 border rounded bg-background" />
-            <Button onClick={async () => {
-              const u = (document.getElementById("admin-user") as HTMLInputElement).value;
-              const p = (document.getElementById("admin-pass") as HTMLInputElement).value;
-              try {
-                const response = await fetch(\\'/api/trpc/auth.login\\', {
-                  method: \\'POST\\',
-                  headers: { \\'Content-Type\\': \\'application/json\\'}, 
-                  body: JSON.stringify({ json: { username: u, password: p } })
-                });
-                if (response.ok) {
-                  window.location.reload();
-                } else {
-                  alert(\\'Credenciais inválidas\\');
-                }
-              } catch(e) {
-                alert(\\'Erro ao conectar ao servidor\\');
-              } 
-            }} className="w-full bg-secondary">Login Admin</Button>
-          </div>
-          <div className="relative w-full text-center py-2 text-xs text-muted-foreground">ou</div>
-```
+-   A função `upsertUser` foi atualizada para aceitar e persistir a propriedade `role` do usuário. Se `user.role` não for definido, mas o `openId` do usuário corresponder ao `ENV.ownerOpenId`, a `role` será definida como 'admin'. Caso contrário, o padrão é 'user'.
 
-**Trecho Adicionado (para guiar o administrador):**
+### 7. `dev-ai-assistant/server/routers.ts`
 
-```html
-              <p className="text-xs text-muted-foreground/50 italic mt-2">
-                Para acesso administrativo, visite <a href="/admin-login" class="text-blue-400 hover:underline">/admin-login</a>
-              </p>
-```
+-   A lógica de login de administrador hardcoded na rota `auth.login` foi removida. Agora, este endpoint retornará um erro `FORBIDDEN`, pois o login de administrador será tratado via Supabase e verificação de `role`.
 
-### 3. `dev-ai-assistant/client/src/App.tsx`
+### 8. `dev-ai-assistant/.env.example`
 
-A importação do novo componente `AdminLogin` e a rota correspondente foram adicionadas.
+-   Atualizado com placeholders para `VITE_SUPABASE_URL`, `VITE_SUPABASE_ANON_KEY` e `VITE_OAUTH_PORTAL_URL`, e `VITE_APP_ID` para garantir que o login de usuário comum funcione corretamente após a configuração.
 
-**Importação Adicionada:**
-
-```typescript
-import AdminLogin from "./pages/AdminLogin";
-```
-
-**Rota Adicionada:**
-
-```typescript
-      <Route path={"/admin-login"} component={AdminLogin} />
-```
-
-## Próximos Passos e Correção Crítica
+## Próximos Passos e Configuração Essencial
 
 ### 1. Configuração das Variáveis de Ambiente (CRÍTICO)
 
-O fluxo de login de usuário comum está atualmente inoperante devido à falta das variáveis de ambiente `VITE_OAUTH_PORTAL_URL` e `VITE_APP_ID`. Para corrigir isso, você **precisa** criar um arquivo `.env` na raiz do seu projeto (ou onde o Vite espera encontrar as variáveis de ambiente) e adicionar as seguintes linhas, substituindo os valores pelos corretos do seu provedor OAuth (provavelmente Supabase):
+Para que o fluxo de login de usuário comum e o reconhecimento de administrador funcionem, você **precisa** criar um arquivo `.env` na raiz do seu projeto (ou onde o Vite espera encontrar as variáveis de ambiente) e adicionar as seguintes linhas, substituindo os valores pelos corretos do seu provedor Supabase:
 
 ```
+VITE_SUPABASE_URL="https://<SEU_DOMINIO_SUPABASE>.supabase.co"
+VITE_SUPABASE_ANON_KEY="<SUA_CHAVE_ANON_SUPABASE>"
 VITE_OAUTH_PORTAL_URL="https://<SEU_DOMINIO_SUPABASE>.supabase.co/auth/v1"
 VITE_APP_ID="<SEU_APP_ID_SUPABASE>"
 ```
 
--   **`VITE_OAUTH_PORTAL_URL`**: Esta é a URL base do seu provedor de autenticação OAuth. Para Supabase, geralmente segue o formato `https://<project-ref>.supabase.co/auth/v1`.
--   **`VITE_APP_ID`**: Este é o ID da sua aplicação, conforme configurado no seu provedor OAuth.
+-   **`VITE_SUPABASE_URL`**: A URL do seu projeto Supabase.
+-   **`VITE_SUPABASE_ANON_KEY`**: A chave `anon` do seu projeto Supabase.
+-   **`VITE_OAUTH_PORTAL_URL`**: A URL base do seu provedor de autenticação OAuth do Supabase.
+-   **`VITE_APP_ID`**: O ID da sua aplicação, conforme configurado no seu provedor OAuth.
 
-**Sem essas configurações, o botão "Entrar" para usuários comuns não funcionará.**
+**Sem essas configurações, o login de usuário comum não funcionará.**
 
-### 2. Teste das Alterações
+### 2. Configuração de Administrador no Supabase
 
-Após configurar as variáveis de ambiente e reconstruir o projeto:
+Para que seu usuário seja reconhecido como administrador, siga estes passos no painel do Supabase:
 
--   Acesse a URL principal do seu site (`/`). Você deverá ver apenas o botão "Entrar" e a mensagem com o link para o login de administrador.
--   Clique em "Entrar" (após configurar as variáveis de ambiente) para testar o fluxo de login de usuário comum.
--   Acesse a rota `/admin-login` diretamente no navegador para verificar a nova página de login de administrador.
--   Tente fazer login como administrador usando suas credenciais.
+1.  Vá para a seção **Authentication** -> **Users**.
+2.  Encontre seu usuário na lista.
+3.  Clique no usuário para editar seus detalhes.
+4.  Na seção **App Metadata**, adicione ou edite o campo `role` com o valor `admin`. Por exemplo:
 
-## Como Aplicar as Mudanças
+    ```json
+    {
+      "role": "admin"
+    }
+    ```
 
-1.  **Crie o arquivo `AdminLogin.tsx`** no caminho `dev-ai-assistant/client/src/pages/AdminLogin.tsx` com o conteúdo fornecido acima.
-2.  **Edite `dev-ai-assistant/client/src/components/DashboardLayout.tsx`** para remover o trecho de código do login de administrador e adicionar a mensagem de guia, conforme detalhado.
-3.  **Edite `dev-ai-assistant/client/src/App.tsx`** para adicionar a importação e a rota para `AdminLogin`.
-4.  **Crie ou atualize seu arquivo `.env`** na raiz do projeto com as variáveis `VITE_OAUTH_PORTAL_URL` e `VITE_APP_ID`.
-5.  **Reconstrua e redeploy** seu projeto para que as alterações entrem em vigor.
+### 3. Teste das Alterações
+
+Após configurar as variáveis de ambiente e o metadado de administrador no Supabase, e reconstruir/redeploy o projeto:
+
+-   Acesse a URL principal do seu site (`/`). Você deverá ver as opções de login com Google, Microsoft e o formulário de e-mail/senha.
+-   Tente fazer login com sua conta de administrador (com o metadado `role: 'admin'` configurado no Supabase). Você deverá ser reconhecido como administrador.
+-   Tente fazer login com uma conta de usuário comum. Você deverá ser reconhecido como usuário.
 
 Se precisar de ajuda para encontrar os valores das variáveis de ambiente ou para aplicar as mudanças, por favor, me avise.

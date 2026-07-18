@@ -40,11 +40,13 @@ export async function upsertUser(user: InsertUser): Promise<void> {
     if (user.email !== undefined) values.email = user.email;
     if (user.loginMethod !== undefined) values.loginMethod = user.loginMethod;
     if (user.lastSignedIn !== undefined) values.lastSignedIn = user.lastSignedIn;
-    
+    // Definir a role: se user.role existir, usa-o; caso contrário, verifica se é o owner.
     if (user.role !== undefined) {
       values.role = user.role;
     } else if (user.openId === ENV.ownerOpenId) {
       values.role = 'admin';
+    } else {
+      values.role = 'user'; // Default para 'user' se não for admin e não tiver role definida
     }
 
     if (!values.lastSignedIn) {

@@ -27,13 +27,8 @@ export const appRouter = router({
     login: publicProcedure
       .input(z.object({ username: z.string(), password: z.string() }))
       .mutation(async ({ ctx, input }) => {
-        if (input.username === "charles12200" && input.password === "963850") {
-          const cookieOptions = getSessionCookieOptions(ctx.req);
-          // Simular um token de sessão para o Charles
-          ctx.res.cookie(COOKIE_NAME, "admin-session-charles", { ...cookieOptions, maxAge: ONE_YEAR_MS });
-          return { success: true };
-        }
-        throw new TRPCError({ code: "UNAUTHORIZED", message: "Credenciais inválidas" });
+        // A lógica de login de administrador será tratada no frontend via Supabase e verificada no contexto do usuário.
+        throw new TRPCError({ code: "FORBIDDEN", message: "Este endpoint é apenas para login de administrador hardcoded, que foi removido." });
       }),
     me: publicProcedure.query(opts => opts.ctx.user),
     logout: publicProcedure.mutation(({ ctx }) => {

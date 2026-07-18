@@ -19,7 +19,7 @@ export default function Login() {
     setLoading(true);
 
     try {
-      // Tentar login como administrador primeiro
+      // A lógica de login de administrador foi unificada aqui. Não há mais um AdminLogin.tsx separado.
       const adminResponse = await fetch("/api/trpc/auth.login", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -30,11 +30,12 @@ export default function Login() {
         toast.success("Login de administrador realizado com sucesso!");
         window.location.reload();
         return;
-      } else if (adminResponse.status !== 401) {
-        throw new Error("Erro ao conectar ao servidor de administração");
+      } else if (adminResponse.status !== 401 && adminResponse.status !== 400) {
+        // Se não for 401 (não autorizado) ou 400 (bad request), é um erro inesperado do servidor
+        throw new Error("Erro inesperado ao tentar login de administrador");
       }
 
-      // Se não for admin ou admin login falhou (401), tentar login de usuário comum via Supabase
+      // Se o login de administrador falhou (401) ou foi um Bad Request (400), tentar login de usuário comum via Supabase
       const { data, error } = await supabase.auth.signInWithPassword({
         email,
         password,
@@ -65,7 +66,7 @@ export default function Login() {
     }
   };
 
-  const handleSocialLogin = async (provider: 'google' | 'microsoft' | 'apple') => {
+  const handleSocialLogin = async (provider: 'google' | 'microsoft') => {
     setLoading(true);
     try {
       const { error } = await supabase.auth.signInWithOAuth({
@@ -111,19 +112,11 @@ export default function Login() {
               <img src="/microsoft-icon.svg" alt="Microsoft" className="h-5 w-5" />
               Continuar com Microsoft
             </Button>
-            <Button
-              variant="outline"
-              className="w-full flex items-center justify-center gap-2"
-              onClick={() => handleSocialLogin('apple')}
-              disabled={loading}
-            >
-              <img src="/apple-icon.svg" alt="Apple" className="h-5 w-5" />
-              Continuar com Apple
-            </Button>
+
           </div>
 
           <div className="relative flex justify-center text-xs uppercase mb-6">
-            <span className="bg-card px-2 text-muted-foreground">Ou</span>
+            <span className="bg-card px-2 text-muted-foreground">Ou faça login com e-mail e senha</span>
           </div>
 
           <form onSubmit={handleLogin} className="space-y-4">

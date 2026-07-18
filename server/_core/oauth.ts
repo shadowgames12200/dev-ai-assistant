@@ -32,6 +32,7 @@ export function registerOAuthRoutes(app: Express) {
         name: user.user_metadata?.full_name || user.email?.split('@')[0] || "Usuário",
         email: user.email ?? null,
         loginMethod: user.app_metadata?.provider || "email",
+        role: (user.app_metadata?.role === 'admin' || user.app_metadata?.role === 'user') ? user.app_metadata.role : undefined,
         lastSignedIn: new Date(),
       });
 
