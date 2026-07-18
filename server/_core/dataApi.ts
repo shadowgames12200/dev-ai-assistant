@@ -52,12 +52,12 @@ export async function callDataApi(
     );
   }
 
-  const payload = await responseon().catch(() => ({}));
+  const payload = await response.json().catch(() => ({}));
   if (payload && typeof payload === "object" && "jsonData" in payload) {
     try {
-      return JSON.parse((payload as Record<string, string>)onData ?? "{}");
+      return JSON.parse((payload as Record<string, string>).jsonData ?? "{}");
     } catch {
-      return (payload as Record<string, unknown>)onData;
+      return (payload as Record<string, unknown>).jsonData;
     }
   }
   return payload;

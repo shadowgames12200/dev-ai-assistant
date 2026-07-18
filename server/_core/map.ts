@@ -86,7 +86,7 @@ export async function makeRequest<T = unknown>(
     );
   }
 
-  return (await responseon()) as T;
+  return (await response.json()) as T;
 }
 
 // ============================================================================

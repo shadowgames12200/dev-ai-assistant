@@ -55,7 +55,7 @@ export const toolHandlers: Record<string, (args: any) => Promise<string>> = {
       });
 
       if (!response.ok) throw new Error("Falha na busca web");
-      const data = await responseon();
+      const data = await response.json();
       
       // Formatar os resultados para a IA
       if (data.results && data.results.length > 0) {
@@ -83,7 +83,7 @@ export const toolHandlers: Record<string, (args: any) => Promise<string>> = {
       });
 
       if (!response.ok) throw new Error("Falha na execução de código");
-      const data = await responseon();
+      const data = await response.json();
       
       return `Saída do código:\n${data.stdout || ""}\n${data.stderr ? "Erros:\n" + data.stderr : ""}`;
     } catch (error) {

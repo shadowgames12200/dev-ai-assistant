@@ -2,7 +2,7 @@ import { eq, desc } from "drizzle-orm";
 import { drizzle } from "drizzle-orm/neon-http";
 import { neon } from "@neondatabase/serverless";
 import { InsertUser, users, conversations, messages, InsertConversation, InsertMessage } from "../drizzle/schema.js";
-import { ENV } from './_core/env';
+import { ENV } from './_core/env.js';
 
 let _db: ReturnType<typeof drizzle> | null = null;
 

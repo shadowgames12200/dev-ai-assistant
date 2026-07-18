@@ -96,7 +96,7 @@ const callForge = async <T>(
     const detail = await response.text().catch(() => "");
     throw mapForgeError(response, detail, rpc);
   }
-  return (await responseon()) as T;
+  return (await response.json()) as T;
 };
 
 const mapForgeError = (

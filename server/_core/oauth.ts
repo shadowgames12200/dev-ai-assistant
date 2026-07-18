@@ -1,4 +1,4 @@
-import { COOKIE_NAME, ONE_YEAR_MS, OAUTH_STATE_COOKIE, decodeOAuthState } from "@shared/const";
+import { COOKIE_NAME, ONE_YEAR_MS, OAUTH_STATE_COOKIE, decodeOAuthState } from "../../shared/const.js";
 import { parse as parseCookieHeader } from "cookie";
 import type { Express, Request, Response } from "express";
 import * as db from "../db.js";
@@ -16,7 +16,7 @@ export function registerOAuthRoutes(app: Express) {
     const state = getQueryParam(req, "state");
 
     if (!code || !state) {
-      res.status(400)on({ error: "code and state are required" });
+      res.status(400).json({ error: "code and state are required" });
       return;
     }
 
@@ -26,7 +26,7 @@ export function registerOAuthRoutes(app: Express) {
     const { nonce } = decodeOAuthState(state);
     const expectedNonce = parseCookieHeader(req.headers.cookie ?? "")[OAUTH_STATE_COOKIE];
     if (!nonce || nonce !== expectedNonce) {
-      res.status(403)on({ error: "invalid oauth state" });
+      res.status(403).json({ error: "invalid oauth state" });
       return;
     }
     res.clearCookie(OAUTH_STATE_COOKIE, { path: "/", secure: true, sameSite: "none" });
@@ -36,7 +36,7 @@ export function registerOAuthRoutes(app: Express) {
       const userInfo = await sdk.getUserInfo(tokenResponse.accessToken);
 
       if (!userInfo.openId) {
-        res.status(400)on({ error: "openId missing from user info" });
+        res.status(400).json({ error: "openId missing from user info" });
         return;
       }
 
@@ -59,7 +59,7 @@ export function registerOAuthRoutes(app: Express) {
       res.redirect(302, "/");
     } catch (error) {
       console.error("[OAuth] Callback failed", error);
-      res.status(500)on({ error: "OAuth callback failed" });
+      res.status(500).json({ error: "OAuth callback failed" });
     }
   });
 }

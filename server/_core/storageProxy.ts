@@ -32,7 +32,7 @@ export function registerStorageProxy(app: Express) {
         return;
       }
 
-      const { url } = (await forgeRespon()) as { url: string };
+      const { url } = (await forgeResp.json()) as { url: string };
       if (!url) {
         res.status(502).send("Empty signed URL from backend");
         return;

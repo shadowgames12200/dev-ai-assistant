@@ -86,7 +86,7 @@ export async function generateImage(
     );
   }
 
-  const result = (await responseon()) as {
+  const result = (await response.json()) as {
     image: {
       b64Json: string;
       mimeType: string;
@@ -155,6 +155,6 @@ export async function listImageModels(): Promise<ListImageModelsResponse> {
     );
   }
 
-  const result = (await responseon()) as { models?: ImageModelInfo[] };
+  const result = (await response.json()) as { models?: ImageModelInfo[] };
   return { models: result.models ?? [] };
 }
