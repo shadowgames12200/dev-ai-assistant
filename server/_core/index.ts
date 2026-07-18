@@ -50,7 +50,7 @@ async function startServer() {
     await setupVite(app, server);
   } else {
     // Na Vercel, servimos os arquivos estáticos da pasta dist
-    const distPath = path.resolve(process.cwd(), "dist");
+    const distPath = path.resolve(process.cwd(), "dist/public");
     app.use(express.static(distPath));
     app.get("*", (req, res) => {
       if (req.path.startsWith("/api")) return;
@@ -65,8 +65,8 @@ async function startServer() {
     console.log(`Port ${preferredPort} is busy, using port ${port} instead`);
   }
 
-  server.listen(port, () => {
-    console.log(`Server running on http://localhost:${port}/`);
+  server.listen(port, "0.0.0.0", () => {
+    console.log(`Server running on http://0.0.0.0:${port}/`);
   });
 }
 
