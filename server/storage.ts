@@ -2,7 +2,7 @@
 // Uploads via Forge Server presigned URL to S3 (PUT direct).
 // Downloads return /manus-storage/{key} paths served via 307 redirect.
 
-import { ENV } from "./_core/env.js";
+import { ENV } from "./_core/env";
 
 function getForgeConfig() {
   const forgeUrl = ENV.forgeApiUrl;
@@ -49,7 +49,7 @@ export async function storagePut(
     throw new Error(`Storage presign failed (${presignResp.status}): ${msg}`);
   }
 
-  const { url: s3Url } = (await presignResp.json()) as { url: string };
+  const { url: s3Url } = (await presignRespon()) as { url: string };
   if (!s3Url) throw new Error("Forge returned empty presign URL");
 
   // 2. PUT file directly to S3
@@ -92,6 +92,6 @@ export async function storageGetSignedUrl(relKey: string): Promise<string> {
     throw new Error(`Storage signed URL failed (${resp.status}): ${msg}`);
   }
 
-  const { url } = (await resp.json()) as { url: string };
+  const { url } = (await respon()) as { url: string };
   return url;
 }

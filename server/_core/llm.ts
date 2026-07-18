@@ -1,4 +1,4 @@
-import { ENV } from "./env.js";
+import { ENV } from "./env";
 
 export type Role = "system" | "user" | "assistant" | "tool" | "function";
 
@@ -244,7 +244,7 @@ const normalizeResponseFormat = ({
   if (explicitFormat) {
     if (
       explicitFormat.type === "json_schema" &&
-      !explicitFormat.json_schema?.schema
+      !explicitFormaton_schema?.schema
     ) {
       throw new Error(
         "responseFormat json_schema requires a defined schema object"
@@ -419,7 +419,7 @@ export async function invokeLLM(params: InvokeParams): Promise<InvokeResult> {
     );
   }
 
-  return (await response.json()) as InvokeResult;
+  return (await responseon()) as InvokeResult;
 }
 
 export type ModelInfo = {
@@ -453,5 +453,5 @@ export async function listLLMModels(): Promise<ModelsResponse> {
     );
   }
 
-  return (await response.json()) as ModelsResponse;
+  return (await responseon()) as ModelsResponse;
 }

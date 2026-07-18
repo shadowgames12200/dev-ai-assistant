@@ -7,7 +7,7 @@
  * See API examples below the type definitions for usage patterns.
  */
 
-import { ENV } from "./env.js";
+import { ENV } from "./env";
 
 // ============================================================================
 // Configuration
@@ -86,7 +86,7 @@ export async function makeRequest<T = unknown>(
     );
   }
 
-  return (await response.json()) as T;
+  return (await responseon()) as T;
 }
 
 // ============================================================================

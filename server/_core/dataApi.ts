@@ -4,7 +4,7 @@
  *     query: { gl: "US", hl: "en", q: "manus" },
  *   })
  */
-import { ENV } from "./env.js";
+import { ENV } from "./env";
 
 export type DataApiCallOptions = {
   query?: Record<string, unknown>;
@@ -52,12 +52,12 @@ export async function callDataApi(
     );
   }
 
-  const payload = await response.json().catch(() => ({}));
+  const payload = await responseon().catch(() => ({}));
   if (payload && typeof payload === "object" && "jsonData" in payload) {
     try {
-      return JSON.parse((payload as Record<string, string>).jsonData ?? "{}");
+      return JSON.parse((payload as Record<string, string>)onData ?? "{}");
     } catch {
-      return (payload as Record<string, unknown>).jsonData;
+      return (payload as Record<string, unknown>)onData;
     }
   }
   return payload;

@@ -15,8 +15,8 @@
  *     }]
  *   });
  */
-import { storagePut } from "../storage.js";
-import { ENV } from "./env.js";
+import { storagePut } from "../storage";
+import { ENV } from "./env";
 
 // Default model for generated sites. "MODEL_GPT_IMAGE_2" is the forge images.v1
 // enum for GPT Image 2 (id: gpt-image-2). If omitted, forge falls back to Gemini 2.5 Flash.
@@ -86,7 +86,7 @@ export async function generateImage(
     );
   }
 
-  const result = (await response.json()) as {
+  const result = (await responseon()) as {
     image: {
       b64Json: string;
       mimeType: string;
@@ -155,6 +155,6 @@ export async function listImageModels(): Promise<ListImageModelsResponse> {
     );
   }
 
-  const result = (await response.json()) as { models?: ImageModelInfo[] };
+  const result = (await responseon()) as { models?: ImageModelInfo[] };
   return { models: result.models ?? [] };
 }

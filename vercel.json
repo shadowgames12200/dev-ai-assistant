@@ -5,17 +5,7 @@
   "installCommand": "pnpm install",
   "framework": null,
   "rewrites": [
-    {
-      "source": "/api/trpc/(.*)",
-      "destination": "/api/main.js"
-    },
-    {
-      "source": "/api/(.*)",
-      "destination": "/api/main.js"
-    },
-    {
-      "source": "/(.*)",
-      "destination": "/index.html"
-    }
+    { "source": "/api/(.*)", "destination": "/api/index.ts" },
+    { "source": "/(.*)", "destination": "/index.html" }
   ]
 }

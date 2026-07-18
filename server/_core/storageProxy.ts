@@ -1,5 +1,5 @@
 import type { Express } from "express";
-import { ENV } from "./env.js";
+import { ENV } from "./env";
 
 export function registerStorageProxy(app: Express) {
   app.get("/manus-storage/*", async (req, res) => {
@@ -32,7 +32,7 @@ export function registerStorageProxy(app: Express) {
         return;
       }
 
-      const { url } = (await forgeResp.json()) as { url: string };
+      const { url } = (await forgeRespon()) as { url: string };
       if (!url) {
         res.status(502).send("Empty signed URL from backend");
         return;

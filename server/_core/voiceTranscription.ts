@@ -25,7 +25,7 @@
  * });
  * ```
  */
-import { ENV } from "./env.js";
+import { ENV } from "./env";
 
 export type TranscribeOptions = {
   audioUrl: string; // URL to the audio file (e.g., S3 URL)
@@ -171,7 +171,7 @@ export async function transcribeAudio(
     }
 
     // Step 5: Parse and return the transcription result
-    const whisperResponse = await response.json() as WhisperResponse;
+    const whisperResponse = await responseon() as WhisperResponse;
     
     // Validate response structure
     if (!whisperResponse.text || typeof whisperResponse.text !== 'string') {
@@ -246,7 +246,7 @@ function getLanguageName(langCode: string): string {
  * 
  * ```ts
  * // In server/routers.ts
- * import { transcribeAudio } from "./_core/voiceTranscription.js";
+ * import { transcribeAudio } from "./_core/voiceTranscription";
  * 
  * export const voiceRouter = router({
  *   transcribe: protectedProcedure

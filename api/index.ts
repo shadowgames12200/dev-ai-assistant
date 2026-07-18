@@ -1,10 +1,10 @@
 import { createExpressMiddleware } from '@trpc/server/adapters/express';
 import express from 'express';
 import path from 'path';
-import { appRouter } from '../dist/server/routers.js';
-import { createContext } from '../dist/server/_core/context.js';
+import { appRouter } from '../dist/server/routers';
+import { createContext } from '../dist/server/_core/context';
 const app = express();
-app.use(express.json());
+app.use(expresson());
 // tRPC API
 app.use(
   '/api/trpc',

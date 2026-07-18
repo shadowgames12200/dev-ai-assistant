@@ -1,5 +1,5 @@
 import { TRPCError } from "@trpc/server";
-import { ENV } from "./env.js";
+import { ENV } from "./env";
 
 export type HeartbeatJob = {
   name: string;
@@ -96,7 +96,7 @@ const callForge = async <T>(
     const detail = await response.text().catch(() => "");
     throw mapForgeError(response, detail, rpc);
   }
-  return (await response.json()) as T;
+  return (await responseon()) as T;
 };
 
 const mapForgeError = (
