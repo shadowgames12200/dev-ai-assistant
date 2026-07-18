@@ -48,7 +48,13 @@ async function startServer() {
   if (process.env.NODE_ENV === "development") {
     await setupVite(app, server);
   } else {
-    serveStatic(app);
+    // Na Vercel, servimos os arquivos estáticos da pasta dist
+    const distPath = path.resolve(process.cwd(), "dist");
+    app.use(express.static(distPath));
+    app.get("*", (req, res) => {
+      if (req.path.startsWith("/api")) return;
+      res.sendFile(path.join(distPath, "index.html"));
+    });
   }
 
   const preferredPort = parseInt(process.env.PORT || "3000");
