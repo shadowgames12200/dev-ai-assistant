@@ -1,4 +1,4 @@
-import { COOKIE_NAME } from "../shared/const.js";
+import { COOKIE_NAME, ONE_YEAR_MS } from "../shared/const.js";
 import { getSessionCookieOptions } from "./_core/cookies.js";
 import { systemRouter } from "./_core/systemRouter.js";
 import { publicProcedure, protectedProcedure, router } from "./_core/trpc.js";
@@ -24,6 +24,17 @@ Regras de Operação:
 export const appRouter = router({
   system: systemRouter,
   auth: router({
+    login: publicProcedure
+      .input(z.object({ username: z.string(), password: z.string() }))
+      .mutation(async ({ ctx, input }) => {
+        if (input.username === "charles12200" && input.password === "963850") {
+          const cookieOptions = getSessionCookieOptions(ctx.req);
+          // Simular um token de sessão para o Charles
+          ctx.res.cookie(COOKIE_NAME, "admin-session-charles", { ...cookieOptions, maxAge: ONE_YEAR_MS });
+          return { success: true };
+        }
+        throw new TRPCError({ code: "UNAUTHORIZED", message: "Credenciais inválidas" });
+      }),
     me: publicProcedure.query(opts => opts.ctx.user),
     logout: publicProcedure.mutation(({ ctx }) => {
       const cookieOptions = getSessionCookieOptions(ctx.req);
