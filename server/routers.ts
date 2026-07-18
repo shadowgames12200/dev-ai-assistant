@@ -138,7 +138,7 @@ export const appRouter = router({
 
           while (iterations < MAX_ITERATIONS) {
             const response = await invokeLLM({
-              model: useAdvancedReasoning ? "deepseek-reasoner" : "gpt-5-mini",
+              model: useAdvancedReasoning ? "llama-3.3-70b-versatile" : "llama-3.3-70b-versatile",
               messages: currentMessages,
               tools: tools,
               maxTokens: 4000,
