@@ -7,7 +7,7 @@
     "dev": "NODE_ENV=development tsx watch server/_core/index.ts",
     "build": "vite build && tsc -p tsconfig.server.json",
     "vercel-build": "vite build && tsc -p tsconfig.server.json --noEmit false || true",
-    "start": "node dist/server/index.js",
+    "start": "node dist/server/_core/index.js",
     "check": "tsc --noEmit",
     "format": "prettier --write .",
     "test": "vitest run",
