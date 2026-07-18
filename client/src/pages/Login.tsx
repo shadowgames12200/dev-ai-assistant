@@ -12,13 +12,7 @@ export default function Login() {
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [loading, setLoading] = useState(false);
-  const [turnstileToken, setTurnstileToken] = useState<string | null>(null);
   const [, setLocation] = useLocation();
-
-  // Função de callback para o Cloudflare Turnstile
-  (window as any).javascriptCallback = (token: string) => {
-    setTurnstileToken(token);
-  };
 
   const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -29,7 +23,7 @@ export default function Login() {
       const adminResponse = await fetch("/api/trpc/auth.login", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ json: { username: email, password: password, turnstileToken } }),
+        body: JSON.stringify({ json: { username: email, password: password } }),
       });
 
       if (adminResponse.ok) {
@@ -44,9 +38,6 @@ export default function Login() {
       const { data, error } = await supabase.auth.signInWithPassword({
         email,
         password,
-        options: {
-          captchaToken: turnstileToken || undefined,
-        },
       });
 
       if (error) throw error;
@@ -159,9 +150,7 @@ export default function Login() {
               />
             </div>
             
-            <div className="mt-4">
-              <div className="cf-turnstile" data-sitekey={import.meta.env.VITE_CLOUDFLARE_TURNSTILE_SITE_KEY} data-callback="javascriptCallback"></div>
-            </div>
+
 
             <div className="pt-4">
               <Button type="submit" className="w-full" disabled={loading}>
