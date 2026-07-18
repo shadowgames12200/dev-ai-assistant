@@ -66,6 +66,9 @@ export default function DashboardLayout({
               <p className="text-sm text-muted-foreground max-w-sm">
                 Seu assistente inteligente de programação e produtividade. Faça login para começar.
               </p>
+              <p className="text-xs text-muted-foreground/50 italic mt-2">
+                Criada por: Charles Henrique
+              </p>
             </div>
           </div>
           <Button
@@ -214,6 +217,9 @@ function DashboardLayoutContent({
                     </p>
                     <p className="text-xs text-muted-foreground truncate mt-1.5">
                       {user?.email || "-"}
+                    </p>
+                    <p className="text-[10px] text-muted-foreground/60 mt-2 italic">
+                      Criada por: Charles Henrique
                     </p>
                   </div>
                 </button>
