@@ -19,7 +19,8 @@ import {
   SidebarTrigger,
   useSidebar,
 } from "@/components/ui/sidebar";
-import { startLogin } from "@/const";
+
+import Login from "@/pages/Login";
 import { useIsMobile } from "@/hooks/useMobile";
 import { LayoutDashboard, LogOut, PanelLeft, Sparkles } from "lucide-react";
 import { CSSProperties, useEffect, useRef, useState } from "react";
@@ -71,37 +72,7 @@ export default function DashboardLayout({
               </p>
             </div>
           </div>
-          <div className="w-full space-y-4">
-            <input id="admin-user" type="text" placeholder="Usuário" className="w-full p-2 border rounded bg-background" />
-            <input id="admin-pass" type="password" placeholder="Senha" className="w-full p-2 border rounded bg-background" />
-            <Button onClick={async () => {
-              const u = (document.getElementById("admin-user") as HTMLInputElement).value;
-              const p = (document.getElementById("admin-pass") as HTMLInputElement).value;
-              try {
-                const response = await fetch('/api/trpc/auth.login', {
-                  method: 'POST',
-                  headers: { 'Content-Type': 'application/json' },
-                  body: JSON.stringify({ json: { username: u, password: p } })
-                });
-                if (response.ok) {
-                  window.location.reload();
-                } else {
-                  alert('Credenciais inválidas');
-                }
-              } catch(e) {
-                alert('Erro ao conectar ao servidor');
-              } 
-            }} className="w-full bg-secondary">Login Admin</Button>
-          </div>
-          <div className="relative w-full text-center py-2 text-xs text-muted-foreground">ou</div>
-          <Button
-            onClick={() => startLogin()}
-            size="lg"
-            className="w-full shadow-lg hover:shadow-xl transition-all bg-gradient-to-r from-violet-600 to-indigo-600 hover:from-violet-500 hover:to-indigo-500"
-          >
-            <Sparkles className="mr-2 h-4 w-4" />
-            Entrar
-          </Button>
+          <Login />
         </div>
       </div>
     );
