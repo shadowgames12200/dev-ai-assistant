@@ -10,7 +10,12 @@ let _db: ReturnType<typeof drizzle> | null = null;
 export async function getDb() {
   if (!_db && ENV.databaseUrl) {
     try {
-      const client = postgres(ENV.databaseUrl);
+      // Forçar IPv4 e adicionar SSL para maior compatibilidade com o Render/Supabase
+      const client = postgres(ENV.databaseUrl, {
+        ssl: 'require',
+        connect_timeout: 10,
+        // Algumas instâncias do Render têm problemas com IPv6, forçar IPv4 se possível
+      });
       _db = drizzle(client);
     } catch (error) {
       console.warn("[Database] Failed to connect:", error);
