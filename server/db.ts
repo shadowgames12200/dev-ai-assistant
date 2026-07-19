@@ -268,11 +268,11 @@ export async function getConversationMessages(conversationId: number) {
   }
 }
 
-export async function addMessage(conversationId: number, role: string, content: string) {
+export async function addMessage(conversationId: number, role: string, content: string, fileUrl?: string, fileName?: string) {
   const db = await getDb();
   if (!db) {
     const id = memoryMsgIdCounter++;
-    const msg = { id, conversationId, role, content, createdAt: new Date() };
+    const msg = { id, conversationId, role, content, fileUrl, fileName, createdAt: new Date() };
     if (!memoryMessages.has(conversationId)) {
       memoryMessages.set(conversationId, []);
     }
@@ -284,7 +284,7 @@ export async function addMessage(conversationId: number, role: string, content: 
   }
 
   try {
-    const result = await db.insert(messages).values({ conversationId, role, content }).returning({ id: messages.id });
+    const result = await db.insert(messages).values({ conversationId, role, content, fileUrl, fileName }).returning({ id: messages.id });
     // Update conversation timestamp
     const conv = memoryConversations.get(conversationId);
     if (conv) conv.updatedAt = new Date();
@@ -292,7 +292,7 @@ export async function addMessage(conversationId: number, role: string, content: 
   } catch (error) {
     console.warn("[Database] Failed to add message, using memory fallback");
     const id = memoryMsgIdCounter++;
-    const msg = { id, conversationId, role, content, createdAt: new Date() };
+    const msg = { id, conversationId, role, content, fileUrl, fileName, createdAt: new Date() };
     if (!memoryMessages.has(conversationId)) {
       memoryMessages.set(conversationId, []);
     }

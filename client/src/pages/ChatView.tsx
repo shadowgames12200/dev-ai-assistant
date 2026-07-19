@@ -19,15 +19,20 @@ import {
   Code2,
   Zap,
   Brain,
+  Paperclip,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { toast } from "sonner";
 
 type DbMessage = {
+  fileUrl?: string;
+  fileName?: string;
   id: number;
   conversationId: number;
   role: string;
   content: string;
+  fileUrl?: string;
+  fileName?: string;
   createdAt: Date;
 };
 
@@ -54,7 +59,9 @@ export default function ChatView() {
   const [editingId, setEditingId] = useState<number | null>(null);
   const [editingTitle, setEditingTitle] = useState("");
   const [useAdvancedReasoning, setUseAdvancedReasoning] = useState(false);
-  const textareaRef = useRef<HTMLTextAreaElement>(null);
+  const [selectedFile, setSelectedFile] = useState<File | null>(null);
+    const textareaRef = useRef<HTMLTextAreaElement>(null);
+    const fileInputRef = useRef<HTMLInputElement>(null);
   const scrollAreaRef = useRef<HTMLDivElement>(null);
 
   const queryClient = useQueryClient();
@@ -157,6 +164,59 @@ export default function ChatView() {
     setIsLoading(true);
     setInput("");
     chatMutation.mutate({ conversationId: convId, content: content.trim(), useAdvancedReasoning });
+  };
+
+  const uploadFileMutation = trpc.upload.uploadFile.useMutation({
+    onSuccess: (data) => {
+      setMessages(data.messages);
+      setIsLoading(false);
+      setSelectedFile(null);
+      queryClient.invalidateQueries({ queryKey: ["conversations", "list"] });
+    },
+    onError: (error) => {
+      toast.error("Erro ao fazer upload do arquivo. Tente novamente.");
+      setIsLoading(false);
+      setSelectedFile(null);
+    },
+  });
+
+  const handleFileChange = (event: React.ChangeEvent<HTMLInputElement>) => {
+    const file = event.target.files?.[0];
+    if (file) {
+      setSelectedFile(file);
+      setInput(""); // Clear text input when file is selected
+    }
+  };
+
+  const handleFileUpload = async () => {
+    if (!selectedFile || isLoading || !activeConversationId) return;
+
+    setIsLoading(true);
+    const reader = new FileReader();
+    reader.readAsDataURL(selectedFile);
+    reader.onload = () => {
+      const base64Content = (reader.result as string).split(",")[1];
+      uploadFileMutation.mutate({
+        conversationId: activeConversationId,
+        fileName: selectedFile.name,
+        fileContent: base64Content,
+        fileType: selectedFile.type,
+      });
+    };
+    reader.onerror = (error) => {
+      toast.error("Erro ao ler o arquivo.");
+      setIsLoading(false);
+    };
+  };
+
+  const handleFormSubmit = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (selectedFile) {
+      handleFileUpload();
+    } else {
+      handleSendMessage(input);
+    }
+  };
   };
 
   const handleDeleteConversation = (id: number) => {
@@ -382,7 +442,19 @@ export default function ChatView() {
                         : "bg-card border shadow-sm"
                     )}
                   >
-                    {message.role === "assistant" ? (
+                    {message.fileUrl && message.fileName ? (
+                      <div className="flex items-center gap-2">
+                        <Paperclip className="h-4 w-4 text-muted-foreground" />
+                        <a
+                          href={message.fileUrl}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="text-sm text-blue-500 hover:underline"
+                        >
+                          {message.fileName}
+                        </a>
+                      </div>
+                    ) : message.role === "assistant" ? (
                       <div className="prose prose-sm dark:prose-invert max-w-none prose-pre:bg-muted prose-pre:border prose-pre:border-border prose-pre:rounded-lg">
                         <Streamdown>{message.content}</Streamdown>
                       </div>
@@ -426,10 +498,7 @@ export default function ChatView() {
         <div className="border-t bg-background/80 backdrop-blur supports-[backdrop-filter]:backdrop-blur px-4 py-3">
           <div className="max-w-3xl mx-auto">
             <form
-              onSubmit={(e) => {
-                e.preventDefault();
-                handleSendMessage(input);
-              }}
+              onSubmit={handleFormSubmit}
               className="flex flex-col gap-3"
             >
               <div className="flex items-center gap-2 px-1">
@@ -454,6 +523,64 @@ export default function ChatView() {
                   value={input}
                   onChange={(e) => setInput(e.target.value)}
                   onKeyDown={(e) => {
+                    if (e.key === "Escape") {
+                      setSelectedFile(null);
+                    }
+                  }}
+                  placeholder={selectedFile ? `Anexado: ${selectedFile.name}` : "Pergunte sobre programação, projetos ou qualquer coisa..."}
+                  className="flex-1 resize-none min-h-[44px] max-h-32 pr-10 rounded-xl border bg-background focus-visible:ring-1 focus-visible:ring-primary"
+                  rows={1}
+                  disabled={!!selectedFile}
+                />
+                {selectedFile && (
+                  <button
+                    type="button"
+                    onClick={() => setSelectedFile(null)}
+                    className="absolute right-12 top-1/2 -translate-y-1/2 p-1 rounded-full hover:bg-accent text-muted-foreground"
+                    title="Remover anexo"
+                  >
+                    <X className="h-4 w-4" />
+                  </button>
+                )}
+                <input
+                  type="file"
+                  ref={fileInputRef}
+                  onChange={handleFileChange}
+                  className="hidden"
+                />
+                <button
+                  type="button"
+                  onClick={() => fileInputRef.current?.click()}
+                  className="absolute right-2 top-1/2 -translate-y-1/2 p-1 rounded-full hover:bg-accent text-muted-foreground"
+                  title="Anexar arquivo"
+                >
+                  <Paperclip className="h-4 w-4" />
+                </button>
+              </div>
+              <Button
+                type="submit"
+                size="icon"
+                disabled={(!input.trim() && !selectedFile) || isLoading}
+                className="shrink-0 h-11 w-11 rounded-xl shadow-md"
+              >
+                {isLoading ? (
+                  <Loader2 className="h-4 w-4 animate-spin" />
+                ) : (
+                  <Send className="h-4 w-4" />
+                )}
+              </Button>
+              </div>
+            </form>
+            <p className="mt-1.5 text-center text-[11px] text-muted-foreground/70">
+              DevAI pode cometer erros. Verifique informações importantes.
+            </p>
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}
+
                     if (e.key === "Enter" && !e.shiftKey) {
                       e.preventDefault();
                       handleSendMessage(input);

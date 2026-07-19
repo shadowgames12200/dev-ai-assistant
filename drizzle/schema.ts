@@ -43,6 +43,8 @@ export const messages = pgTable("messages", {
   conversationId: integer("conversationId").notNull(),
   role: varchar("role", { length: 32 }).notNull(),
   content: text("content").notNull(),
+  fileUrl: text("fileUrl"),
+  fileName: text("fileName"),
   createdAt: timestamp("createdAt").defaultNow().notNull(),
 });
 

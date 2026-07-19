@@ -22,7 +22,7 @@ import {
 
 import Login from "@/pages/Login";
 import { useIsMobile } from "@/hooks/useMobile";
-import { LayoutDashboard, LogOut, PanelLeft, Sparkles } from "lucide-react";
+import { LayoutDashboard, LogOut, PanelLeft, Sparkles, Bot, Puzzle, CalendarClock, Book, Folder } from "lucide-react";
 import { CSSProperties, useEffect, useRef, useState } from "react";
 import { useLocation } from "wouter";
 import { DashboardLayoutSkeleton } from './DashboardLayoutSkeleton';
@@ -194,6 +194,61 @@ function DashboardLayoutContent({
                 >
                   <LayoutDashboard className="h-4 w-4" />
                   <span>Chat</span>
+                </SidebarMenuButton>
+              </SidebarMenuItem>
+              <SidebarMenuItem>
+                <SidebarMenuButton
+                  isActive={location === "/agent"}
+                  onClick={() => setLocation("/agent")}
+                  tooltip="Agente"
+                  className="h-10 transition-all font-normal"
+                >
+                  <Bot className="h-4 w-4" />
+                  <span>Agente</span>
+                </SidebarMenuButton>
+              </SidebarMenuItem>
+              <SidebarMenuItem>
+                <SidebarMenuButton
+                  isActive={location === "/plugins"}
+                  onClick={() => setLocation("/plugins")}
+                  tooltip="Plugins"
+                  className="h-10 transition-all font-normal"
+                >
+                  <Puzzle className="h-4 w-4" />
+                  <span>Plugins</span>
+                </SidebarMenuButton>
+              </SidebarMenuItem>
+              <SidebarMenuItem>
+                <SidebarMenuButton
+                  isActive={location === "/scheduled"}
+                  onClick={() => setLocation("/scheduled")}
+                  tooltip="Agendado"
+                  className="h-10 transition-all font-normal"
+                >
+                  <CalendarClock className="h-4 w-4" />
+                  <span>Agendado</span>
+                </SidebarMenuButton>
+              </SidebarMenuItem>
+              <SidebarMenuItem>
+                <SidebarMenuButton
+                  isActive={location === "/library"}
+                  onClick={() => setLocation("/library")}
+                  tooltip="Biblioteca"
+                  className="h-10 transition-all font-normal"
+                >
+                  <Book className="h-4 w-4" />
+                  <span>Biblioteca</span>
+                </SidebarMenuButton>
+              </SidebarMenuItem>
+              <SidebarMenuItem>
+                <SidebarMenuButton
+                  isActive={location === "/projects"}
+                  onClick={() => setLocation("/projects")}
+                  tooltip="Projetos"
+                  className="h-10 transition-all font-normal"
+                >
+                  <Folder className="h-4 w-4" />
+                  <span>Projetos</span>
                 </SidebarMenuButton>
               </SidebarMenuItem>
             </SidebarMenu>
