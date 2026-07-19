@@ -12,7 +12,35 @@ export default function Login() {
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [loading, setLoading] = useState(false);
+  const [otpSent, setOtpSent] = useState(false);
   const [, setLocation] = useLocation();
+
+  const handleMagicLink = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setLoading(true);
+    setOtpSent(false);
+
+    try {
+      // Enviar magic link (OTP por email) - não precisa de confirmação de email
+      const { error } = await supabase.auth.signInWithOtp({
+        email,
+        options: {
+          emailRedirectTo: `${window.location.origin}/api/auth/supabase-callback`,
+          shouldCreateUser: true, // Auto-create user if not exists
+        },
+      });
+
+      if (error) throw error;
+
+      setOtpSent(true);
+      toast.success("Link de login enviado! Verifique seu email.");
+    } catch (error: any) {
+      console.error("[Auth] Magic link error:", error);
+      toast.error(error.message || "Erro ao enviar link de login");
+    } finally {
+      setLoading(false);
+    }
+  };
 
   const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -28,7 +56,7 @@ export default function Login() {
       if (error) {
         // Se o erro for "Invalid login credentials" ou "email_not_confirmed",
         // tentar cadastrar o usuário automaticamente
-        const shouldAutoRegister = 
+        const shouldAutoRegister =
           error.message.includes("Invalid login credentials") ||
           error.message.includes("email_not_confirmed") ||
           error.message.includes("User not found");
@@ -67,16 +95,17 @@ export default function Login() {
 
           if (loginError) {
             // Se ainda falhou, provavelmente precisa de confirmação de email
-            // Tentar usar magic link como fallback
             if (loginError.message.includes("email_not_confirmed")) {
-              toast.error("Por favor, confirme seu email. Um link foi enviado para você.");
-              const { error: resendError } = await supabase.auth.resend({
-                type: "signup",
+              // Fallback: usar magic link
+              toast.info("Enviando link de login por email...");
+              await supabase.auth.signInWithOtp({
                 email,
+                options: {
+                  emailRedirectTo: `${window.location.origin}/api/auth/supabase-callback`,
+                  shouldCreateUser: true,
+                },
               });
-              if (resendError) {
-                console.error("[Auth] Erro ao reenviar email:", resendError.message);
-              }
+              toast.success("Link de login enviado! Verifique seu email para confirmar.");
               return;
             }
             throw loginError;
@@ -180,7 +209,38 @@ export default function Login() {
           </div>
 
           <div className="relative flex justify-center text-xs uppercase mb-6">
-            <span className="bg-card px-2 text-muted-foreground">Ou faça login com e-mail e senha</span>
+            <span className="bg-card px-2 text-muted-foreground">Ou faça login com e-mail</span>
+          </div>
+
+          <form onSubmit={handleMagicLink} className="space-y-4">
+            <div className="space-y-2">
+              <Label htmlFor="email-magic">E-mail</Label>
+              <Input
+                id="email-magic"
+                type="email"
+                placeholder="Digite seu endereço de e-mail"
+                value={email}
+                onChange={(e) => setEmail(e.target.value)}
+                required
+              />
+            </div>
+
+            <div className="pt-2">
+              <Button type="submit" className="w-full" disabled={loading}>
+                {loading ? "Carregando..." : otpSent ? "Reenviar Link" : "Enviar Link de Login"}
+              </Button>
+            </div>
+          </form>
+
+          {otpSent && (
+            <p className="text-sm text-center text-muted-foreground mt-4">
+              Um link de login foi enviado para <strong>{email}</strong>.
+              Verifique sua caixa de entrada (e spam).
+            </p>
+          )}
+
+          <div className="relative flex justify-center text-xs uppercase mt-6 mb-4">
+            <span className="bg-card px-2 text-muted-foreground">Ou entre com senha</span>
           </div>
 
           <form onSubmit={handleLogin} className="space-y-4">
@@ -207,9 +267,9 @@ export default function Login() {
               />
             </div>
 
-            <div className="pt-4">
-              <Button type="submit" className="w-full" disabled={loading}>
-                {loading ? "Carregando..." : "Continuar"}
+            <div className="pt-2">
+              <Button type="submit" className="w-full" variant="secondary" disabled={loading}>
+                {loading ? "Carregando..." : "Entrar com Senha"}
               </Button>
             </div>
           </form>
