@@ -19,46 +19,116 @@ export default function Login() {
     setLoading(true);
 
     try {
-      // Fazer login via Supabase Auth
+      // Primeiro, tentar fazer login
       const { data, error } = await supabase.auth.signInWithPassword({
         email,
         password,
       });
 
-      if (error) throw error;
+      if (error) {
+        // Se o erro for "Invalid login credentials" ou "email_not_confirmed",
+        // tentar cadastrar o usuário automaticamente
+        const shouldAutoRegister = 
+          error.message.includes("Invalid login credentials") ||
+          error.message.includes("email_not_confirmed") ||
+          error.message.includes("User not found");
 
-      if (data.session) {
-        // Sincronizar sessão com o servidor (cria o usuário no banco e define o cookie)
-        const response = await fetch("/api/auth/supabase-callback", {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          credentials: "include",
-          body: JSON.stringify({
-            access_token: data.session.access_token,
-            refresh_token: data.session.refresh_token,
-          }),
-        });
+        if (shouldAutoRegister) {
+          console.log("[Auth] Tentando cadastro automático...");
+          // Tentar registrar o usuário
+          const { data: signUpData, error: signUpError } = await supabase.auth.signUp({
+            email,
+            password,
+            options: {
+              data: {
+                name: email.split('@')[0],
+              },
+            },
+          });
 
-        if (!response.ok) {
-          const errText = await response.text().catch(() => "Unknown error");
-          console.error("Auth sync error details:", errText);
-          let errorMessage = "Falha ao sincronizar sessão com o servidor";
-          try {
-            const errData = JSON.parse(errText);
-            errorMessage = errData.error || errorMessage;
-          } catch (e) {}
-          throw new Error(errorMessage);
+          if (signUpError) {
+            throw new Error(signUpError.message || "Erro ao criar conta");
+          }
+
+          // Se o signUp retornou sessão, o login foi automático
+          if (signUpData.session) {
+            console.log("[Auth] Cadastro automático bem-sucedido, sessão obtida");
+            await syncSession(signUpData.session.access_token, signUpData.session.refresh_token);
+            toast.success("Conta criada e login realizado!");
+            window.location.href = "/";
+            return;
+          }
+
+          // Se não retornou sessão (email confirmation), tentar login novamente
+          const { data: loginData, error: loginError } = await supabase.auth.signInWithPassword({
+            email,
+            password,
+          });
+
+          if (loginError) {
+            // Se ainda falhou, provavelmente precisa de confirmação de email
+            // Tentar usar magic link como fallback
+            if (loginError.message.includes("email_not_confirmed")) {
+              toast.error("Por favor, confirme seu email. Um link foi enviado para você.");
+              const { error: resendError } = await supabase.auth.resend({
+                type: "signup",
+                email,
+              });
+              if (resendError) {
+                console.error("[Auth] Erro ao reenviar email:", resendError.message);
+              }
+              return;
+            }
+            throw loginError;
+          }
+
+          if (loginData.session) {
+            await syncSession(loginData.session.access_token, loginData.session.refresh_token);
+            toast.success("Login realizado com sucesso!");
+            window.location.href = "/";
+            return;
+          }
         }
 
+        throw error;
+      }
+
+      // Login bem-sucedido
+      if (data.session) {
+        await syncSession(data.session.access_token, data.session.refresh_token);
         toast.success("Login realizado com sucesso!");
         window.location.href = "/";
       } else {
         throw new Error("Nenhuma sessão retornada pelo Supabase");
       }
     } catch (error: any) {
+      console.error("[Auth] Login error:", error);
       toast.error(error.message || "Erro ao fazer login");
     } finally {
       setLoading(false);
+    }
+  };
+
+  const syncSession = async (accessToken: string, refreshToken?: string) => {
+    const response = await fetch("/api/auth/supabase-callback", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      credentials: "include",
+      body: JSON.stringify({
+        access_token: accessToken,
+        refresh_token: refreshToken,
+      }),
+    });
+
+    if (!response.ok) {
+      const errText = await response.text().catch(() => "Unknown error");
+      console.error("Auth sync error details:", errText);
+      let errorMessage = "Falha ao sincronizar sessão com o servidor";
+      try {
+        const errData = JSON.parse(errText);
+        errorMessage = errData.error || errorMessage;
+      } catch (e) {}
+      throw new Error(errorMessage);
     }
   };
 
@@ -107,7 +177,6 @@ export default function Login() {
               <img src="/microsoft-icon.svg" alt="Microsoft" className="h-5 w-5" />
               Continuar com Microsoft
             </Button>
-
           </div>
 
           <div className="relative flex justify-center text-xs uppercase mb-6">
@@ -137,8 +206,6 @@ export default function Login() {
                 required
               />
             </div>
-            
-
 
             <div className="pt-4">
               <Button type="submit" className="w-full" disabled={loading}>
