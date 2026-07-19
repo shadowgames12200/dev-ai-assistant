@@ -19,23 +19,7 @@ export default function Login() {
     setLoading(true);
 
     try {
-      // A lógica de login de administrador foi unificada aqui. Não há mais um AdminLogin.tsx separado.
-      const adminResponse = await fetch("/api/trpc/auth.login", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ json: { username: email, password: password } }),
-      });
-
-      if (adminResponse.ok) {
-        toast.success("Login de administrador realizado com sucesso!");
-        window.location.reload();
-        return;
-      } else if (adminResponse.status !== 401 && adminResponse.status !== 400) {
-        // Se não for 401 (não autorizado) ou 400 (bad request), é um erro inesperado do servidor
-        throw new Error("Erro inesperado ao tentar login de administrador");
-      }
-
-      // Se o login de administrador falhou (401) ou foi um Bad Request (400), tentar login de usuário comum via Supabase
+      // Fazer login via Supabase Auth
       const { data, error } = await supabase.auth.signInWithPassword({
         email,
         password,
@@ -44,20 +28,26 @@ export default function Login() {
       if (error) throw error;
 
       if (data.session) {
+        // Sincronizar sessão com o servidor (cria o usuário no banco e define o cookie)
         const response = await fetch("/api/auth/supabase-callback", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
+          credentials: "include",
           body: JSON.stringify({
             access_token: data.session.access_token,
             refresh_token: data.session.refresh_token,
           }),
         });
 
-        if (!response.ok) throw new Error("Falha ao sincronizar sessão com o servidor");
+        if (!response.ok) {
+          const errData = await response.json().catch(() => ({}));
+          throw new Error(errData.error || "Falha ao sincronizar sessão com o servidor");
+        }
 
         toast.success("Login realizado com sucesso!");
-        setLocation("/");
-        window.location.reload();
+        window.location.href = "/";
+      } else {
+        throw new Error("Nenhuma sessão retornada pelo Supabase");
       }
     } catch (error: any) {
       toast.error(error.message || "Erro ao fazer login");
@@ -66,7 +56,7 @@ export default function Login() {
     }
   };
 
-  const handleSocialLogin = async (provider: 'google' | 'microsoft') => {
+  const handleSocialLogin = async (provider: 'google' | 'azure') => {
     setLoading(true);
     try {
       const { error } = await supabase.auth.signInWithOAuth({
@@ -78,7 +68,6 @@ export default function Login() {
       if (error) throw error;
     } catch (error: any) {
       toast.error(error.message || `Erro ao fazer login com ${provider}`);
-    } finally {
       setLoading(false);
     }
   };

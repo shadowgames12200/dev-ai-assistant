@@ -39,10 +39,16 @@ export function getSessionCookieOptions(
   //       ? hostname
   //       : undefined;
 
+  const isSecure = isSecureRequest(req);
+  const hostname = req.hostname || "";
+  const isLocal = LOCAL_HOSTS.has(hostname) || isIpAddress(hostname);
+
   return {
     httpOnly: true,
     path: "/",
-    sameSite: "none",
-    secure: isSecureRequest(req),
+    // SameSite=None requer Secure=true. Em ambientes locais/HTTP usamos Lax
+    // para evitar que o cookie seja rejeitado pelo browser.
+    sameSite: isSecure ? "none" : "lax",
+    secure: isSecure,
   };
 }
