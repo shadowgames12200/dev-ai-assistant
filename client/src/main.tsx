@@ -1,7 +1,7 @@
 import { trpc } from "@/lib/trpc";
 import { COOKIE_NAME, UNAUTHED_ERR_MSG } from '@shared/const';
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
-import { httpBatchLink, TRPCClientError } from "@trpc/client";
+import { httpBatchLink, httpLink, splitLink, TRPCClientError } from "@trpc/client";
 import { createRoot } from "react-dom/client";
 import superjson from "superjson";
 import App from "./App";
@@ -38,37 +38,40 @@ queryClient.getMutationCache().subscribe(event => {
   }
 });
 
+const commonConfig = {
+  url: "/api/trpc",
+  transformer: superjson,
+  headers() {
+    try {
+      const raw = sessionStorage.getItem("manus-cookie");
+      if (raw) {
+        const prefix = `${COOKIE_NAME}=`;
+        const pair = raw.split(";").find(s => s.trim().startsWith(prefix));
+        const token = pair?.trim().slice(prefix.length);
+        if (token) {
+          return { Authorization: `Bearer ${token}` };
+        }
+      }
+    } catch {}
+    return {};
+  },
+  fetch(input: any, init: any) {
+    return globalThis.fetch(input, {
+      ...(init ?? {}),
+      credentials: "include",
+    });
+  },
+};
+
 const trpcClient = trpc.createClient({
   links: [
-    httpBatchLink({
-      url: "/api/trpc",
-      transformer: superjson,
-      headers() {
-        // Preview auto-login fallback: when the browser blocks iframe cookies
-        // (Safari ITP / private browsing / WebView), the runtime mirrors the
-        // session into sessionStorage so we can forward it as a Bearer token.
-        // The regular OAuth cookie flow keeps working and takes priority server-side.
-        try {
-          const raw = sessionStorage.getItem("manus-cookie");
-          if (raw) {
-            const prefix = `${COOKIE_NAME}=`;
-            const pair = raw.split(";").find(s => s.trim().startsWith(prefix));
-            const token = pair?.trim().slice(prefix.length);
-            if (token) {
-              return { Authorization: `Bearer ${token}` };
-            }
-          }
-        } catch {
-          // sessionStorage unavailable
-        }
-        return {};
+    splitLink({
+      condition(op) {
+        // Use httpLink (sem batching) para uploads e mensagens pesadas
+        return op.path === 'upload.uploadFile' || op.path === 'chat.send';
       },
-      fetch(input, init) {
-        return globalThis.fetch(input, {
-          ...(init ?? {}),
-          credentials: "include",
-        });
-      },
+      true: httpLink(commonConfig),
+      false: httpBatchLink(commonConfig),
     }),
   ],
 });

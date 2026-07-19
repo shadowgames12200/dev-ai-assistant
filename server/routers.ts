@@ -213,6 +213,9 @@ export const appRouter = router({
               messages: currentMessages,
               tools: tools,
               maxTokens: 8000,
+            }).catch(err => {
+              console.error("[LLM] Timeout ou erro na chamada:", err);
+              throw new Error("A IA demorou muito para responder. Tente um arquivo menor ou uma pergunta mais específica.");
             });
 
             const message = response.choices[0]?.message;
