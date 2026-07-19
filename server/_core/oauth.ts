@@ -7,12 +7,16 @@ import { supabase } from "./supabase.js";
 
 async function handleSupabaseCallback(req: Request, res: Response, accessToken: string, refreshToken?: string, isRedirect = false) {
   try {
+    console.log("[Auth] Iniciando callback do Supabase...");
     // Validar o token com o Supabase
     const { data: { user }, error } = await supabase.auth.getUser(accessToken);
 
     if (error || !user) {
+      console.error("[Auth] Erro ao obter usuário do Supabase:", error?.message);
       throw new Error(error?.message || "User not found in Supabase");
     }
+
+    console.log("[Auth] Usuário validado no Supabase:", user.email);
 
     // Upsert do usuário no nosso banco local
     await db.upsertUser({

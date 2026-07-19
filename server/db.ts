@@ -25,10 +25,11 @@ export async function upsertUser(user: InsertUser): Promise<void> {
     throw new Error("User openId is required for upsert");
   }
 
+  console.log("[Database] Tentando upsert do usuário:", user.openId);
   const db = await getDb();
   if (!db) {
-    console.warn("[Database] Cannot upsert user: database not available");
-    return;
+    console.warn("[Database] Cannot upsert user: database not available (DATABASE_URL missing)");
+    throw new Error("Banco de dados não configurado no Render (DATABASE_URL ausente)");
   }
 
   try {

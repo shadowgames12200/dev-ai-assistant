@@ -40,8 +40,14 @@ export default function Login() {
         });
 
         if (!response.ok) {
-          const errData = await response.json().catch(() => ({}));
-          throw new Error(errData.error || "Falha ao sincronizar sessão com o servidor");
+          const errText = await response.text().catch(() => "Unknown error");
+          console.error("Auth sync error details:", errText);
+          let errorMessage = "Falha ao sincronizar sessão com o servidor";
+          try {
+            const errData = JSON.parse(errText);
+            errorMessage = errData.error || errorMessage;
+          } catch (e) {}
+          throw new Error(errorMessage);
         }
 
         toast.success("Login realizado com sucesso!");
