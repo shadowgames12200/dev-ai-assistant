@@ -18,7 +18,8 @@ const redirectToLoginIfUnauthorized = (error: unknown) => {
 
   if (!isUnauthorized) return;
 
-  startLogin();
+  // Redirecionar para a página de login do Supabase em vez do login legado
+  window.location.href = "/login";
 };
 
 queryClient.getQueryCache().subscribe(event => {
