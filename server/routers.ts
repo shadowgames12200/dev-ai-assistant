@@ -53,7 +53,6 @@ function extractTextFromBuffer(buffer: Buffer, fileName: string, fileType: strin
   if (isTextType) {
     try {
       const text = buffer.toString("utf-8");
-      // Limita a 50.000 caracteres para não sobrecarregar o contexto
       if (text.length > 200000) {
         return text.slice(0, 200000) + "\n\n[... conteúdo truncado após 200.000 caracteres para preservar o contexto ...]";
       }
@@ -72,7 +71,6 @@ function extractTextFromBuffer(buffer: Buffer, fileName: string, fileType: strin
   if (fileType === "application/pdf" || ext === "pdf") {
     try {
       const raw = buffer.toString("latin1");
-      // Extrai strings legíveis entre parênteses (formato PDF básico)
       const matches = raw.match(/\(([^\)]{3,})\)/g) ?? [];
       const extracted = matches
         .map(m => m.slice(1, -1).replace(/\\n/g, "\n").replace(/\\t/g, "\t"))
@@ -103,8 +101,10 @@ export const appRouter = router({
       }),
     me: publicProcedure.query(opts => opts.ctx.user),
     logout: publicProcedure.mutation(({ ctx }) => {
-      const cookieOptions = getSessionCookieOptions(ctx.req as any);
-      (ctx.res as any).clearCookie(COOKIE_NAME, { ...cookieOptions, maxAge: -1 });
+      const req = ctx.req as any;
+      const res = ctx.res as any;
+      const cookieOptions = getSessionCookieOptions(req);
+      res.clearCookie(COOKIE_NAME, { ...cookieOptions, maxAge: -1 });
       return { success: true } as const;
     }),
   }),
@@ -152,24 +152,19 @@ export const appRouter = router({
         fileName: z.string().min(1),
         fileContent: z.string().min(1), // Base64
         fileType: z.string().min(1),
-        userMessage: z.string().optional(), // Mensagem opcional junto com o arquivo
+        userMessage: z.string().optional(),
       }))
       .mutation(async ({ ctx, input }) => {
         if (!ctx.user) throw new TRPCError({ code: "UNAUTHORIZED" });
 
         const { conversationId, fileName, fileContent, fileType, userMessage } = input;
 
-        // Verifica posse da conversa
         const conv = await db.getConversation(conversationId, ctx.user.id);
         if (!conv) throw new TRPCError({ code: "NOT_FOUND" });
 
-        // Decodifica o arquivo
         const buffer = Buffer.from(fileContent, "base64");
-
-        // Extrai o conteúdo textual do arquivo
         const extractedText = extractTextFromBuffer(buffer, fileName, fileType);
 
-        // Faz upload físico para o storage
         let fileUrl: string | undefined;
         try {
           const { url } = await storagePut(fileName, buffer, fileType);
@@ -178,20 +173,12 @@ export const appRouter = router({
           console.warn("[Upload] Falha no storage, continuando sem URL:", err);
         }
 
-        // Monta a mensagem do usuário com o conteúdo do arquivo embutido
-        const baseMsg = userMessage?.trim()
-          ? `${userMessage.trim()}\n\n`
-          : "";
-
+        const baseMsg = userMessage?.trim() ? `${userMessage.trim()}\n\n` : "";
         const userContent = `${baseMsg}[Conteúdo do arquivo '${fileName}':\n\`\`\`\n${extractedText}\n\`\`\`\n]`;
 
-        // Salva a mensagem do usuário (exibe só o nome do arquivo na UI, mas o conteúdo vai para o LLM)
         await db.addMessage(conversationId, "user", userContent, fileUrl, fileName);
-
-        // Busca histórico completo da conversa
         const allMessages = await db.getConversationMessages(conversationId);
 
-        // Monta o array para o LLM
         const llmMessages: Array<{ role: "system" | "user" | "assistant"; content: string }> = [
           { role: "system", content: SYSTEM_PROMPT },
           ...allMessages.map(m => ({
@@ -200,7 +187,6 @@ export const appRouter = router({
           })),
         ];
 
-        // Chama o LLM para analisar o arquivo
         try {
           let currentMessages: Message[] = [...llmMessages];
           let finalAiContent = "";
@@ -215,7 +201,7 @@ export const appRouter = router({
               maxTokens: 8000,
             }).catch(err => {
               console.error("[LLM] Timeout ou erro na chamada:", err);
-              throw new Error("A IA demorou muito para responder. Tente um arquivo menor ou uma pergunta mais específica.");
+              throw new Error("A IA demorou muito para responder. Tente um arquivo menor.");
             });
 
             const message = response.choices[0]?.message;
@@ -244,27 +230,20 @@ export const appRouter = router({
             break;
           }
 
-          // Salva resposta da IA
           await db.addMessage(conversationId, "assistant", finalAiContent);
-
-          // Atualiza título da conversa se for a primeira interação
           if (allMessages.length <= 2) {
-            const title = `Arquivo: ${fileName}`.slice(0, 50);
-            await db.updateConversationTitle(conversationId, title);
+            await db.updateConversationTitle(conversationId, `Arquivo: ${fileName}`.slice(0, 50));
           }
-
-          const updatedMessages = await db.getConversationMessages(conversationId);
 
           return {
             success: true,
-            messages: updatedMessages,
-            extractedText: extractedText.slice(0, 200), // Preview para debug
+            messages: await db.getConversationMessages(conversationId),
           };
-        } catch (error) {
-          console.error("[Upload] Erro ao processar arquivo com LLM:", error);
+        } catch (error: any) {
+          console.error("[Upload] Erro:", error.message || error);
           throw new TRPCError({
             code: "INTERNAL_SERVER_ERROR",
-            message: "Erro ao analisar o arquivo. Tente novamente.",
+            message: error.message || "Erro ao analisar o arquivo.",
           });
         }
       }),
@@ -282,7 +261,7 @@ export const appRouter = router({
       }),
   }),
 
-  // ─── Chat (envia mensagem e obtém resposta da IA) ───
+  // ─── Chat ───
   chat: router({
     send: protectedProcedure
       .input(z.object({
@@ -294,17 +273,12 @@ export const appRouter = router({
         if (!ctx.user) throw new TRPCError({ code: "UNAUTHORIZED" });
 
         const { conversationId, content, useAdvancedReasoning } = input;
-
-        const conv = await db.getConversation(input.conversationId, ctx.user.id);
+        const conv = await db.getConversation(conversationId, ctx.user.id);
         if (!conv) throw new TRPCError({ code: "NOT_FOUND" });
 
-        // Salva mensagem do usuário
-        await db.addMessage(input.conversationId, "user", input.content);
+        await db.addMessage(conversationId, "user", content);
+        const allMessages = await db.getConversationMessages(conversationId);
 
-        // Busca histórico
-        const allMessages = await db.getConversationMessages(input.conversationId);
-
-        // Monta array para o LLM
         const llmMessages: Array<{ role: "system" | "user" | "assistant"; content: string }> = [
           { role: "system", content: SYSTEM_PROMPT },
           ...allMessages.map(m => ({
@@ -321,7 +295,7 @@ export const appRouter = router({
 
           while (iterations < MAX_ITERATIONS) {
             const response = await invokeLLM({
-              model: useAdvancedReasoning ? "llama-3.3-70b-versatile" : "llama-3.3-70b-versatile",
+              model: "llama-3.3-70b-versatile",
               messages: currentMessages,
               tools: tools,
               maxTokens: 8000,
@@ -353,21 +327,16 @@ export const appRouter = router({
             break;
           }
 
-          await db.addMessage(input.conversationId, "assistant", finalAiContent);
-
-          if (allMessages.length <= 2) {
-            const title = input.content.slice(0, 50) + (input.content.length > 50 ? "..." : "");
-            await db.updateConversationTitle(input.conversationId, title);
-          }
-
-          const updatedMessages = await db.getConversationMessages(input.conversationId);
-
-          return { success: true, messages: updatedMessages };
+          await db.addMessage(conversationId, "assistant", finalAiContent);
+          return {
+            success: true,
+            messages: await db.getConversationMessages(conversationId),
+          };
         } catch (error) {
           console.error("[Chat] LLM error:", error);
           throw new TRPCError({
             code: "INTERNAL_SERVER_ERROR",
-            message: "Erro ao processar sua mensagem. Tente novamente.",
+            message: "Erro ao processar sua mensagem.",
           });
         }
       }),

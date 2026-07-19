@@ -1,14 +1,16 @@
 import { COOKIE_NAME, ONE_YEAR_MS } from "../../shared/const.js";
+import type { Express, Request, Response } from "express";
 import * as db from "../db.js";
 import { getSessionCookieOptions } from "./cookies.js";
 import { sdk } from "./sdk.js";
 import { supabase } from "./supabase.js";
 
-async function handleSupabaseCallback(req: any, res: any, accessToken: string, refreshToken?: string, isRedirect = false) {
+async function handleSupabaseCallback(req: Request, res: Response, accessToken: string, refreshToken?: string, isRedirect = false) {
   try {
     console.log("[Auth] Iniciando callback do Supabase...");
     // Validar o token com o Supabase
-    const { data: { user }, error } = await (supabase.auth as any).getUser(accessToken);
+    const { data, error } = await (supabase.auth as any).getUser(accessToken);
+    const user = data?.user;
 
     if (error || !user) {
       console.error("[Auth] Erro ao obter usuário do Supabase:", error?.message);
@@ -40,33 +42,33 @@ async function handleSupabaseCallback(req: any, res: any, accessToken: string, r
     });
 
     const cookieOptions = getSessionCookieOptions(req);
-    res.cookie(COOKIE_NAME, sessionToken, { ...cookieOptions, maxAge: ONE_YEAR_MS });
+    (res as any).cookie(COOKIE_NAME, sessionToken, { ...cookieOptions, maxAge: ONE_YEAR_MS });
 
     if (isRedirect) {
-      res.redirect("/");
+      (res as any).redirect("/");
     } else {
-      res.json({ success: true, user: { id: user.id, email: user.email } });
+      (res as any).json({ success: true, user: { id: user.id, email: user.email } });
     }
   } catch (error: any) {
     console.error("[Auth] Supabase callback failed:", error.message || error);
     if (isRedirect) {
-      res.redirect("/?error=auth_failed");
+      (res as any).redirect("/?error=auth_failed");
     } else {
-      res.status(500).json({ error: "Auth sync failed" });
+      (res as any).status(500).json({ error: "Auth sync failed" });
     }
   }
 }
 
-export function registerOAuthRoutes(app: any) {
+export function registerOAuthRoutes(app: Express) {
   /**
    * Supabase Auth Callback (POST) - usado pelo login com email/senha
    * Este endpoint recebe a sessão do Supabase e cria o cookie da aplicação.
    */
-  app.post("/api/auth/supabase-callback", async (req: any, res: any) => {
-    const { access_token, refresh_token } = req.body;
+  app.post("/api/auth/supabase-callback", async (req: Request, res: Response) => {
+    const { access_token, refresh_token } = req.body as any;
 
     if (!access_token) {
-      res.status(400).json({ error: "access_token is required" });
+      (res as any).status(400).json({ error: "access_token is required" });
       return;
     }
 
@@ -78,9 +80,9 @@ export function registerOAuthRoutes(app: any) {
    * O Supabase redireciona para cá com o token no fragmento da URL (#access_token=...)
    * ou como query param (?code=...). Esta rota serve o HTML que extrai o token e chama o POST.
    */
-  app.get("/api/auth/supabase-callback", (req: any, res: any) => {
+  app.get("/api/auth/supabase-callback", (req: Request, res: Response) => {
     // Servir uma página HTML que extrai o token do fragmento da URL e faz POST
-    res.send(`<!DOCTYPE html>
+    (res as any).send(`<!DOCTYPE html>
 <html>
 <head><title>Autenticando...</title></head>
 <body>
@@ -118,9 +120,9 @@ export function registerOAuthRoutes(app: any) {
 </html>`);
   });
 
-  app.post("/api/auth/logout", (req: any, res: any) => {
+  app.post("/api/auth/logout", (req: Request, res: Response) => {
     const cookieOptions = getSessionCookieOptions(req);
-    res.clearCookie(COOKIE_NAME, { ...cookieOptions, maxAge: 0 });
-    res.json({ success: true });
+    (res as any).clearCookie(COOKIE_NAME, { ...cookieOptions, maxAge: 0 });
+    (res as any).json({ success: true });
   });
 }
