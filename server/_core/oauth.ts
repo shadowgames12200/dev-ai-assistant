@@ -44,8 +44,8 @@ async function handleSupabaseCallback(req: Request, res: Response, accessToken: 
     } else {
       res.json({ success: true, user: { id: user.id, email: user.email } });
     }
-  } catch (error) {
-    console.error("[Auth] Supabase callback failed", error);
+  } catch (error: any) {
+    console.error("[Auth] Supabase callback failed:", error.message || error);
     if (isRedirect) {
       res.redirect("/?error=auth_failed");
     } else {
