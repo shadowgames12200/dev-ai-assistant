@@ -46,9 +46,9 @@ export function getSessionCookieOptions(
   return {
     httpOnly: true,
     path: "/",
-    // SameSite=None requer Secure=true. Em ambientes locais/HTTP usamos Lax
-    // para evitar que o cookie seja rejeitado pelo browser.
-    sameSite: isSecure ? "none" : "lax",
+    // Usamos SameSite=Lax para garantir que o cookie de sessão seja enviado 
+    // após redirecionamentos do Supabase, evitando o loop de login.
+    sameSite: "lax",
     secure: isSecure,
   };
 }
