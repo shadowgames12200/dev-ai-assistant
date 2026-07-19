@@ -7,13 +7,15 @@ import { createExpressMiddleware } from '@trpc/server/adapters/express';
 import { appRouter } from '../server/routers.js';
 import { createContext } from '../server/_core/context.js';
 import { registerOAuthRoutes } from '../server/_core/oauth.js';
+import { registerLocalAuthRoutes } from '../server/routes/localAuth.js';
 import path from 'path';
 
 const app = express();
 app.use(express.json());
 
-// Registrar rotas de autenticação (Supabase Callback)
+// Registrar rotas de autenticação (Supabase Callback + Local Auth)
 registerOAuthRoutes(app);
+registerLocalAuthRoutes(app);
 
 app.use(
   '/api/trpc',

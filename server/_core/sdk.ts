@@ -122,8 +122,20 @@ class SDKServer {
     let user = await db.getUserByOpenId(sessionUserId);
 
     if (!user) {
-      // No Supabase Auth, o usuário já deve ter sido criado via callback ou hook
-      throw ForbiddenError("User not found in database");
+      // Auto-create user from session token data
+      console.log("[Auth] User not in DB, auto-creating from session:", sessionUserId);
+      await db.upsertUser({
+        openId: sessionUserId,
+        name: session.name || sessionUserId.split('@')[0] || "Usuário",
+        email: sessionUserId.startsWith('local:') ? sessionUserId.replace('local:', '') : null,
+        loginMethod: sessionUserId.startsWith('local:') ? 'email' : 'unknown',
+        role: 'user',
+        lastSignedIn: signedInAt,
+      });
+      user = await db.getUserByOpenId(sessionUserId);
+      if (!user) {
+        throw ForbiddenError("User not found in database after auto-create");
+      }
     }
 
     await db.upsertUser({
