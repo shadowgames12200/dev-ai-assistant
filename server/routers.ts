@@ -54,8 +54,8 @@ function extractTextFromBuffer(buffer: Buffer, fileName: string, fileType: strin
     try {
       const text = buffer.toString("utf-8");
       // Limita a 50.000 caracteres para não sobrecarregar o contexto
-      if (text.length > 50000) {
-        return text.slice(0, 50000) + "\n\n[... conteúdo truncado após 50.000 caracteres ...]";
+      if (text.length > 200000) {
+        return text.slice(0, 200000) + "\n\n[... conteúdo truncado após 200.000 caracteres para preservar o contexto ...]";
       }
       return text;
     } catch {
@@ -212,7 +212,7 @@ export const appRouter = router({
               model: "llama-3.3-70b-versatile",
               messages: currentMessages,
               tools: tools,
-              maxTokens: 4000,
+              maxTokens: 8000,
             });
 
             const message = response.choices[0]?.message;
@@ -321,7 +321,7 @@ export const appRouter = router({
               model: useAdvancedReasoning ? "llama-3.3-70b-versatile" : "llama-3.3-70b-versatile",
               messages: currentMessages,
               tools: tools,
-              maxTokens: 4000,
+              maxTokens: 8000,
             });
 
             const message = response.choices[0]?.message;

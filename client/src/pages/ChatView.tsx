@@ -242,9 +242,9 @@ export default function ChatView() {
     const file = event.target.files?.[0];
     if (!file) return;
 
-    // Limite de 10MB
-    if (file.size > 10 * 1024 * 1024) {
-      toast.error("Arquivo muito grande. Limite: 10MB.");
+    // Limite de 100MB
+    if (file.size > 100 * 1024 * 1024) {
+      toast.error("Arquivo muito grande. Limite: 100MB.");
       return;
     }
 
