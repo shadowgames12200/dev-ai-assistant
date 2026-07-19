@@ -93,7 +93,7 @@ class SDKServer {
       return {
         openId,
         appId,
-        name,
+        name: typeof name === 'string' ? name : '',
       };
     } catch (error) {
       return null;
