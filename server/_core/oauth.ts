@@ -1,15 +1,14 @@
 import { COOKIE_NAME, ONE_YEAR_MS } from "../../shared/const.js";
-import type { Express, Request, Response } from "express";
 import * as db from "../db.js";
 import { getSessionCookieOptions } from "./cookies.js";
 import { sdk } from "./sdk.js";
 import { supabase } from "./supabase.js";
 
-async function handleSupabaseCallback(req: Request, res: Response, accessToken: string, refreshToken?: string, isRedirect = false) {
+async function handleSupabaseCallback(req: any, res: any, accessToken: string, refreshToken?: string, isRedirect = false) {
   try {
     console.log("[Auth] Iniciando callback do Supabase...");
     // Validar o token com o Supabase
-    const { data: { user }, error } = await supabase.auth.getUser(accessToken);
+    const { data: { user }, error } = await (supabase.auth as any).getUser(accessToken);
 
     if (error || !user) {
       console.error("[Auth] Erro ao obter usuário do Supabase:", error?.message);
@@ -58,12 +57,12 @@ async function handleSupabaseCallback(req: Request, res: Response, accessToken: 
   }
 }
 
-export function registerOAuthRoutes(app: Express) {
+export function registerOAuthRoutes(app: any) {
   /**
    * Supabase Auth Callback (POST) - usado pelo login com email/senha
    * Este endpoint recebe a sessão do Supabase e cria o cookie da aplicação.
    */
-  app.post("/api/auth/supabase-callback", async (req: Request, res: Response) => {
+  app.post("/api/auth/supabase-callback", async (req: any, res: any) => {
     const { access_token, refresh_token } = req.body;
 
     if (!access_token) {
@@ -79,7 +78,7 @@ export function registerOAuthRoutes(app: Express) {
    * O Supabase redireciona para cá com o token no fragmento da URL (#access_token=...)
    * ou como query param (?code=...). Esta rota serve o HTML que extrai o token e chama o POST.
    */
-  app.get("/api/auth/supabase-callback", (req: Request, res: Response) => {
+  app.get("/api/auth/supabase-callback", (req: any, res: any) => {
     // Servir uma página HTML que extrai o token do fragmento da URL e faz POST
     res.send(`<!DOCTYPE html>
 <html>
@@ -119,7 +118,7 @@ export function registerOAuthRoutes(app: Express) {
 </html>`);
   });
 
-  app.post("/api/auth/logout", (req: Request, res: Response) => {
+  app.post("/api/auth/logout", (req: any, res: any) => {
     const cookieOptions = getSessionCookieOptions(req);
     res.clearCookie(COOKIE_NAME, { ...cookieOptions, maxAge: 0 });
     res.json({ success: true });
