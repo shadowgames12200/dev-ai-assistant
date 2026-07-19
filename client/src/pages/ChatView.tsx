@@ -4,6 +4,7 @@ import { useState, useRef, useEffect, useCallback } from "react";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
 import { ScrollArea } from "@/components/ui/scroll-area";
+import { Badge } from "@/components/ui/badge";
 import { Streamdown } from "streamdown";
 import {
   MessageSquarePlus,
@@ -20,6 +21,10 @@ import {
   Zap,
   Brain,
   Paperclip,
+  FileText,
+  FileCode,
+  FileJson,
+  File,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { toast } from "sonner";
@@ -49,6 +54,61 @@ const SUGGESTED_PROMPTS = [
   { icon: MessageSquarePlus, text: "Me ajude a organizar minha rotina diária", desc: "Dia a dia" },
 ];
 
+// Tipos de arquivo suportados para análise de texto
+const TEXT_EXTENSIONS = new Set([
+  "txt", "md", "markdown", "csv", "json", "xml", "yaml", "yml",
+  "toml", "ini", "env", "log", "sh", "bash",
+  "js", "jsx", "ts", "tsx", "mjs", "cjs",
+  "py", "rb", "php", "java", "kt", "scala",
+  "c", "cpp", "h", "hpp", "cs", "go", "rs",
+  "swift", "dart", "lua", "r", "sql", "graphql",
+  "html", "htm", "css", "scss", "vue", "svelte",
+  "dockerfile", "makefile", "gitignore",
+]);
+
+function getFileIcon(fileName: string) {
+  const ext = fileName.split(".").pop()?.toLowerCase() ?? "";
+  if (["js", "jsx", "ts", "tsx", "py", "java", "go", "rs", "c", "cpp", "cs"].includes(ext))
+    return FileCode;
+  if (["json", "yaml", "yml", "toml", "xml"].includes(ext))
+    return FileJson;
+  if (["txt", "md", "log", "csv"].includes(ext))
+    return FileText;
+  return File;
+}
+
+function isTextFile(file: File): boolean {
+  const ext = file.name.split(".").pop()?.toLowerCase() ?? "";
+  return file.type.startsWith("text/") ||
+    file.type === "application/json" ||
+    file.type === "application/javascript" ||
+    TEXT_EXTENSIONS.has(ext);
+}
+
+function formatFileSize(bytes: number): string {
+  if (bytes < 1024) return `${bytes} B`;
+  if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(1)} KB`;
+  return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
+}
+
+// Extrai o nome do arquivo de uma mensagem com conteúdo de arquivo
+function extractFileName(content: string): string | null {
+  const match = content.match(/\[Conteúdo do arquivo '([^']+)'/);
+  return match ? match[1] : null;
+}
+
+// Verifica se uma mensagem contém conteúdo de arquivo embutido
+function hasEmbeddedFile(content: string): boolean {
+  return content.includes("[Conteúdo do arquivo '");
+}
+
+// Extrai a mensagem do usuário antes do conteúdo do arquivo
+function extractUserMessage(content: string): string {
+  const idx = content.indexOf("[Conteúdo do arquivo '");
+  if (idx === -1) return content;
+  return content.slice(0, idx).trim();
+}
+
 export default function ChatView() {
   const [activeConversationId, setActiveConversationId] = useState<number | null>(null);
   const [messages, setMessages] = useState<DbMessage[]>([]);
@@ -58,7 +118,7 @@ export default function ChatView() {
   const [editingTitle, setEditingTitle] = useState("");
   const [useAdvancedReasoning, setUseAdvancedReasoning] = useState(false);
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
-  
+
   const textareaRef = useRef<HTMLTextAreaElement>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const scrollAreaRef = useRef<HTMLDivElement>(null);
@@ -74,13 +134,13 @@ export default function ChatView() {
     onSuccess: (data) => {
       setActiveConversationId(data.id);
       setMessages([]);
-      queryClient.invalidateQueries({ queryKey: ['conversations', 'list'] });
+      queryClient.invalidateQueries({ queryKey: ["conversations", "list"] });
     },
   });
 
   const deleteConversationMutation = trpc.conversations.delete.useMutation({
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['conversations', 'list'] });
+      queryClient.invalidateQueries({ queryKey: ["conversations", "list"] });
       if (activeConversationId) {
         setActiveConversationId(null);
         setMessages([]);
@@ -90,7 +150,7 @@ export default function ChatView() {
 
   const renameConversationMutation = trpc.conversations.rename.useMutation({
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['conversations', 'list'] });
+      queryClient.invalidateQueries({ queryKey: ["conversations", "list"] });
       setEditingId(null);
       setEditingTitle("");
     },
@@ -100,9 +160,9 @@ export default function ChatView() {
     onSuccess: (data) => {
       setMessages(data.messages);
       setIsLoading(false);
-      queryClient.invalidateQueries({ queryKey: ['conversations', 'list'] });
+      queryClient.invalidateQueries({ queryKey: ["conversations", "list"] });
     },
-    onError: (error) => {
+    onError: () => {
       toast.error("Erro ao enviar mensagem. Tente novamente.");
       setIsLoading(false);
     },
@@ -113,16 +173,17 @@ export default function ChatView() {
       setMessages(data.messages);
       setIsLoading(false);
       setSelectedFile(null);
+      setInput("");
       queryClient.invalidateQueries({ queryKey: ["conversations", "list"] });
+      toast.success("Arquivo analisado com sucesso!");
     },
     onError: (error) => {
-      toast.error("Erro ao fazer upload do arquivo. Tente novamente.");
+      toast.error("Erro ao processar o arquivo. Tente novamente.");
       setIsLoading(false);
       setSelectedFile(null);
     },
   });
 
-  // Sync messages from query
   useEffect(() => {
     if (messagesQuery.data) {
       setMessages(messagesQuery.data as DbMessage[]);
@@ -147,6 +208,7 @@ export default function ChatView() {
   const handleNewConversation = () => {
     createConversationMutation.mutate({ title: "Nova conversa" });
     setInput("");
+    setSelectedFile(null);
     textareaRef.current?.focus();
   };
 
@@ -178,14 +240,24 @@ export default function ChatView() {
 
   const handleFileChange = (event: React.ChangeEvent<HTMLInputElement>) => {
     const file = event.target.files?.[0];
-    if (file) {
-      setSelectedFile(file);
-      setInput("");
+    if (!file) return;
+
+    // Limite de 10MB
+    if (file.size > 10 * 1024 * 1024) {
+      toast.error("Arquivo muito grande. Limite: 10MB.");
+      return;
     }
+
+    setSelectedFile(file);
+    // Foca no textarea para o usuário digitar uma mensagem opcional
+    setTimeout(() => textareaRef.current?.focus(), 100);
+
+    // Reset o input de arquivo para permitir selecionar o mesmo arquivo novamente
+    if (fileInputRef.current) fileInputRef.current.value = "";
   };
 
-  const handleFileUpload = async () => {
-    if (!selectedFile || isLoading || !activeConversationId) return;
+  const handleFileUpload = async (convId: number) => {
+    if (!selectedFile || isLoading) return;
 
     setIsLoading(true);
     const reader = new FileReader();
@@ -193,10 +265,11 @@ export default function ChatView() {
     reader.onload = () => {
       const base64Content = (reader.result as string).split(",")[1];
       uploadFileMutation.mutate({
-        conversationId: activeConversationId,
+        conversationId: convId,
         fileName: selectedFile.name,
         fileContent: base64Content,
-        fileType: selectedFile.type,
+        fileType: selectedFile.type || "application/octet-stream",
+        userMessage: input.trim() || undefined,
       });
     };
     reader.onerror = () => {
@@ -207,8 +280,24 @@ export default function ChatView() {
 
   const handleFormSubmit = (e: React.FormEvent) => {
     e.preventDefault();
+    if (isLoading) return;
+
     if (selectedFile) {
-      handleFileUpload();
+      // Se há arquivo selecionado, precisa de uma conversa ativa
+      if (!activeConversationId) {
+        const title = selectedFile.name.slice(0, 50);
+        createConversationMutation.mutate(
+          { title: `Arquivo: ${title}` },
+          {
+            onSuccess: (data) => {
+              setActiveConversationId(data.id);
+              handleFileUpload(data.id);
+            },
+          }
+        );
+      } else {
+        handleFileUpload(activeConversationId);
+      }
     } else {
       handleSendMessage(input);
     }
@@ -230,6 +319,8 @@ export default function ChatView() {
   };
 
   const displayMessages = messages.filter((m) => m.role !== "system");
+
+  const FileIcon = selectedFile ? getFileIcon(selectedFile.name) : Paperclip;
 
   return (
     <div className="flex h-[calc(100vh-3.5rem)] overflow-hidden">
@@ -333,13 +424,20 @@ export default function ChatView() {
                   </div>
                   <div className="text-center space-y-2">
                     <h1 className="text-2xl font-bold tracking-tight">DevAI Assistant</h1>
-                    <p className="text-sm text-muted-foreground max-w-md">Seu assistente de programação e produtividade. Pergunte qualquer coisa sobre código, projetos ou tarefas do dia a dia.</p>
+                    <p className="text-sm text-muted-foreground max-w-md">
+                      Seu assistente de programação e produtividade. Pergunte qualquer coisa sobre código, projetos ou envie um arquivo para análise.
+                    </p>
                   </div>
                 </div>
 
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                   {SUGGESTED_PROMPTS.map((prompt, index) => (
-                    <button key={index} onClick={() => handleSendMessage(prompt.text)} disabled={isLoading} className="group flex items-start gap-3 rounded-xl border bg-card p-4 text-left transition-all hover:shadow-md hover:border-primary/30 hover:bg-accent/50 disabled:opacity-50">
+                    <button
+                      key={index}
+                      onClick={() => handleSendMessage(prompt.text)}
+                      disabled={isLoading}
+                      className="group flex items-start gap-3 rounded-xl border bg-card p-4 text-left transition-all hover:shadow-md hover:border-primary/30 hover:bg-accent/50 disabled:opacity-50"
+                    >
                       <div className="mt-0.5 flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-primary/10 text-primary group-hover:bg-primary/20 transition-colors">
                         <prompt.icon className="h-4 w-4" />
                       </div>
@@ -354,41 +452,78 @@ export default function ChatView() {
             </div>
           ) : (
             <div className="max-w-3xl mx-auto space-y-6 py-6 px-4">
-              {displayMessages.map((message) => (
-                <div key={message.id} className={cn("flex gap-3", message.role === "user" ? "justify-end" : "justify-start")}>
-                  {message.role === "assistant" && (
-                    <div className="shrink-0 mt-0.5">
-                      <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-gradient-to-br from-violet-500 to-indigo-600 shadow-sm">
-                        <Sparkles className="h-4 w-4 text-white" />
-                      </div>
-                    </div>
-                  )}
+              {displayMessages.map((message) => {
+                const isFileMessage = hasEmbeddedFile(message.content);
+                const fileName = message.fileName || (isFileMessage ? extractFileName(message.content) : null);
+                const userText = isFileMessage ? extractUserMessage(message.content) : message.content;
+                const FileIconComp = fileName ? getFileIcon(fileName) : FileText;
 
-                  <div className={cn("max-w-[85%] rounded-2xl px-4 py-3", message.role === "user" ? "bg-primary text-primary-foreground" : "bg-card border shadow-sm")}>
-                    {message.fileUrl && message.fileName ? (
-                      <div className="flex items-center gap-2">
-                        <Paperclip className="h-4 w-4 text-muted-foreground" />
-                        <a href={message.fileUrl} target="_blank" rel="noopener noreferrer" className="text-sm text-blue-500 hover:underline">{message.fileName}</a>
+                return (
+                  <div key={message.id} className={cn("flex gap-3", message.role === "user" ? "justify-end" : "justify-start")}>
+                    {message.role === "assistant" && (
+                      <div className="shrink-0 mt-0.5">
+                        <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-gradient-to-br from-violet-500 to-indigo-600 shadow-sm">
+                          <Sparkles className="h-4 w-4 text-white" />
+                        </div>
                       </div>
-                    ) : message.role === "assistant" ? (
-                      <div className="prose prose-sm dark:prose-invert max-w-none prose-pre:bg-muted prose-pre:border prose-pre:border-border prose-pre:rounded-lg">
-                        <Streamdown>{message.content}</Streamdown>
+                    )}
+
+                    <div className={cn(
+                      "max-w-[85%] rounded-2xl px-4 py-3",
+                      message.role === "user"
+                        ? "bg-primary text-primary-foreground"
+                        : "bg-card border shadow-sm"
+                    )}>
+                      {message.role === "user" && isFileMessage ? (
+                        // Mensagem de usuário com arquivo anexado
+                        <div className="space-y-2">
+                          {userText && (
+                            <p className="text-sm whitespace-pre-wrap leading-relaxed">{userText}</p>
+                          )}
+                          <div className={cn(
+                            "flex items-center gap-2 rounded-lg px-3 py-2",
+                            "bg-primary-foreground/10 border border-primary-foreground/20"
+                          )}>
+                            <FileIconComp className="h-4 w-4 shrink-0 opacity-80" />
+                            <div className="min-w-0">
+                              <p className="text-xs font-medium truncate">{fileName}</p>
+                              {message.fileUrl && (
+                                <a
+                                  href={message.fileUrl}
+                                  target="_blank"
+                                  rel="noopener noreferrer"
+                                  className="text-xs opacity-70 hover:opacity-100 underline"
+                                >
+                                  Ver arquivo
+                                </a>
+                              )}
+                            </div>
+                            <Badge variant="secondary" className="shrink-0 text-xs bg-primary-foreground/20 text-primary-foreground border-0">
+                              Analisado
+                            </Badge>
+                          </div>
+                        </div>
+                      ) : message.role === "assistant" ? (
+                        <div className="prose prose-sm dark:prose-invert max-w-none prose-pre:bg-muted prose-pre:border prose-pre:border-border prose-pre:rounded-lg">
+                          <Streamdown>{message.content}</Streamdown>
+                        </div>
+                      ) : (
+                        <p className="text-sm whitespace-pre-wrap leading-relaxed">{message.content}</p>
+                      )}
+                    </div>
+
+                    {message.role === "user" && (
+                      <div className="shrink-0 mt-0.5">
+                        <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-muted border shadow-sm">
+                          <User className="h-4 w-4 text-muted-foreground" />
+                        </div>
                       </div>
-                    ) : (
-                      <p className="text-sm whitespace-pre-wrap leading-relaxed">{message.content}</p>
                     )}
                   </div>
+                );
+              })}
 
-                  {message.role === "user" && (
-                    <div className="shrink-0 mt-0.5">
-                      <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-muted border shadow-sm">
-                        <User className="h-4 w-4 text-muted-foreground" />
-                      </div>
-                    </div>
-                  )}
-                </div>
-              ))}
-              {isLoading && !selectedFile && (
+              {isLoading && (
                 <div className="flex gap-3 justify-start">
                   <div className="shrink-0 mt-0.5">
                     <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-gradient-to-br from-violet-500 to-indigo-600 shadow-sm">
@@ -398,7 +533,9 @@ export default function ChatView() {
                   <div className="rounded-2xl bg-card border shadow-sm px-4 py-3">
                     <div className="flex items-center gap-2 text-muted-foreground">
                       <Loader2 className="h-4 w-4 animate-spin" />
-                      <span className="text-sm">DevAI está pensando...</span>
+                      <span className="text-sm">
+                        {selectedFile ? `Analisando ${selectedFile.name}...` : "DevAI está pensando..."}
+                      </span>
                     </div>
                   </div>
                 </div>
@@ -407,43 +544,87 @@ export default function ChatView() {
           )}
         </div>
 
+        {/* ─── Input Area ─── */}
         <div className="p-4 border-t bg-background/80 backdrop-blur">
-          <div className="max-w-3xl mx-auto">
-            <form onSubmit={handleFormSubmit} className="flex flex-col gap-3">
-              <div className="flex items-center gap-3">
-                <div className="relative flex-1">
-                  <Textarea
-                    ref={textareaRef}
-                    value={input}
-                    onChange={(e) => setInput(e.target.value)}
-                    onKeyDown={(e) => {
-                      if (e.key === "Enter" && !e.shiftKey) {
-                        e.preventDefault();
-                        handleFormSubmit(e);
-                      }
-                      if (e.key === "Escape") setSelectedFile(null);
-                    }}
-                    placeholder={selectedFile ? `Anexado: ${selectedFile.name}` : "Pergunte sobre programação, projetos ou qualquer coisa..."}
-                    className="flex-1 resize-none min-h-[44px] max-h-32 pr-20 rounded-xl border bg-background focus-visible:ring-1 focus-visible:ring-primary"
-                    rows={1}
-                    disabled={!!selectedFile}
-                  />
-                  {selectedFile && (
-                    <button type="button" onClick={() => setSelectedFile(null)} className="absolute right-12 top-1/2 -translate-y-1/2 p-1 rounded-full hover:bg-accent text-muted-foreground" title="Remover anexo">
-                      <X className="h-4 w-4" />
-                    </button>
-                  )}
-                  <input type="file" ref={fileInputRef} onChange={handleFileChange} className="hidden" />
-                  <button type="button" onClick={() => fileInputRef.current?.click()} className="absolute right-2 top-1/2 -translate-y-1/2 p-1 rounded-full hover:bg-accent text-muted-foreground" title="Anexar arquivo">
-                    <Paperclip className="h-4 w-4" />
-                  </button>
+          <div className="max-w-3xl mx-auto space-y-2">
+            {/* Preview do arquivo selecionado */}
+            {selectedFile && (
+              <div className="flex items-center gap-2 rounded-xl border bg-muted/50 px-3 py-2">
+                <FileIcon className="h-4 w-4 text-muted-foreground shrink-0" />
+                <div className="flex-1 min-w-0">
+                  <p className="text-xs font-medium truncate">{selectedFile.name}</p>
+                  <p className="text-xs text-muted-foreground">
+                    {formatFileSize(selectedFile.size)}
+                    {isTextFile(selectedFile) ? " · Conteúdo será lido pela IA" : " · Arquivo binário"}
+                  </p>
                 </div>
-                <Button type="submit" size="icon" disabled={(!input.trim() && !selectedFile) || isLoading} className="shrink-0 h-11 w-11 rounded-xl shadow-md">
-                  {isLoading ? <Loader2 className="h-4 w-4 animate-spin" /> : <Send className="h-4 w-4" />}
-                </Button>
+                <button
+                  type="button"
+                  onClick={() => setSelectedFile(null)}
+                  className="shrink-0 rounded-full p-1 hover:bg-accent text-muted-foreground"
+                  title="Remover arquivo"
+                >
+                  <X className="h-3.5 w-3.5" />
+                </button>
               </div>
+            )}
+
+            <form onSubmit={handleFormSubmit} className="flex items-end gap-3">
+              <div className="relative flex-1">
+                <Textarea
+                  ref={textareaRef}
+                  value={input}
+                  onChange={(e) => setInput(e.target.value)}
+                  onKeyDown={(e) => {
+                    if (e.key === "Enter" && !e.shiftKey) {
+                      e.preventDefault();
+                      handleFormSubmit(e);
+                    }
+                    if (e.key === "Escape") setSelectedFile(null);
+                  }}
+                  placeholder={
+                    selectedFile
+                      ? "Adicione uma mensagem sobre o arquivo (opcional)..."
+                      : "Pergunte sobre programação, projetos ou qualquer coisa..."
+                  }
+                  className="flex-1 resize-none min-h-[44px] max-h-32 pr-10 rounded-xl border bg-background focus-visible:ring-1 focus-visible:ring-primary"
+                  rows={1}
+                />
+                <input
+                  type="file"
+                  ref={fileInputRef}
+                  onChange={handleFileChange}
+                  className="hidden"
+                  accept="*/*"
+                />
+                <button
+                  type="button"
+                  onClick={() => fileInputRef.current?.click()}
+                  className={cn(
+                    "absolute right-2 top-1/2 -translate-y-1/2 p-1 rounded-full transition-colors",
+                    selectedFile
+                      ? "text-primary hover:bg-primary/10"
+                      : "text-muted-foreground hover:bg-accent"
+                  )}
+                  title="Anexar arquivo para análise"
+                >
+                  <Paperclip className="h-4 w-4" />
+                </button>
+              </div>
+
+              <Button
+                type="submit"
+                size="icon"
+                disabled={(!input.trim() && !selectedFile) || isLoading}
+                className="shrink-0 h-11 w-11 rounded-xl shadow-md"
+              >
+                {isLoading ? <Loader2 className="h-4 w-4 animate-spin" /> : <Send className="h-4 w-4" />}
+              </Button>
             </form>
-            <p className="mt-1.5 text-center text-[11px] text-muted-foreground/70">DevAI pode cometer erros. Verifique informações importantes.</p>
+
+            <p className="text-center text-[11px] text-muted-foreground/70">
+              DevAI pode cometer erros. Verifique informações importantes.
+            </p>
           </div>
         </div>
       </div>
