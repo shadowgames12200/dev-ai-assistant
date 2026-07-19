@@ -1,3 +1,7 @@
+import dns from 'node:dns';
+// Forçar o Node.js a priorizar IPv4 sobre IPv6 para evitar erros de rede no Render (ENETUNREACH)
+dns.setDefaultResultOrder('ipv4first');
+
 import express from 'express';
 import { createExpressMiddleware } from '@trpc/server/adapters/express';
 import { appRouter } from '../server/routers.js';
