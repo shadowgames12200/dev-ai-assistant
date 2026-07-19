@@ -16,7 +16,7 @@ export async function createContext(
   let user: User | null = null;
 
   try {
-    const cookies = parseCookieHeader(opts.req.headers.cookie ?? "");
+    const cookies = parseCookieHeader((opts.req.headers as any).cookie ?? "");
     if (cookies[COOKIE_NAME] === "admin-session-charles") {
       user = { id: 1, openId: "charles-admin", name: "Charles Henrique", role: "admin" } as any;
       return { req: opts.req, res: opts.res, user };
