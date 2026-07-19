@@ -142,7 +142,6 @@ export const appRouter = router({
               messages: currentMessages,
               tools: tools,
               maxTokens: 4000,
-              thinking: useAdvancedReasoning ? { level: "high" } : undefined,
             });
 
             const message = response.choices[0]?.message;

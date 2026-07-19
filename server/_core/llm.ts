@@ -142,6 +142,7 @@ const normalizeContentPart = (
 const normalizeMessage = (message: Message) => {
   const { role, name, tool_call_id } = message;
 
+  // Handle tool/function messages
   if (role === "tool" || role === "function") {
     const content = ensureArray(message.content)
       .map(part => (typeof part === "string" ? part : JSON.stringify(part)))
@@ -152,6 +153,25 @@ const normalizeMessage = (message: Message) => {
       name,
       tool_call_id,
       content,
+    };
+  }
+
+  // Handle assistant messages with tool_calls (content may be null)
+  if (role === "assistant" && (message as any).tool_calls) {
+    return {
+      role,
+      name,
+      content: null,
+      tool_calls: (message as any).tool_calls,
+    };
+  }
+
+  // Handle user/system messages with content
+  if (message.content === undefined || message.content === null) {
+    return {
+      role,
+      name,
+      content: "",
     };
   }
 
@@ -378,6 +398,9 @@ export async function invokeLLM(params: InvokeParams): Promise<InvokeResult> {
   );
   if (normalizedToolChoice) {
     payload.tool_choice = normalizedToolChoice;
+  } else if (tools && tools.length > 0) {
+    // Default to auto for Groq/OpenAI compatible APIs
+    payload.tool_choice = "auto";
   }
 
   const resolvedMaxTokens = max_tokens ?? maxTokens;
@@ -385,12 +408,8 @@ export async function invokeLLM(params: InvokeParams): Promise<InvokeResult> {
     payload.max_tokens = resolvedMaxTokens;
   }
 
-  if (thinking) {
-    payload.thinking = thinking;
-  }
-  if (reasoning) {
-    payload.reasoning = reasoning;
-  }
+  // thinking/reasoning are not supported by Groq, skip them
+  // (they are Manus-specific features)
 
   const normalizedResponseFormat = normalizeResponseFormat({
     responseFormat,
