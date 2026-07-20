@@ -1,12 +1,10 @@
 import { COOKIE_NAME, ONE_YEAR_MS } from "../../shared/const.js";
 import { ForbiddenError } from "../../shared/_core/errors.js";
 import { parse as parseCookieHeader } from "cookie";
-import type { Request } from "express";
 import { SignJWT, jwtVerify } from "jose";
 import type { User } from "../../drizzle/schema.js";
 import * as db from "../db.js";
 import { ENV } from "./env.js";
-import { supabase } from "./supabase.js";
 
 // Utility function
 const isNonEmptyString = (value: unknown): value is string =>
@@ -100,12 +98,13 @@ class SDKServer {
     }
   }
 
-  async authenticateRequest(req: Request): Promise<AuthenticatedUser> {
-    const cookies = this.parseCookies(req.headers.cookie);
+  async authenticateRequest(req: any): Promise<AuthenticatedUser> {
+    const cookieHeader = req.headers?.cookie;
+    const cookies = this.parseCookies(cookieHeader);
     let sessionToken = cookies.get(COOKIE_NAME);
 
     if (!sessionToken) {
-      const authHeader = req.headers.authorization;
+      const authHeader = req.headers?.authorization;
       if (typeof authHeader === "string" && authHeader.startsWith("Bearer ")) {
         sessionToken = authHeader.slice(7);
       }

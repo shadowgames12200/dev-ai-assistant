@@ -1,5 +1,4 @@
 import { COOKIE_NAME, ONE_YEAR_MS } from "../../shared/const.js";
-import type { Express, Request, Response } from "express";
 import * as db from "../db.js";
 import { getSessionCookieOptions } from "../_core/cookies.js";
 import { sdk } from "../_core/sdk.js";
@@ -17,13 +16,14 @@ function generateSalt(): string {
 // In-memory password store (fallback when DB is not available)
 const passwordStore: Map<string, { passwordHash: string; salt: string }> = new Map();
 
-export function registerLocalAuthRoutes(app: Express) {
+export function registerLocalAuthRoutes(app: any) {
   /**
    * POST /api/auth/login - Login ou cadastro automático
    * Se o usuário não existir, cria automaticamente.
    * Se existir, valida a senha e faz login.
    */
-  app.post("/api/auth/login", async (req: Request, res: Response) => {
+  // @ts-ignore
+  app.post("/api/auth/login", async (req: any, res: any) => {
     try {
       const { email, password } = req.body;
 
@@ -106,7 +106,8 @@ export function registerLocalAuthRoutes(app: Express) {
   /**
    * POST /api/auth/logout - Logout
    */
-  app.post("/api/auth/logout", (req: Request, res: Response) => {
+  // @ts-ignore
+  app.post("/api/auth/logout", (req: any, res: any) => {
     const cookieOptions = getSessionCookieOptions(req);
     res.clearCookie(COOKIE_NAME, { ...cookieOptions, maxAge: 0 });
     res.json({ success: true });

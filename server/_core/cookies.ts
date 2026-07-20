@@ -1,5 +1,3 @@
-import type { CookieOptions, Request } from "express";
-
 const LOCAL_HOSTS = new Set(["localhost", "127.0.0.1", "::1"]);
 
 function isIpAddress(host: string) {
@@ -8,39 +6,21 @@ function isIpAddress(host: string) {
   return host.includes(":");
 }
 
-function isSecureRequest(req: Request) {
+function isSecureRequest(req: any) {
   if (req.protocol === "https") return true;
 
-  const forwardedProto = req.headers["x-forwarded-proto"];
+  const forwardedProto = req.headers?.["x-forwarded-proto"];
   if (!forwardedProto) return false;
 
   const protoList = Array.isArray(forwardedProto)
     ? forwardedProto
     : forwardedProto.split(",");
 
-  return protoList.some(proto => proto.trim().toLowerCase() === "https");
+  return protoList.some((proto: string) => proto.trim().toLowerCase() === "https");
 }
 
-export function getSessionCookieOptions(
-  req: Request
-): Pick<CookieOptions, "domain" | "httpOnly" | "path" | "sameSite" | "secure"> {
-  // const hostname = req.hostname;
-  // const shouldSetDomain =
-  //   hostname &&
-  //   !LOCAL_HOSTS.has(hostname) &&
-  //   !isIpAddress(hostname) &&
-  //   hostname !== "127.0.0.1" &&
-  //   hostname !== "::1";
-
-  // const domain =
-  //   shouldSetDomain && !hostname.startsWith(".")
-  //     ? `.${hostname}`
-  //     : shouldSetDomain
-  //       ? hostname
-  //       : undefined;
-
-  const isSecure = isSecureRequest(req);
-  const hostname = req.hostname || "";
+export function getSessionCookieOptions(req: any) {
+  const hostname = req.hostname || req.headers?.host?.split(":")[0] || "";
   const isLocal = LOCAL_HOSTS.has(hostname) || isIpAddress(hostname);
 
   return {
@@ -48,7 +28,7 @@ export function getSessionCookieOptions(
     path: "/",
     // Usamos SameSite=Lax para garantir que o cookie de sessão seja enviado 
     // após redirecionamentos do Supabase, evitando o loop de login.
-    sameSite: "lax",
-    secure: isSecure,
+    sameSite: "lax" as const,
+    secure: isSecureRequest(req),
   };
 }
