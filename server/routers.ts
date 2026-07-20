@@ -96,14 +96,19 @@ export const appRouter = router({
         await db.addMessage(conversationId, "user", content, fileUrl, fileName);
         
         const history = await db.getConversationMessages(conversationId);
-        const response = await invokeLLM({
-          model: "llama-3.1-8b-instant",
-          messages: history.map(m => ({ role: m.role as any, content: m.content })),
-          maxTokens: 2000,
-        });
+        try {
+          const response = await invokeLLM({
+            model: "gpt-5-mini",
+            messages: history.map(m => ({ role: m.role as any, content: m.content })),
+            maxTokens: 2000,
+          });
 
-        const aiMsg = response.choices[0]?.message?.content || "Erro";
-        await db.addMessage(conversationId, "assistant", aiMsg as string);
+          const aiMsg = response.choices[0]?.message?.content || "Desculpe, não consegui gerar uma resposta.";
+          await db.addMessage(conversationId, "assistant", aiMsg as string);
+        } catch (err) {
+          console.error("[Chat] LLM invocation error:", err);
+          await db.addMessage(conversationId, "assistant", "Desculpe, ocorreu um erro ao processar sua solicitação. Tente novamente.");
+        }
         
         return { success: true, messages: await db.getConversationMessages(conversationId) };
       }),
@@ -120,14 +125,19 @@ export const appRouter = router({
         await db.addMessage(input.conversationId, "user", input.content);
         const history = await db.getConversationMessages(input.conversationId);
         
-        const response = await invokeLLM({
-          model: "llama-3.1-8b-instant",
-          messages: history.map(m => ({ role: m.role as any, content: m.content })),
-          maxTokens: 2000,
-        });
+        try {
+          const response = await invokeLLM({
+            model: "gpt-5-mini",
+            messages: history.map(m => ({ role: m.role as any, content: m.content })),
+            maxTokens: 2000,
+          });
 
-        const aiMsg = response.choices[0]?.message?.content || "Erro";
-        await db.addMessage(input.conversationId, "assistant", aiMsg as string);
+          const aiMsg = response.choices[0]?.message?.content || "Desculpe, não consegui gerar uma resposta.";
+          await db.addMessage(input.conversationId, "assistant", aiMsg as string);
+        } catch (err) {
+          console.error("[Chat] LLM invocation error:", err);
+          await db.addMessage(input.conversationId, "assistant", "Desculpe, ocorreu um erro ao processar sua solicitação. Tente novamente.");
+        }
         
         return { success: true, messages: await db.getConversationMessages(input.conversationId) };
       }),
