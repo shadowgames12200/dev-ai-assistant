@@ -4,6 +4,12 @@
   "outputDirectory": "dist/public",
   "installCommand": "pnpm install",
   "framework": null,
+  "functions": {
+    "api/main.js": {
+      "maxDuration": 60,
+      "memory": 1024
+    }
+  },
   "rewrites": [
     { "source": "/api/(.*)", "destination": "/api/main.js" },
     { "source": "/((?!assets|static|.*\\..*).*)", "destination": "/api/main.js" }

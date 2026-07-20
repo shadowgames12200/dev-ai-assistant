@@ -277,11 +277,19 @@ export default function ChatView() {
     const file = event.target.files?.[0];
     if (!file) return;
 
-    // Limite de 15MB para upload via JSON (limite seguro para Vercel serverless)
-    const maxSize = 15 * 1024 * 1024;
+    // Limite de 100MB para upload via JSON
+    const maxSize = 100 * 1024 * 1024;
     if (file.size > maxSize) {
       toast.error(`Arquivo muito grande. Limite: ${maxSize / 1024 / 1024}MB.`);
       return;
+    }
+
+    // Aviso para arquivos grandes no Vercel (limite de 4.5MB no plano free)
+    const vercelLimit = 4.5 * 1024 * 1024;
+    if (file.size > vercelLimit) {
+      toast.info(`Arquivo de ${Math.round(file.size / 1024 / 1024)}MB. Se estiver usando Vercel free, o limite é 4.5MB.`, {
+        duration: 6000,
+      });
     }
 
     setSelectedFile(file);
