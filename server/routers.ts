@@ -38,12 +38,15 @@ Você TEM a capacidade de melhorar a si mesma. Quando:
 Você DEVE usar a ferramenta de self-improvement. O processo é:
 1. Analisar o que precisa ser melhorado
 2. Planejar as mudanças necessárias
-3. Implementar as mudanças
-4. Testar 5 vezes para garantir estabilidade
-5. Só aplicar se TODOS os 5 testes passarem
+3. Implementar as mudanças no clone
+4. Testar 20 vezes consecutivas para garantir estabilidade TOTAL
+5. Se algum teste falhar → corrigir automaticamente e testar de novo
+6. Repetir até TODOS os 20 testes passarem consecutivamente
+7. Máximo de 3 rodadas de correção
+8. Só aplicar (push) se 20/20 testes passarem
 
 NUNCA aplique mudanças sem testar. Segurança é prioridade.
-Se um teste falhar, reverta e informe o usuário sobre o problema encontrado.`;
+Se não conseguir passar após 3 rodadas de correção, reverta e informe o usuário sobre o problema encontrado.
 
 function truncateMessagesForContext(messages: any[], maxContentLength: number = 200000): any[] {
   let totalLength = 0;
