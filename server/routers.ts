@@ -57,7 +57,11 @@ Quando aprovada, o processo é:
 
 NUNCA aplique mudanças sem testar. Segurança é prioridade.
 Se não conseguir passar após 3 rodadas de correção, reverta e informe o usuário.
-APROVAÇÃO DO USUÁRIO É OBRIGATÓRIA ANTES DE QUALQUER MUDANÇA.`;
+APROVAÇÃO DO USUÁRIO É OBRIGATÓRIA ANTES DE QUALQUER MUDANÇA.
+
+IMPORTANTE: Para aprovar, o dono deve fornecer a APPROVAL_KEY (chave secreta configurada no servidor).
+Se outro usuário (não dono) tentar aprovar, a tentativa será REJEITADA automaticamente.
+Se a chave estiver errada, avise que "Só o dono pode aprovar melhorias."`;
 
 function truncateMessagesForContext(messages: any[], maxContentLength: number = 200000): any[] {
   let totalLength = 0;
@@ -298,7 +302,7 @@ export const appRouter = router({
         msg += `\n**Benefícios:** ${proposal.benefits.length > 0 ? proposal.benefits.join(", ") : "N/A"}`;
         msg += `\n**Tempo estimado:** ${proposal.estimatedTime}\n\n`;
         msg += `---\n`;
-        msg += `⏳ **Aguardando sua aprovação.** Diga "aprovo" ou "sim" para executar, ou "não" para rejeitar.`;
+        msg += `⏳ **Aguardando sua aprovação.** Para aprovar, use o comando:\n\`/aprovar <ID> <SUA_CHAVE_SECRETA>\`\n\nSe você não é o dono, pode apenas sugerir — não pode aprovar.`;
 
         await db.addMessage(1, "assistant", msg);
 
@@ -306,14 +310,32 @@ export const appRouter = router({
       }),
 
     /**
-     * O USUÁRIO aprova a proposta — a IA só executa APÓS isso
+     * O DONO aprova a proposta — EXIGE uma approval key secreta
+     * Outros usuários só podem SUGERIR, não aprovar
      */
     approve: protectedProcedure
       .input(z.object({
         proposalId: z.string().describe("ID da proposta a ser aprovada"),
+        approvalKey: z.string().describe("Chave secreta de aprovação do dono"),
       }))
       .mutation(async ({ ctx, input }) => {
         if (!ctx.user) throw new TRPCError({ code: "UNAUTHORIZED" });
+
+        // Verificar se a approval key é válida
+        // A chave deve ser configurada no .env como APPROVAL_KEY
+        const expectedKey = process.env.APPROVAL_KEY || "";
+
+        if (!expectedKey) {
+          return { success: false, message: "Approval key não configurada no servidor. O dono precisa configurar APPROVAL_KEY no .env." };
+        }
+
+        if (input.approvalKey !== expectedKey) {
+          // Registrar tentativa não autorizada
+          const proposal = getProposal(input.proposalId);
+          const msg = `⚠️ **TENTATIVA DE APROVAÇÃO NÃO AUTORIZADA**\n\nAlguém tentou aprovar a proposta "${proposal?.title || input.proposalId}" sem a chave correta.\n**Só o dono pode aprovar melhorias.**`;
+          await db.addMessage(1, "assistant", msg);
+          return { success: false, message: "Chave de aprovação inválida. Só o dono pode aprovar melhorias." };
+        }
 
         const proposal = getProposal(input.proposalId);
         if (!proposal) {
@@ -330,10 +352,10 @@ export const appRouter = router({
 
         approveProposal(input.proposalId);
 
-        const msg = `✅ **Proposta aprovada!** Iniciando execução...\n\n**${proposal.title}**\nClonando repositório, aplicando mudanças e testando 20 vezes consecutivas...`;
+        const msg = `✅ **Proposta aprovada pelo DONO!** Iniciando execução...\n\n**${proposal.title}**\nClonando repositório, aplicando mudanças e testando 20 vezes consecutivas...`;
         await db.addMessage(1, "assistant", msg);
 
-        return { success: true, message: "Proposta aprovada. Executando..." };
+        return { success: true, message: "Proposta aprovada pelo dono. Executando..." };
       }),
 
     /**
