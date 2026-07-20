@@ -25,6 +25,8 @@ import {
   FileCode,
   FileJson,
   File,
+  Image as ImageIcon,
+  FileArchive,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { toast } from "sonner";
@@ -66,6 +68,11 @@ const TEXT_EXTENSIONS = new Set([
   "dockerfile", "makefile", "gitignore",
 ]);
 
+// Tipos MIME de imagens
+const IMAGE_MIME_TYPES = new Set([
+  "image/jpeg", "image/jpg", "image/png", "image/gif", "image/webp", "image/bmp", "image/svg+xml",
+]);
+
 function getFileIcon(fileName: string) {
   const ext = fileName.split(".").pop()?.toLowerCase() ?? "";
   if (["js", "jsx", "ts", "tsx", "py", "java", "go", "rs", "c", "cpp", "cs"].includes(ext))
@@ -74,6 +81,8 @@ function getFileIcon(fileName: string) {
     return FileJson;
   if (["txt", "md", "log", "csv"].includes(ext))
     return FileText;
+  if (["zip", "rar", "7z", "tar", "gz", "bz2"].includes(ext))
+    return FileArchive;
   return File;
 }
 
@@ -85,6 +94,17 @@ function isTextFile(file: File): boolean {
     TEXT_EXTENSIONS.has(ext);
 }
 
+function isImageFile(file: File): boolean {
+  return IMAGE_MIME_TYPES.has(file.type.toLowerCase()) ||
+    ["jpg", "jpeg", "png", "gif", "webp", "bmp", "svg"].includes(file.name.split(".").pop()?.toLowerCase() ?? "");
+}
+
+function getFileCategory(file: File): string {
+  if (isImageFile(file)) return "Imagem";
+  if (isTextFile(file)) return "Texto";
+  return "Arquivo";
+}
+
 function formatFileSize(bytes: number): string {
   if (bytes < 1024) return `${bytes} B`;
   if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(1)} KB`;
@@ -93,20 +113,34 @@ function formatFileSize(bytes: number): string {
 
 // Extrai o nome do arquivo de uma mensagem com conteúdo de arquivo
 function extractFileName(content: string): string | null {
-  const match = content.match(/\[Conteúdo do arquivo '([^']+)'/);
+  const match = content.match(/\[Arquivo:\s*([^\]]+)\]/);
   return match ? match[1] : null;
 }
 
 // Verifica se uma mensagem contém conteúdo de arquivo embutido
 function hasEmbeddedFile(content: string): boolean {
-  return content.includes("[Conteúdo do arquivo '");
+  return content.includes("[Arquivo:") || content.includes("[Imagem anexada:");
 }
 
 // Extrai a mensagem do usuário antes do conteúdo do arquivo
 function extractUserMessage(content: string): string {
-  const idx = content.indexOf("[Conteúdo do arquivo '");
-  if (idx === -1) return content;
+  const idx = Math.min(
+    content.indexOf("[Arquivo:") !== -1 ? content.indexOf("[Arquivo:") : Infinity,
+    content.indexOf("[Imagem anexada:") !== -1 ? content.indexOf("[Imagem anexada:") : Infinity
+  );
+  if (idx === Infinity) return content;
   return content.slice(0, idx).trim();
+}
+
+// Detecta se a mensagem é de imagem
+function hasEmbeddedImage(content: string): boolean {
+  return content.includes("[Imagem anexada:");
+}
+
+// Verifica se é imagem pelo filename
+function isImageByFileName(fileName: string): boolean {
+  const ext = fileName.split(".").pop()?.toLowerCase() ?? "";
+  return ["jpg", "jpeg", "png", "gif", "webp", "bmp", "svg"].includes(ext);
 }
 
 export default function ChatView() {
@@ -118,6 +152,7 @@ export default function ChatView() {
   const [editingTitle, setEditingTitle] = useState("");
   const [useAdvancedReasoning, setUseAdvancedReasoning] = useState(false);
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
+  const [imagePreview, setImagePreview] = useState<string | null>(null);
 
   const textareaRef = useRef<HTMLTextAreaElement>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
@@ -173,14 +208,17 @@ export default function ChatView() {
       setMessages(data.messages);
       setIsLoading(false);
       setSelectedFile(null);
+      setImagePreview(null);
       setInput("");
       queryClient.invalidateQueries({ queryKey: ["conversations", "list"] });
       toast.success("Arquivo analisado com sucesso!");
     },
-    onError: (error) => {
-      toast.error("Erro ao processar o arquivo. Tente novamente.");
+    onError: (error: any) => {
+      const msg = error?.message || "Erro ao processar o arquivo. Tente novamente.";
+      toast.error(msg);
       setIsLoading(false);
       setSelectedFile(null);
+      setImagePreview(null);
     },
   });
 
@@ -209,6 +247,7 @@ export default function ChatView() {
     createConversationMutation.mutate({ title: "Nova conversa" });
     setInput("");
     setSelectedFile(null);
+    setImagePreview(null);
     textareaRef.current?.focus();
   };
 
@@ -242,13 +281,25 @@ export default function ChatView() {
     const file = event.target.files?.[0];
     if (!file) return;
 
-    // Limite de 100MB
-    if (file.size > 100 * 1024 * 1024) {
-      toast.error("Arquivo muito grande. Limite: 100MB.");
+    // Limite de 20MB (limite do Groq para imagens)
+    if (file.size > 20 * 1024 * 1024) {
+      toast.error("Arquivo muito grande. Limite: 20MB.");
       return;
     }
 
     setSelectedFile(file);
+
+    // Gerar preview para imagens
+    if (isImageFile(file)) {
+      const reader = new FileReader();
+      reader.onload = (e) => {
+        setImagePreview(e.target?.result as string);
+      };
+      reader.readAsDataURL(file);
+    } else {
+      setImagePreview(null);
+    }
+
     // Foca no textarea para o usuário digitar uma mensagem opcional
     setTimeout(() => textareaRef.current?.focus(), 100);
 
@@ -275,6 +326,8 @@ export default function ChatView() {
     reader.onerror = () => {
       toast.error("Erro ao ler o arquivo.");
       setIsLoading(false);
+      setSelectedFile(null);
+      setImagePreview(null);
     };
   };
 
@@ -425,7 +478,7 @@ export default function ChatView() {
                   <div className="text-center space-y-2">
                     <h1 className="text-2xl font-bold tracking-tight">DevAI Assistant</h1>
                     <p className="text-sm text-muted-foreground max-w-md">
-                      Seu assistente de programação e produtividade. Pergunte qualquer coisa sobre código, projetos ou envie um arquivo para análise.
+                      Seu assistente de programação e produtividade. Envie arquivos (imagens, código, documentos) para análise e receba feedback inteligente via Groq AI.
                     </p>
                   </div>
                 </div>
@@ -454,9 +507,11 @@ export default function ChatView() {
             <div className="max-w-3xl mx-auto space-y-6 py-6 px-4">
               {displayMessages.map((message) => {
                 const isFileMessage = hasEmbeddedFile(message.content);
+                const isImageMessage = hasEmbeddedImage(message.content);
                 const fileName = message.fileName || (isFileMessage ? extractFileName(message.content) : null);
                 const userText = isFileMessage ? extractUserMessage(message.content) : message.content;
                 const FileIconComp = fileName ? getFileIcon(fileName) : FileText;
+                const isFileImage = fileName ? isImageByFileName(fileName) : false;
 
                 return (
                   <div key={message.id} className={cn("flex gap-3", message.role === "user" ? "justify-end" : "justify-start")}>
@@ -484,7 +539,11 @@ export default function ChatView() {
                             "flex items-center gap-2 rounded-lg px-3 py-2",
                             "bg-primary-foreground/10 border border-primary-foreground/20"
                           )}>
-                            <FileIconComp className="h-4 w-4 shrink-0 opacity-80" />
+                            {isFileImage ? (
+                              <ImageIcon className="h-4 w-4 shrink-0 opacity-80" />
+                            ) : (
+                              <FileIconComp className="h-4 w-4 shrink-0 opacity-80" />
+                            )}
                             <div className="min-w-0">
                               <p className="text-xs font-medium truncate">{fileName}</p>
                               {message.fileUrl && (
@@ -499,7 +558,7 @@ export default function ChatView() {
                               )}
                             </div>
                             <Badge variant="secondary" className="shrink-0 text-xs bg-primary-foreground/20 text-primary-foreground border-0">
-                              Analisado
+                              {isFileImage ? "Imagem" : "Analisado"}
                             </Badge>
                           </div>
                         </div>
@@ -549,23 +608,38 @@ export default function ChatView() {
           <div className="max-w-3xl mx-auto space-y-2">
             {/* Preview do arquivo selecionado */}
             {selectedFile && (
-              <div className="flex items-center gap-2 rounded-xl border bg-muted/50 px-3 py-2">
-                <FileIcon className="h-4 w-4 text-muted-foreground shrink-0" />
-                <div className="flex-1 min-w-0">
-                  <p className="text-xs font-medium truncate">{selectedFile.name}</p>
-                  <p className="text-xs text-muted-foreground">
-                    {formatFileSize(selectedFile.size)}
-                    {isTextFile(selectedFile) ? " · Conteúdo será lido pela IA" : " · Arquivo binário"}
-                  </p>
+              <div className="flex flex-col gap-2 rounded-xl border bg-muted/50 px-3 py-2">
+                <div className="flex items-center gap-2">
+                  {imagePreview ? (
+                    <ImageIcon className="h-4 w-4 text-primary shrink-0" />
+                  ) : (
+                    <FileIcon className="h-4 w-4 text-muted-foreground shrink-0" />
+                  )}
+                  <div className="flex-1 min-w-0">
+                    <p className="text-xs font-medium truncate">{selectedFile.name}</p>
+                    <p className="text-xs text-muted-foreground">
+                      {formatFileSize(selectedFile.size)} · {getFileCategory(selectedFile)}
+                    </p>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() => { setSelectedFile(null); setImagePreview(null); }}
+                    className="shrink-0 rounded-full p-1 hover:bg-accent text-muted-foreground"
+                    title="Remover arquivo"
+                  >
+                    <X className="h-3.5 w-3.5" />
+                  </button>
                 </div>
-                <button
-                  type="button"
-                  onClick={() => setSelectedFile(null)}
-                  className="shrink-0 rounded-full p-1 hover:bg-accent text-muted-foreground"
-                  title="Remover arquivo"
-                >
-                  <X className="h-3.5 w-3.5" />
-                </button>
+                {/* Preview da imagem */}
+                {imagePreview && (
+                  <div className="mt-1 rounded-lg overflow-hidden border max-h-48">
+                    <img
+                      src={imagePreview}
+                      alt="Preview"
+                      className="w-full h-full object-contain"
+                    />
+                  </div>
+                )}
               </div>
             )}
 
@@ -580,12 +654,12 @@ export default function ChatView() {
                       e.preventDefault();
                       handleFormSubmit(e);
                     }
-                    if (e.key === "Escape") setSelectedFile(null);
+                    if (e.key === "Escape") { setSelectedFile(null); setImagePreview(null); }
                   }}
                   placeholder={
                     selectedFile
                       ? "Adicione uma mensagem sobre o arquivo (opcional)..."
-                      : "Pergunte sobre programação, projetos ou qualquer coisa..."
+                      : "Pergunte sobre programação, projetos ou envie um arquivo para análise..."
                   }
                   className="flex-1 resize-none min-h-[44px] max-h-32 pr-10 rounded-xl border bg-background focus-visible:ring-1 focus-visible:ring-primary"
                   rows={1}
@@ -606,7 +680,7 @@ export default function ChatView() {
                       ? "text-primary hover:bg-primary/10"
                       : "text-muted-foreground hover:bg-accent"
                   )}
-                  title="Anexar arquivo para análise"
+                  title="Anexar arquivo para análise (imagem, código, documento, etc.)"
                 >
                   <Paperclip className="h-4 w-4" />
                 </button>
@@ -623,7 +697,7 @@ export default function ChatView() {
             </form>
 
             <p className="text-center text-[11px] text-muted-foreground/70">
-              DevAI pode cometer erros. Verifique informações importantes.
+              DevAI usa Groq AI · Envie imagens, código, documentos e mais · Pode cometer erros
             </p>
           </div>
         </div>

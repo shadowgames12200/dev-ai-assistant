@@ -5,24 +5,83 @@ import { publicProcedure, protectedProcedure, router } from "./_core/trpc.js";
 import { TRPCError } from "@trpc/server";
 import { z } from "zod";
 import * as db from "./db.js";
-import { invokeLLM, Message } from "./_core/llm.js";
+import { invokeGroq, buildGroqUserMessage } from "./_core/groq.js";
 import { storagePut } from "./storage.js";
-import { tools, toolHandlers } from "./_core/tools.js";
 
-const SYSTEM_PROMPT = `Você é o DevAI, um assistente ultra-rápido e técnico.
-Responda de forma concisa, direta e sem enrolação.
-Se o usuário enviar um arquivo, analise o conteúdo embutido diretamente.`;
+const SYSTEM_PROMPT = `Você é o DevAI, um assistente de programação e produtividade extremamente competente.
+Responda de forma clara, concisa e direta.
+Quando o usuário enviar um arquivo (imagem, código, documento, etc.), analise-o completamente e forneça feedback detalhado.
+Você pode analisar imagens, código-fonte, arquivos de texto, logs, documentos e muito mais.
+Se o arquivo for código, sugira melhorias, corrija bugs e explique o que está acontecendo.
+Se o arquivo for uma imagem, descreva o que vê e forneça insights relevantes.
+Se o arquivo for um documento ou texto, resuma, analise e forneça recomendações.`;
+
+// Extensões de arquivos de texto que podem ser lidos como texto puro
+const TEXT_EXTENSIONS = new Set([
+  "txt", "md", "markdown", "csv", "json", "xml", "yaml", "yml",
+  "toml", "ini", "env", "log", "sh", "bash",
+  "js", "jsx", "ts", "tsx", "mjs", "cjs",
+  "py", "rb", "php", "java", "kt", "scala",
+  "c", "cpp", "h", "hpp", "cs", "go", "rs",
+  "swift", "dart", "lua", "r", "sql", "graphql",
+  "html", "htm", "css", "scss", "vue", "svelte",
+  "dockerfile", "makefile", "gitignore", "toml", "cfg", "conf",
+]);
+
+// Tipos MIME de imagens suportados pelo modelo de visão do Groq
+const IMAGE_MIME_TYPES = new Set([
+  "image/jpeg", "image/jpg", "image/png", "image/gif", "image/webp", "image/bmp", "image/svg+xml",
+]);
+
+function isTextFile(fileName: string, fileType: string): boolean {
+  const ext = fileName.split(".").pop()?.toLowerCase() ?? "";
+  return fileType.startsWith("text/") ||
+    fileType === "application/json" ||
+    fileType === "application/javascript" ||
+    fileType === "application/typescript" ||
+    TEXT_EXTENSIONS.has(ext);
+}
+
+function isImageFile(fileType: string): boolean {
+  return IMAGE_MIME_TYPES.has(fileType.toLowerCase());
+}
 
 function extractTextFromBuffer(buffer: Buffer, fileName: string, fileType: string): string {
-  const textExtensions = ["txt", "md", "json", "js", "ts", "tsx", "py", "html", "css", "sql", "yaml", "yml"];
   const ext = fileName.split(".").pop()?.toLowerCase() ?? "";
-  const isText = fileType.startsWith("text/") || textExtensions.includes(ext);
+  const isText = isTextFile(fileName, fileType);
 
   if (isText) {
     const text = buffer.toString("utf-8");
-    return text.length > 100000 ? text.slice(0, 100000) + "..." : text;
+    return text.length > 80000 ? text.slice(0, 80000) + "\n\n[... conteúdo truncado ...]" : text;
   }
-  return `[Arquivo: ${fileName}]`;
+
+  // Para PDFs, tentar extrair texto básico (se vier como texto)
+  if (fileType === "application/pdf" || ext === "pdf") {
+    return "[Arquivo PDF anexado - conteúdo binário não pode ser lido diretamente como texto. O modelo de visão pode analisá-lo se convertido em imagem.]";
+  }
+
+  return `[Arquivo binário: ${fileName} (${fileType || 'tipo desconhecido'})]`;
+}
+
+function truncateMessagesForContext(messages: any[], maxContentLength: number = 200000): any[] {
+  // Remove system messages from history (we'll inject a fresh one)
+  // Truncate old messages if the total content is too large
+  let totalLength = 0;
+  const truncated = [];
+
+  // Always include the last few messages to maintain context
+  for (let i = messages.length - 1; i >= 0; i--) {
+    const msg = messages[i];
+    const content = typeof msg.content === 'string' ? msg.content : JSON.stringify(msg.content);
+    totalLength += content.length;
+    if (totalLength <= maxContentLength) {
+      truncated.unshift(msg);
+    } else {
+      break;
+    }
+  }
+
+  return truncated;
 }
 
 export const appRouter = router({
@@ -76,7 +135,7 @@ export const appRouter = router({
       .input(z.object({
         conversationId: z.number(),
         fileName: z.string(),
-        fileContent: z.string(),
+        fileContent: z.string(), // base64
         fileType: z.string(),
         userMessage: z.string().optional(),
       }))
@@ -84,32 +143,91 @@ export const appRouter = router({
         if (!ctx.user) throw new TRPCError({ code: "UNAUTHORIZED" });
         const { conversationId, fileName, fileContent, fileType, userMessage } = input;
         const buffer = Buffer.from(fileContent, "base64");
-        const text = extractTextFromBuffer(buffer, fileName, fileType);
-        
+
+        // Salvar o arquivo no storage
         let fileUrl = "";
         try {
           const res = await storagePut(fileName, buffer, fileType);
           fileUrl = res.url;
-        } catch {}
+        } catch (storageErr) {
+          console.warn("[Upload] Storage save failed, continuing without fileUrl:", (storageErr as Error).message);
+        }
 
-        const content = `${userMessage || ""} [Arquivo: ${fileName}]\n\nConteúdo:\n${text}`;
+        const isImage = isImageFile(fileType);
+        const isText = isTextFile(fileName, fileType);
+
+        // Construir o conteúdo da mensagem do usuário
+        let content: string;
+        if (isImage) {
+          // Para imagens: embutir como texto descritivo + base64 data URI
+          content = `${userMessage || ""}\n[Imagem anexada: ${fileName}]`;
+        } else if (isText) {
+          const text = extractTextFromBuffer(buffer, fileName, fileType);
+          content = `${userMessage || ""}\n[Arquivo: ${fileName}]\n\nConteúdo:\n\`\`\`\n${text}\n\`\`\``;
+        } else {
+          // Para outros binários
+          content = `${userMessage || ""}\n[Arquivo binário: ${fileName} (${(buffer.length / 1024).toFixed(1)} KB)]\nEste é um arquivo binário. O que você gostaria que eu analisasse sobre ele?`;
+        }
+
+        // Salvar mensagem do usuário
         await db.addMessage(conversationId, "user", content, fileUrl, fileName);
-        
+
+        // Obter histórico da conversa
         const history = await db.getConversationMessages(conversationId);
+
+        // Truncar mensagens antigas se necessário
+        const truncatedHistory = truncateMessagesForContext(history);
+
         try {
-          const response = await invokeLLM({
-            model: "gpt-5-mini",
-            messages: history.map(m => ({ role: m.role as any, content: m.content })),
-            maxTokens: 2000,
+          // Construir mensagens para o Groq
+          const groqMessages: any[] = [
+            { role: "system", content: SYSTEM_PROMPT }
+          ];
+
+          for (const msg of truncatedHistory) {
+            if (msg.role === "system") continue;
+
+            if (msg.role === "user" && isImage && msg.fileName === fileName) {
+              // Para a última mensagem de usuário que contém a imagem, usar vision
+              const imageText = userMessage || "Analise esta imagem e me diga o que você vê. Se for um código, explique o que ele faz.";
+              groqMessages.push({
+                role: "user",
+                content: [
+                  { type: "text", text: imageText },
+                  {
+                    type: "image_url",
+                    image_url: {
+                      url: `data:${fileType};base64,${fileContent}`,
+                      detail: "high",
+                    },
+                  },
+                ],
+              });
+            } else {
+              groqMessages.push({
+                role: msg.role,
+                content: msg.content,
+              });
+            }
+          }
+
+          // Usar o modelo de visão se for imagem, senão usar o modelo padrão
+          const model = isImage ? "qwen/qwen3.6-27b" : "llama-3.3-70b-versatile";
+
+          const response = await invokeGroq({
+            model,
+            messages: groqMessages,
+            maxTokens: 4000,
+            temperature: 0.7,
           });
 
           const aiMsg = response.choices[0]?.message?.content || "Desculpe, não consegui gerar uma resposta.";
-          await db.addMessage(conversationId, "assistant", aiMsg as string);
+          await db.addMessage(conversationId, "assistant", aiMsg);
         } catch (err) {
-          console.error("[Chat] LLM invocation error:", err);
-          await db.addMessage(conversationId, "assistant", "Desculpe, ocorreu um erro ao processar sua solicitação. Tente novamente.");
+          console.error("[Upload] Groq invocation error:", err);
+          await db.addMessage(conversationId, "assistant", `Desculpe, ocorreu um erro ao processar o arquivo: ${(err as Error).message}`);
         }
-        
+
         return { success: true, messages: await db.getConversationMessages(conversationId) };
       }),
   }),
@@ -119,26 +237,48 @@ export const appRouter = router({
       .input(z.object({
         conversationId: z.number(),
         content: z.string(),
+        useAdvancedReasoning: z.boolean().optional(),
       }))
       .mutation(async ({ ctx, input }) => {
         if (!ctx.user) throw new TRPCError({ code: "UNAUTHORIZED" });
         await db.addMessage(input.conversationId, "user", input.content);
         const history = await db.getConversationMessages(input.conversationId);
-        
+
+        // Truncar mensagens antigas se necessário
+        const truncatedHistory = truncateMessagesForContext(history);
+
         try {
-          const response = await invokeLLM({
-            model: "gpt-5-mini",
-            messages: history.map(m => ({ role: m.role as any, content: m.content })),
-            maxTokens: 2000,
+          // Construir mensagens para o Groq
+          const groqMessages: any[] = [
+            { role: "system", content: SYSTEM_PROMPT }
+          ];
+
+          for (const msg of truncatedHistory) {
+            if (msg.role === "system") continue;
+            groqMessages.push({
+              role: msg.role,
+              content: msg.content,
+            });
+          }
+
+          const model = input.useAdvancedReasoning
+            ? "llama-3.3-70b-versatile"
+            : "llama-3.3-70b-versatile";
+
+          const response = await invokeGroq({
+            model,
+            messages: groqMessages,
+            maxTokens: 4000,
+            temperature: 0.7,
           });
 
           const aiMsg = response.choices[0]?.message?.content || "Desculpe, não consegui gerar uma resposta.";
-          await db.addMessage(input.conversationId, "assistant", aiMsg as string);
+          await db.addMessage(input.conversationId, "assistant", aiMsg);
         } catch (err) {
-          console.error("[Chat] LLM invocation error:", err);
-          await db.addMessage(input.conversationId, "assistant", "Desculpe, ocorreu um erro ao processar sua solicitação. Tente novamente.");
+          console.error("[Chat] Groq invocation error:", err);
+          await db.addMessage(input.conversationId, "assistant", `Desculpe, ocorreu um erro ao processar sua solicitação: ${(err as Error).message}`);
         }
-        
+
         return { success: true, messages: await db.getConversationMessages(input.conversationId) };
       }),
   }),
