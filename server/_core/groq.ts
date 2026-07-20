@@ -57,17 +57,33 @@ const GROQ_API_URL = () => {
   return `${base}/chat/completions`;
 };
 
+// Exportar função para verificar se a API key está configurada (usada pelo frontend)
+export function isGroqConfigured(): boolean {
+  return !!ENV.groqApiKey;
+}
+
 const assertGroqApiKey = () => {
   if (!ENV.groqApiKey) {
-    throw new Error("GROQ_API_KEY is not configured. Please set the GROQ_API_KEY environment variable.");
+    throw new Error(
+      "GROQ_API_KEY is not configured. " +
+      "Please add the GROQ_API_KEY environment variable to your Vercel project settings. " +
+      "Get your key at https://console.groq.com/keys"
+    );
+  }
+  // Verificar se a key parece válida (começa com gsk_)
+  if (!ENV.groqApiKey.startsWith("gsk_")) {
+    throw new Error(
+      "GROQ_API_KEY is invalid. Keys must start with 'gsk_'. " +
+      "Get your key at https://console.groq.com/keys"
+    );
   }
 };
 
 // ─── Retry logic ───
 
-const RETRY_MAX_RETRIES = 4;
+const RETRY_MAX_RETRIES = 3;
 const RETRY_BASE_DELAY_MS = 500;
-const RETRY_MAX_DELAY_MS = 30_000;
+const RETRY_MAX_DELAY_MS = 10_000;
 
 const sleep = (ms: number) => new Promise<void>(resolve => setTimeout(resolve, ms));
 
@@ -84,6 +100,11 @@ const fetchWithBackoff = async (url: string, init: RequestInit): Promise<Respons
     try {
       const response = await fetch(url, init);
       if (response.ok || attempt === RETRY_MAX_RETRIES) {
+        return response;
+      }
+
+      // Se for erro de autenticação (401), não fazer retry
+      if (response.status === 401) {
         return response;
       }
 
@@ -123,6 +144,8 @@ export async function invokeGroq(params: GroqInvokeParams): Promise<GroqResponse
     payload.max_tokens = maxTokens;
   }
 
+  console.log(`[Groq] Calling model: ${model}`);
+
   const response = await fetchWithBackoff(GROQ_API_URL(), {
     method: "POST",
     headers: {
@@ -134,9 +157,19 @@ export async function invokeGroq(params: GroqInvokeParams): Promise<GroqResponse
 
   if (!response.ok) {
     const errorText = await response.text();
-    throw new Error(
-      `Groq invoke failed: ${response.status} ${response.statusText} – ${errorText}`
-    );
+    let errorMsg = `Groq API error: ${response.status}`;
+
+    if (response.status === 401) {
+      errorMsg = "GROQ_API_KEY is invalid or expired. Please update the GROQ_API_KEY environment variable at https://console.groq.com/keys";
+    } else if (response.status === 429) {
+      errorMsg = "Groq API rate limit exceeded. Please wait a moment and try again.";
+    } else if (response.status === 400) {
+      errorMsg = `Groq API bad request: ${errorText}`;
+    } else if (response.status >= 500) {
+      errorMsg = `Groq API server error (${response.status}). Please try again later.`;
+    }
+
+    throw new Error(errorMsg);
   }
 
   return (await response.json()) as GroqResponse;

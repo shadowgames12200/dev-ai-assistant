@@ -128,6 +128,15 @@ export const appRouter = router({
         await db.updateConversationTitle(input.id, input.title);
         return { success: true };
       }),
+    messages: protectedProcedure
+      .input(z.object({ id: z.number() }))
+      .query(async ({ ctx, input }) => {
+        if (!ctx.user) throw new TRPCError({ code: "UNAUTHORIZED" });
+        // Verify ownership
+        const conv = await db.getConversation(input.id, ctx.user.id);
+        if (!conv) throw new TRPCError({ code: "NOT_FOUND", message: "Conversation not found" });
+        return db.getConversationMessages(input.id);
+      }),
   }),
 
   upload: router({

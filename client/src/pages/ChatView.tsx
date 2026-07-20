@@ -27,6 +27,8 @@ import {
   File,
   Image as ImageIcon,
   FileArchive,
+  AlertCircle,
+  RefreshCw,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { toast } from "sonner";
@@ -49,156 +51,117 @@ type Conversation = {
   updatedAt: Date;
 };
 
-const SUGGESTED_PROMPTS = [
-  { icon: Code2, text: "Crie um script Python para automatizar tarefas do dia a dia", desc: "Automação" },
-  { icon: Brain, text: "Explique como funciona um sistema de autenticação JWT", desc: "Conceito" },
-  { icon: Zap, text: "Monte uma API REST completa em Node.js com Express", desc: "Projeto" },
-  { icon: MessageSquarePlus, text: "Me ajude a organizar minha rotina diária", desc: "Dia a dia" },
-];
-
-// Tipos de arquivo suportados para análise de texto
-const TEXT_EXTENSIONS = new Set([
-  "txt", "md", "markdown", "csv", "json", "xml", "yaml", "yml",
-  "toml", "ini", "env", "log", "sh", "bash",
-  "js", "jsx", "ts", "tsx", "mjs", "cjs",
-  "py", "rb", "php", "java", "kt", "scala",
-  "c", "cpp", "h", "hpp", "cs", "go", "rs",
-  "swift", "dart", "lua", "r", "sql", "graphql",
-  "html", "htm", "css", "scss", "vue", "svelte",
-  "dockerfile", "makefile", "gitignore",
-]);
-
-// Tipos MIME de imagens
+// Tipos MIME de imagens para preview
 const IMAGE_MIME_TYPES = new Set([
   "image/jpeg", "image/jpg", "image/png", "image/gif", "image/webp", "image/bmp", "image/svg+xml",
 ]);
 
+function isImageFile(file: File): boolean {
+  return IMAGE_MIME_TYPES.has(file.type.toLowerCase());
+}
+
 function getFileIcon(fileName: string) {
   const ext = fileName.split(".").pop()?.toLowerCase() ?? "";
-  if (["js", "jsx", "ts", "tsx", "py", "java", "go", "rs", "c", "cpp", "cs"].includes(ext))
-    return FileCode;
-  if (["json", "yaml", "yml", "toml", "xml"].includes(ext))
-    return FileJson;
-  if (["txt", "md", "log", "csv"].includes(ext))
-    return FileText;
-  if (["zip", "rar", "7z", "tar", "gz", "bz2"].includes(ext))
-    return FileArchive;
+  const imageExts = ["jpg", "jpeg", "png", "gif", "webp", "bmp", "svg"];
+  const codeExts = ["js", "jsx", "ts", "tsx", "py", "java", "go", "rs", "c", "cpp", "h", "cs", "php", "rb", "swift", "kt", "dart", "lua", "r"];
+  const docExts = ["json", "xml", "yaml", "yml", "md", "csv", "txt", "log", "env", "ini", "toml", "cfg", "conf", "sql", "graphql"];
+
+  if (imageExts.includes(ext)) return ImageIcon;
+  if (codeExts.includes(ext)) return Code2;
+  if (docExts.includes(ext)) return FileJson;
+  if (ext === "zip" || ext === "rar" || ext === "7z" || ext === "tar" || ext === "gz") return FileArchive;
   return File;
 }
 
-function isTextFile(file: File): boolean {
-  const ext = file.name.split(".").pop()?.toLowerCase() ?? "";
-  return file.type.startsWith("text/") ||
-    file.type === "application/json" ||
-    file.type === "application/javascript" ||
-    TEXT_EXTENSIONS.has(ext);
-}
-
-function isImageFile(file: File): boolean {
-  return IMAGE_MIME_TYPES.has(file.type.toLowerCase()) ||
-    ["jpg", "jpeg", "png", "gif", "webp", "bmp", "svg"].includes(file.name.split(".").pop()?.toLowerCase() ?? "");
-}
-
-function getFileCategory(file: File): string {
-  if (isImageFile(file)) return "Imagem";
-  if (isTextFile(file)) return "Texto";
-  return "Arquivo";
-}
-
-function formatFileSize(bytes: number): string {
-  if (bytes < 1024) return `${bytes} B`;
-  if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(1)} KB`;
-  return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
-}
-
-// Extrai o nome do arquivo de uma mensagem com conteúdo de arquivo
-function extractFileName(content: string): string | null {
-  const match = content.match(/\[Arquivo:\s*([^\]]+)\]/);
-  return match ? match[1] : null;
-}
-
-// Verifica se uma mensagem contém conteúdo de arquivo embutido
-function hasEmbeddedFile(content: string): boolean {
-  return content.includes("[Arquivo:") || content.includes("[Imagem anexada:");
-}
-
-// Extrai a mensagem do usuário antes do conteúdo do arquivo
-function extractUserMessage(content: string): string {
-  const idx = Math.min(
-    content.indexOf("[Arquivo:") !== -1 ? content.indexOf("[Arquivo:") : Infinity,
-    content.indexOf("[Imagem anexada:") !== -1 ? content.indexOf("[Imagem anexada:") : Infinity
-  );
-  if (idx === Infinity) return content;
-  return content.slice(0, idx).trim();
-}
-
-// Detecta se a mensagem é de imagem
-function hasEmbeddedImage(content: string): boolean {
-  return content.includes("[Imagem anexada:");
-}
-
-// Verifica se é imagem pelo filename
-function isImageByFileName(fileName: string): boolean {
-  const ext = fileName.split(".").pop()?.toLowerCase() ?? "";
-  return ["jpg", "jpeg", "png", "gif", "webp", "bmp", "svg"].includes(ext);
-}
-
 export default function ChatView() {
+  const queryClient = useQueryClient();
   const [activeConversationId, setActiveConversationId] = useState<number | null>(null);
-  const [messages, setMessages] = useState<DbMessage[]>([]);
   const [input, setInput] = useState("");
   const [isLoading, setIsLoading] = useState(false);
-  const [editingId, setEditingId] = useState<number | null>(null);
-  const [editingTitle, setEditingTitle] = useState("");
-  const [useAdvancedReasoning, setUseAdvancedReasoning] = useState(false);
+  const [messages, setMessages] = useState<DbMessage[]>([]);
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
   const [imagePreview, setImagePreview] = useState<string | null>(null);
-
+  const [useAdvancedReasoning, setUseAdvancedReasoning] = useState(false);
+  const [editingId, setEditingId] = useState<number | null>(null);
+  const [editingTitle, setEditingTitle] = useState("");
   const textareaRef = useRef<HTMLTextAreaElement>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const scrollAreaRef = useRef<HTMLDivElement>(null);
 
-  const queryClient = useQueryClient();
-  const conversationsQuery = trpc.conversations.list.useQuery();
-  const messagesQuery = trpc.messages.list.useQuery(
-    { conversationId: activeConversationId ?? -1 },
-    { enabled: activeConversationId !== null }
-  );
+  const conversationsQuery = trpc.conversations.list.useQuery(undefined, {
+    enabled: true,
+    staleTime: 30_000,
+  });
+
+
 
   const createConversationMutation = trpc.conversations.create.useMutation({
     onSuccess: (data) => {
       setActiveConversationId(data.id);
-      setMessages([]);
       queryClient.invalidateQueries({ queryKey: ["conversations", "list"] });
     },
   });
 
   const deleteConversationMutation = trpc.conversations.delete.useMutation({
     onSuccess: () => {
+      if (activeConversationId === undefined) return;
+      setActiveConversationId(null);
+      setMessages([]);
       queryClient.invalidateQueries({ queryKey: ["conversations", "list"] });
-      if (activeConversationId) {
-        setActiveConversationId(null);
-        setMessages([]);
-      }
+      toast.success("Conversa deletada.");
     },
   });
 
   const renameConversationMutation = trpc.conversations.rename.useMutation({
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["conversations", "list"] });
       setEditingId(null);
-      setEditingTitle("");
+      queryClient.invalidateQueries({ queryKey: ["conversations", "list"] });
+      toast.success("Conversa renomeada.");
     },
   });
+
+  // Carregar mensagens da conversa ativa
+  const [conversationMessages, setConversationMessages] = useState<DbMessage[]>([]);
+
+  const handleConversationSelect = useCallback((convId: number) => {
+    setActiveConversationId(convId);
+  }, []);
+
+  // Efeito para carregar mensagens quando a conversa muda
+  useEffect(() => {
+    if (!activeConversationId) {
+      setConversationMessages([]);
+      setMessages([]);
+      return;
+    }
+
+    // Usar tRPC para buscar mensagens da conversa
+    trpc.conversations.messages.query(
+      { id: activeConversationId },
+      {
+        onSuccess: (data) => {
+          setConversationMessages(data);
+          setMessages(data);
+        },
+        onError: (error) => {
+          console.error("Failed to fetch messages:", error);
+          setConversationMessages([]);
+          setMessages([]);
+        },
+      }
+    );
+  }, [activeConversationId]);
 
   const chatMutation = trpc.chat.send.useMutation({
     onSuccess: (data) => {
       setMessages(data.messages);
+      setConversationMessages(data.messages);
       setIsLoading(false);
+      setInput("");
       queryClient.invalidateQueries({ queryKey: ["conversations", "list"] });
     },
-    onError: () => {
-      toast.error("Erro ao enviar mensagem. Tente novamente.");
+    onError: (error: any) => {
+      handleApiError(error, "chat");
       setIsLoading(false);
     },
   });
@@ -206,6 +169,7 @@ export default function ChatView() {
   const uploadFileMutation = trpc.upload.uploadFile.useMutation({
     onSuccess: (data) => {
       setMessages(data.messages);
+      setConversationMessages(data.messages);
       setIsLoading(false);
       setSelectedFile(null);
       setImagePreview(null);
@@ -214,19 +178,47 @@ export default function ChatView() {
       toast.success("Arquivo analisado com sucesso!");
     },
     onError: (error: any) => {
-      const msg = error?.message || "Erro ao processar o arquivo. Tente novamente.";
-      toast.error(msg);
+      handleApiError(error, "upload");
       setIsLoading(false);
       setSelectedFile(null);
       setImagePreview(null);
     },
   });
 
-  useEffect(() => {
-    if (messagesQuery.data) {
-      setMessages(messagesQuery.data as DbMessage[]);
+  // Função unificada para tratar erros de API
+  function handleApiError(error: any, context: string) {
+    console.error(`[${context}] Error:`, error);
+    const msg = error?.message || error?.toString() || "";
+
+    // Detectar erros de parse JSON (servidor retornando HTML)
+    if (msg.includes("Unexpected token") || msg.includes("is not valid JSON")) {
+      toast.error(
+        "Erro de conexão com o servidor. Verifique se a GROQ_API_KEY está configurada nas variáveis de ambiente do Vercel.",
+        { duration: 8000 }
+      );
+      return;
     }
-  }, [messagesQuery.data]);
+
+    // Detectar erros de API key
+    if (msg.includes("GROQ_API_KEY")) {
+      toast.error(
+        "Configuração necessária: Adicione a variável GROQ_API_KEY nas configurações do Vercel (Settings > Environment Variables).",
+        { duration: 10000 }
+      );
+      return;
+    }
+
+    // Detectar rate limit
+    if (msg.includes("rate limit") || msg.includes("429")) {
+      toast.error("Limite de requisições atingido. Aguarde um momento e tente novamente.");
+      return;
+    }
+
+    // Erro genérico
+    toast.error(msg || `Erro ao enviar ${context === "upload" ? "arquivo" : "mensagem"}. Tente novamente.`);
+  }
+
+
 
   const scrollToBottom = useCallback(() => {
     const viewport = scrollAreaRef.current?.querySelector(
@@ -267,6 +259,10 @@ export default function ChatView() {
             setInput("");
             chatMutation.mutate({ conversationId: data.id, content, useAdvancedReasoning });
           },
+          onError: (error) => {
+            handleApiError(error, "chat");
+            setIsLoading(false);
+          },
         }
       );
       return;
@@ -281,9 +277,10 @@ export default function ChatView() {
     const file = event.target.files?.[0];
     if (!file) return;
 
-    // Limite de 20MB (limite do Groq para imagens)
-    if (file.size > 20 * 1024 * 1024) {
-      toast.error("Arquivo muito grande. Limite: 20MB.");
+    // Limite de 15MB para upload via JSON (limite seguro para Vercel serverless)
+    const maxSize = 15 * 1024 * 1024;
+    if (file.size > maxSize) {
+      toast.error(`Arquivo muito grande. Limite: ${maxSize / 1024 / 1024}MB.`);
       return;
     }
 
@@ -346,6 +343,10 @@ export default function ChatView() {
               setActiveConversationId(data.id);
               handleFileUpload(data.id);
             },
+            onError: (error) => {
+              handleApiError(error, "upload");
+              setIsLoading(false);
+            },
           }
         );
       } else {
@@ -397,309 +398,280 @@ export default function ChatView() {
                 Nenhuma conversa ainda.<br />Inicie uma nova!
               </div>
             )}
-            {conversationsQuery.data?.map((conv) => {
-              const isActive = conv.id === activeConversationId;
-              const isEditing = editingId === conv.id;
-
-              return (
-                <div
-                  key={conv.id}
-                  className={cn(
-                    "group flex items-center gap-1.5 rounded-lg px-3 py-2.5 cursor-pointer transition-all",
-                    isActive
-                      ? "bg-accent text-accent-foreground"
-                      : "hover:bg-accent/50 text-sidebar-foreground"
-                  )}
-                  onClick={() => { if (!isEditing) setActiveConversationId(conv.id); }}
-                >
-                  {isEditing ? (
-                    <div className="flex flex-1 items-center gap-1" onClick={(e) => e.stopPropagation()}>
-                      <input
-                        type="text"
-                        value={editingTitle}
-                        onChange={(e) => setEditingTitle(e.target.value)}
-                        onKeyDown={(e) => {
-                          if (e.key === "Enter") handleConfirmRename(conv.id);
-                          if (e.key === "Escape") setEditingId(null);
+            {conversationsQuery.data?.map((conv) => (
+              <div
+                key={conv.id}
+                className={cn(
+                  "group flex items-center gap-1 rounded-md px-3 py-2 text-sm transition-colors",
+                  activeConversationId === conv.id
+                    ? "bg-accent text-accent-foreground"
+                    : "hover:bg-accent/50"
+                )}
+                onClick={() => handleConversationSelect(conv.id)}
+              >
+                {editingId === conv.id ? (
+                  <div className="flex flex-1 items-center gap-1">
+                    <input
+                      className="flex-1 rounded border bg-background px-2 py-1 text-sm outline-none"
+                      value={editingTitle}
+                      onChange={(e) => setEditingTitle(e.target.value)}
+                      onKeyDown={(e) => {
+                        if (e.key === "Enter") handleConfirmRename(conv.id);
+                        if (e.key === "Escape") setEditingId(null);
+                      }}
+                      autoFocus
+                    />
+                    <Button
+                      size="icon"
+                      variant="ghost"
+                      className="h-6 w-6"
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        handleConfirmRename(conv.id);
+                      }}
+                    >
+                      <Check className="h-3 w-3" />
+                    </Button>
+                    <Button
+                      size="icon"
+                      variant="ghost"
+                      className="h-6 w-6"
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        setEditingId(null);
+                      }}
+                    >
+                      <X className="h-3 w-3" />
+                    </Button>
+                  </div>
+                ) : (
+                  <>
+                    <span className="flex-1 truncate">{conv.title}</span>
+                    <div className="hidden gap-1 group-hover:flex">
+                      <Button
+                        size="icon"
+                        variant="ghost"
+                        className="h-6 w-6"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          handleStartRename(conv);
                         }}
-                        className="flex-1 min-w-0 rounded border bg-background px-2 py-0.5 text-sm outline-none focus:ring-1 focus:ring-ring"
-                        autoFocus
-                      />
-                      <button onClick={() => handleConfirmRename(conv.id)} className="shrink-0 rounded p-1 hover:bg-accent">
-                        <Check className="h-3.5 w-3.5" />
-                      </button>
-                      <button onClick={() => setEditingId(null)} className="shrink-0 rounded p-1 hover:bg-accent">
-                        <X className="h-3.5 w-3.5" />
-                      </button>
+                      >
+                        <Pencil className="h-3 w-3" />
+                      </Button>
+                      <Button
+                        size="icon"
+                        variant="ghost"
+                        className="h-6 w-6 text-destructive hover:text-destructive"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          handleDeleteConversation(conv.id);
+                        }}
+                      >
+                        <Trash2 className="h-3 w-3" />
+                      </Button>
                     </div>
-                  ) : (
-                    <>
-                      <MessageSquarePlus className="h-4 w-4 shrink-0 opacity-60" />
-                      <span className="flex-1 truncate text-sm">{conv.title}</span>
-                      <div className="flex shrink-0 gap-0.5 opacity-0 group-hover:opacity-100 transition-opacity">
-                        <button onClick={(e) => { e.stopPropagation(); handleStartRename(conv); }} className="rounded p-1 hover:bg-accent" title="Renomear">
-                          <Pencil className="h-3.5 w-3.5" />
-                        </button>
-                        <button onClick={(e) => { e.stopPropagation(); handleDeleteConversation(conv.id); }} className="rounded p-1 hover:bg-destructive/20 hover:text-destructive" title="Excluir">
-                          <Trash2 className="h-3.5 w-3.5" />
-                        </button>
-                      </div>
-                    </>
-                  )}
-                </div>
-              );
-            })}
+                  </>
+                )}
+              </div>
+            ))}
+          </div>
+        </div>
+
+        <div className="border-t p-3">
+          <div className="text-xs text-muted-foreground">
+            Powered by <span className="font-semibold text-primary">Groq AI</span>
           </div>
         </div>
       </div>
 
       {/* ─── Main Chat Area ─── */}
-      <div className="flex flex-1 flex-col overflow-hidden">
-        <div className="lg:hidden flex items-center gap-2 border-b px-4 py-2.5 bg-background/80 backdrop-blur">
-          <Button onClick={handleNewConversation} size="sm" className="gap-1.5">
-            <MessageSquarePlus className="h-4 w-4" /> Nova
-          </Button>
-          <div className="flex-1" />
-          {activeConversationId && (
-            <Button variant="ghost" size="sm" onClick={() => { setActiveConversationId(null); setMessages([]); }}>
-              <X className="h-4 w-4" />
-            </Button>
-          )}
-        </div>
-
-        <div ref={scrollAreaRef} className="flex-1 overflow-y-auto">
-          {displayMessages.length === 0 ? (
-            <div className="flex h-full flex-col items-center justify-center p-8">
-              <div className="max-w-2xl w-full space-y-8">
-                <div className="flex flex-col items-center gap-4">
-                  <div className="flex h-16 w-16 items-center justify-center rounded-2xl bg-gradient-to-br from-violet-500 to-indigo-600 shadow-lg shadow-violet-500/25">
-                    <Sparkles className="h-8 w-8 text-white" />
-                  </div>
-                  <div className="text-center space-y-2">
-                    <h1 className="text-2xl font-bold tracking-tight">DevAI Assistant</h1>
-                    <p className="text-sm text-muted-foreground max-w-md">
-                      Seu assistente de programação e produtividade. Envie arquivos (imagens, código, documentos) para análise e receba feedback inteligente via Groq AI.
-                    </p>
-                  </div>
-                </div>
-
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                  {SUGGESTED_PROMPTS.map((prompt, index) => (
-                    <button
-                      key={index}
-                      onClick={() => handleSendMessage(prompt.text)}
-                      disabled={isLoading}
-                      className="group flex items-start gap-3 rounded-xl border bg-card p-4 text-left transition-all hover:shadow-md hover:border-primary/30 hover:bg-accent/50 disabled:opacity-50"
-                    >
-                      <div className="mt-0.5 flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-primary/10 text-primary group-hover:bg-primary/20 transition-colors">
-                        <prompt.icon className="h-4 w-4" />
-                      </div>
-                      <div className="space-y-1">
-                        <p className="text-sm font-medium leading-tight">{prompt.desc}</p>
-                        <p className="text-xs text-muted-foreground leading-relaxed line-clamp-2">{prompt.text}</p>
-                      </div>
-                    </button>
-                  ))}
-                </div>
+      <div className="flex flex-1 flex-col">
+        {displayMessages.length === 0 ? (
+          /* Empty State */
+          <div className="flex flex-1 items-center justify-center p-6">
+            <div className="max-w-lg text-center space-y-6">
+              <div className="mx-auto flex h-16 w-16 items-center justify-center rounded-2xl bg-primary/10">
+                <Sparkles className="h-8 w-8 text-primary" />
+              </div>
+              <div className="space-y-2">
+                <h2 className="text-2xl font-bold">DevAI Assistant</h2>
+                <p className="text-muted-foreground">
+                  Seu assistente de programação e produtividade. Envie arquivos (imagens, código, documentos) para análise e receba feedback inteligente via Groq AI.
+                </p>
+              </div>
+              <div className="grid gap-3 text-left">
+                {[
+                  { icon: Code2, title: "Automação", desc: "Crie um script Python para automatizar tarefas do dia a dia" },
+                  { icon: Brain, title: "Conceito", desc: "Explique como funciona um sistema de autenticação JWT" },
+                  { icon: Zap, title: "Projeto", desc: "Monte uma API REST completa em Node.js com Express" },
+                  { icon: FileText, title: "Dia a dia", desc: "Me ajude a organizar minha rotina diária" },
+                ].map((item) => (
+                  <button
+                    key={item.title}
+                    onClick={() => handleSendMessage(item.desc)}
+                    className="flex items-start gap-3 rounded-xl border bg-card p-4 text-left transition-colors hover:bg-accent"
+                  >
+                    <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-primary/10">
+                      <item.icon className="h-4 w-4 text-primary" />
+                    </div>
+                    <div>
+                      <div className="font-medium">{item.title}</div>
+                      <div className="text-sm text-muted-foreground">{item.desc}</div>
+                    </div>
+                  </button>
+                ))}
               </div>
             </div>
-          ) : (
-            <div className="max-w-3xl mx-auto space-y-6 py-6 px-4">
-              {displayMessages.map((message) => {
-                const isFileMessage = hasEmbeddedFile(message.content);
-                const isImageMessage = hasEmbeddedImage(message.content);
-                const fileName = message.fileName || (isFileMessage ? extractFileName(message.content) : null);
-                const userText = isFileMessage ? extractUserMessage(message.content) : message.content;
-                const FileIconComp = fileName ? getFileIcon(fileName) : FileText;
-                const isFileImage = fileName ? isImageByFileName(fileName) : false;
-
-                return (
-                  <div key={message.id} className={cn("flex gap-3", message.role === "user" ? "justify-end" : "justify-start")}>
-                    {message.role === "assistant" && (
-                      <div className="shrink-0 mt-0.5">
-                        <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-gradient-to-br from-violet-500 to-indigo-600 shadow-sm">
-                          <Sparkles className="h-4 w-4 text-white" />
-                        </div>
-                      </div>
-                    )}
-
-                    <div className={cn(
-                      "max-w-[85%] rounded-2xl px-4 py-3",
-                      message.role === "user"
+          </div>
+        ) : (
+          /* Messages */
+          <ScrollArea ref={scrollAreaRef} className="flex-1">
+            <div className="p-4 space-y-4">
+              {displayMessages.map((msg) => (
+                <div
+                  key={msg.id}
+                  className={cn(
+                    "flex gap-3",
+                    msg.role === "user" ? "justify-end" : "justify-start"
+                  )}
+                >
+                  {msg.role === "assistant" && (
+                    <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-primary/10">
+                      <Bot className="h-4 w-4 text-primary" />
+                    </div>
+                  )}
+                  <div
+                    className={cn(
+                      "max-w-[80%] rounded-xl px-4 py-2",
+                      msg.role === "user"
                         ? "bg-primary text-primary-foreground"
-                        : "bg-card border shadow-sm"
-                    )}>
-                      {message.role === "user" && isFileMessage ? (
-                        // Mensagem de usuário com arquivo anexado
-                        <div className="space-y-2">
-                          {userText && (
-                            <p className="text-sm whitespace-pre-wrap leading-relaxed">{userText}</p>
-                          )}
-                          <div className={cn(
-                            "flex items-center gap-2 rounded-lg px-3 py-2",
-                            "bg-primary-foreground/10 border border-primary-foreground/20"
-                          )}>
-                            {isFileImage ? (
-                              <ImageIcon className="h-4 w-4 shrink-0 opacity-80" />
-                            ) : (
-                              <FileIconComp className="h-4 w-4 shrink-0 opacity-80" />
-                            )}
-                            <div className="min-w-0">
-                              <p className="text-xs font-medium truncate">{fileName}</p>
-                              {message.fileUrl && (
-                                <a
-                                  href={message.fileUrl}
-                                  target="_blank"
-                                  rel="noopener noreferrer"
-                                  className="text-xs opacity-70 hover:opacity-100 underline"
-                                >
-                                  Ver arquivo
-                                </a>
-                              )}
-                            </div>
-                            <Badge variant="secondary" className="shrink-0 text-xs bg-primary-foreground/20 text-primary-foreground border-0">
-                              {isFileImage ? "Imagem" : "Analisado"}
-                            </Badge>
-                          </div>
-                        </div>
-                      ) : message.role === "assistant" ? (
-                        <div className="prose prose-sm dark:prose-invert max-w-none prose-pre:bg-muted prose-pre:border prose-pre:border-border prose-pre:rounded-lg">
-                          <Streamdown>{message.content}</Streamdown>
-                        </div>
-                      ) : (
-                        <p className="text-sm whitespace-pre-wrap leading-relaxed">{message.content}</p>
-                      )}
-                    </div>
-
-                    {message.role === "user" && (
-                      <div className="shrink-0 mt-0.5">
-                        <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-muted border shadow-sm">
-                          <User className="h-4 w-4 text-muted-foreground" />
-                        </div>
+                        : "bg-muted"
+                    )}
+                  >
+                    {msg.fileName && (
+                      <div className="mb-1 flex items-center gap-1 text-xs opacity-70">
+                        {(() => {
+                          const Icon = getFileIcon(msg.fileName);
+                          return <Icon className="h-3 w-3" />;
+                        })()}
+                        {msg.fileName}
                       </div>
                     )}
+                    {msg.role === "assistant" ? (
+                      <Streamdown>{msg.content}</Streamdown>
+                    ) : (
+                      <p className="whitespace-pre-wrap break-words">{msg.content}</p>
+                    )}
                   </div>
-                );
-              })}
-
+                  {msg.role === "user" && (
+                    <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-muted">
+                      <User className="h-4 w-4" />
+                    </div>
+                  )}
+                </div>
+              ))}
               {isLoading && (
-                <div className="flex gap-3 justify-start">
-                  <div className="shrink-0 mt-0.5">
-                    <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-gradient-to-br from-violet-500 to-indigo-600 shadow-sm">
-                      <Sparkles className="h-4 w-4 text-white" />
-                    </div>
+                <div className="flex justify-start gap-3">
+                  <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-primary/10">
+                    <Bot className="h-4 w-4 text-primary" />
                   </div>
-                  <div className="rounded-2xl bg-card border shadow-sm px-4 py-3">
-                    <div className="flex items-center gap-2 text-muted-foreground">
-                      <Loader2 className="h-4 w-4 animate-spin" />
-                      <span className="text-sm">
-                        {selectedFile ? `Analisando ${selectedFile.name}...` : "DevAI está pensando..."}
-                      </span>
-                    </div>
+                  <div className="flex items-center gap-2 rounded-xl bg-muted px-4 py-2">
+                    <Loader2 className="h-4 w-4 animate-spin" />
+                    <span className="text-sm text-muted-foreground">
+                      Pensando...
+                    </span>
                   </div>
                 </div>
               )}
             </div>
-          )}
-        </div>
+          </ScrollArea>
+        )}
 
         {/* ─── Input Area ─── */}
-        <div className="p-4 border-t bg-background/80 backdrop-blur">
-          <div className="max-w-3xl mx-auto space-y-2">
-            {/* Preview do arquivo selecionado */}
-            {selectedFile && (
-              <div className="flex flex-col gap-2 rounded-xl border bg-muted/50 px-3 py-2">
-                <div className="flex items-center gap-2">
-                  {imagePreview ? (
-                    <ImageIcon className="h-4 w-4 text-primary shrink-0" />
-                  ) : (
-                    <FileIcon className="h-4 w-4 text-muted-foreground shrink-0" />
-                  )}
-                  <div className="flex-1 min-w-0">
-                    <p className="text-xs font-medium truncate">{selectedFile.name}</p>
-                    <p className="text-xs text-muted-foreground">
-                      {formatFileSize(selectedFile.size)} · {getFileCategory(selectedFile)}
-                    </p>
-                  </div>
-                  <button
-                    type="button"
-                    onClick={() => { setSelectedFile(null); setImagePreview(null); }}
-                    className="shrink-0 rounded-full p-1 hover:bg-accent text-muted-foreground"
-                    title="Remover arquivo"
-                  >
-                    <X className="h-3.5 w-3.5" />
-                  </button>
-                </div>
-                {/* Preview da imagem */}
-                {imagePreview && (
-                  <div className="mt-1 rounded-lg overflow-hidden border max-h-48">
-                    <img
-                      src={imagePreview}
-                      alt="Preview"
-                      className="w-full h-full object-contain"
-                    />
-                  </div>
-                )}
-              </div>
-            )}
-
-            <form onSubmit={handleFormSubmit} className="flex items-end gap-3">
-              <div className="relative flex-1">
-                <Textarea
-                  ref={textareaRef}
-                  value={input}
-                  onChange={(e) => setInput(e.target.value)}
-                  onKeyDown={(e) => {
-                    if (e.key === "Enter" && !e.shiftKey) {
-                      e.preventDefault();
-                      handleFormSubmit(e);
-                    }
-                    if (e.key === "Escape") { setSelectedFile(null); setImagePreview(null); }
-                  }}
-                  placeholder={
-                    selectedFile
-                      ? "Adicione uma mensagem sobre o arquivo (opcional)..."
-                      : "Pergunte sobre programação, projetos ou envie um arquivo para análise..."
-                  }
-                  className="flex-1 resize-none min-h-[44px] max-h-32 pr-10 rounded-xl border bg-background focus-visible:ring-1 focus-visible:ring-primary"
-                  rows={1}
-                />
-                <input
-                  type="file"
-                  ref={fileInputRef}
-                  onChange={handleFileChange}
-                  className="hidden"
-                  accept="*/*"
-                />
-                <button
-                  type="button"
-                  onClick={() => fileInputRef.current?.click()}
-                  className={cn(
-                    "absolute right-2 top-1/2 -translate-y-1/2 p-1 rounded-full transition-colors",
-                    selectedFile
-                      ? "text-primary hover:bg-primary/10"
-                      : "text-muted-foreground hover:bg-accent"
-                  )}
-                  title="Anexar arquivo para análise (imagem, código, documento, etc.)"
-                >
-                  <Paperclip className="h-4 w-4" />
-                </button>
-              </div>
-
+        <div className="border-t bg-background p-3">
+          {imagePreview && (
+            <div className="mb-2 relative inline-block">
+              <img
+                src={imagePreview}
+                alt="Preview"
+                className="max-h-32 rounded-lg border"
+              />
               <Button
-                type="submit"
                 size="icon"
-                disabled={(!input.trim() && !selectedFile) || isLoading}
-                className="shrink-0 h-11 w-11 rounded-xl shadow-md"
+                variant="destructive"
+                className="absolute -top-2 -right-2 h-6 w-6 rounded-full"
+                onClick={() => {
+                  setImagePreview(null);
+                  setSelectedFile(null);
+                }}
               >
-                {isLoading ? <Loader2 className="h-4 w-4 animate-spin" /> : <Send className="h-4 w-4" />}
+                <X className="h-3 w-3" />
               </Button>
-            </form>
-
-            <p className="text-center text-[11px] text-muted-foreground/70">
-              DevAI usa Groq AI · Envie imagens, código, documentos e mais · Pode cometer erros
-            </p>
-          </div>
+            </div>
+          )}
+          {selectedFile && !imagePreview && (
+            <div className="mb-2 flex items-center gap-2 rounded-lg bg-muted px-3 py-2">
+              <FileIcon className="h-4 w-4 text-primary" />
+              <span className="text-sm truncate flex-1">{selectedFile.name}</span>
+              <Button
+                size="icon"
+                variant="ghost"
+                className="h-6 w-6"
+                onClick={() => {
+                  setSelectedFile(null);
+                  setImagePreview(null);
+                }}
+              >
+                <X className="h-3 w-3" />
+              </Button>
+            </div>
+          )}
+          <form onSubmit={handleFormSubmit} className="flex items-end gap-2">
+            <input
+              ref={fileInputRef}
+              type="file"
+              className="hidden"
+              accept="image/*,.js,.jsx,.ts,.tsx,.py,.java,.go,.rs,.c,.cpp,.h,.cs,.php,.rb,.swift,.kt,.dart,.lua,.r,.sql,.json,.xml,.yaml,.yml,.md,.txt,.csv,.log,.env,.html,.css,.sh,.bash,.dockerfile,.makefile,.gitignore,.zip,.tar,.gz,.pdf,.doc,.docx"
+              onChange={handleFileChange}
+            />
+            <Button
+              type="button"
+              size="icon"
+              variant="outline"
+              className="shrink-0"
+              onClick={() => fileInputRef.current?.click()}
+            >
+              <Paperclip className="h-4 w-4" />
+            </Button>
+            <Textarea
+              ref={textareaRef}
+              value={input}
+              onChange={(e) => setInput(e.target.value)}
+              placeholder="Pergunte sobre programação, projetos ou envie um arquivo para análise..."
+              className="min-h-[60px] max-h-[200px] resize-none flex-1"
+              onKeyDown={(e) => {
+                if (e.key === "Enter" && !e.shiftKey) {
+                  e.preventDefault();
+                  handleFormSubmit(e);
+                }
+              }}
+            />
+            <Button
+              type="submit"
+              size="icon"
+              disabled={isLoading || (!input.trim() && !selectedFile)}
+              className="shrink-0"
+            >
+              <Send className="h-4 w-4" />
+            </Button>
+          </form>
+          {useAdvancedReasoning && (
+            <div className="mt-1 flex items-center gap-1 text-xs text-muted-foreground">
+              <Brain className="h-3 w-3" />
+              <span>Modo raciocínio avançado ativado (Llama 3.3 70B)</span>
+            </div>
+          )}
         </div>
       </div>
     </div>
