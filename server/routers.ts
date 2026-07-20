@@ -8,6 +8,7 @@ import * as db from "./db.js";
 import { invokeGroq } from "./_core/groq.js";
 import { storagePut } from "./storage.js";
 import { analyzeBinaryFile, detectFileTypeByHeader, isTextFile, isImageFile, extractTextFromBuffer } from "./_core/file-analyzer.js";
+import { selfImprove, analyzeForImprovements, executeSystemCommand, type SelfImprovementResult } from "./_core/self-improvement.js";
 
 const SYSTEM_PROMPT = `Você é o DevAI, um assistente de programação e produtividade extremamente competente.
 Responda de forma clara, concisa e direta.
@@ -26,7 +27,23 @@ Quando o usuário enviar um arquivo, analise-o completamente.
 Se for código, sugira melhorias e corrija bugs.
 Se for uma imagem, descreva o que vê em detalhes.
 Se for um arquivo binário/executável, analise as strings e identifique o propósito.
-Se for um ZIP, liste todo o conteúdo e destaque os arquivos importantes.`;
+Se for um ZIP, liste todo o conteúdo e destaque os arquivos importantes.
+
+=== AUTO-MELHORIA ===
+Você TEM a capacidade de melhorar a si mesma. Quando:
+1. O usuário pedir para melhorar algo
+2. Você identificar que uma funcionalidade está faltando ou com bug
+3. Você detectar que pode otimizar algum processo
+
+Você DEVE usar a ferramenta de self-improvement. O processo é:
+1. Analisar o que precisa ser melhorado
+2. Planejar as mudanças necessárias
+3. Implementar as mudanças
+4. Testar 5 vezes para garantir estabilidade
+5. Só aplicar se TODOS os 5 testes passarem
+
+NUNCA aplique mudanças sem testar. Segurança é prioridade.
+Se um teste falhar, reverta e informe o usuário sobre o problema encontrado.`;
 
 function truncateMessagesForContext(messages: any[], maxContentLength: number = 200000): any[] {
   let totalLength = 0;
@@ -250,6 +267,117 @@ export const appRouter = router({
         }
 
         return { success: true, messages: await db.getConversationMessages(input.conversationId) };
+      }),
+  }),
+
+  // ─── Self-Improvement Router ───
+  selfImprove: router({
+    /**
+     * Analisar o repositório e sugerir melhorias necessárias
+     */
+    analyze: protectedProcedure.mutation(async ({ ctx }) => {
+      if (!ctx.user) throw new TRPCError({ code: "UNAUTHORIZED" });
+
+      try {
+        const improvements = await analyzeForImprovements();
+        await db.addMessage(
+          1, // Usar primeira conversa ou criar uma de sistema
+          "assistant",
+          `📋 **Análise de Auto-Melhoria Concluída**\n\n${improvements.length > 0
+            ? improvements.map(imp => `- **${imp.area}**: ${imp.description}`).join("\n")
+            : "Nenhuma melhoria necessária encontrada no momento."
+          }`
+        );
+        return { success: true, improvements };
+      } catch (err) {
+        console.error("[SelfImprove] Analysis error:", err);
+        return { success: false, improvements: [], error: (err as Error).message };
+      }
+    }),
+
+    /**
+     * Executar uma melhoria no código (clone → melhorar → testar 5x → push se passar)
+     */
+    execute: protectedProcedure
+      .input(z.object({
+        description: z.string().describe("Descrição da melhoria a ser implementada"),
+        files: z.array(z.object({
+          path: z.string().describe("Caminho do arquivo no repositório"),
+          content: z.string().describe("Conteúdo completo do arquivo corrigido"),
+        })),
+        tests: z.array(z.string()).describe("Comandos de teste a serem executados").optional(),
+      }))
+      .mutation(async ({ ctx, input }) => {
+        if (!ctx.user) throw new TRPCError({ code: "UNAUTHORIZED" });
+
+        // Registrar que começou a melhoria
+        const statusMsg = `🔧 **Iniciando Auto-Melhoria**\n\n**Melhoria:** ${input.description}\n**Arquivos a modificar:** ${input.files.map(f => f.path).join(", ")}\n**Testes:** ${input.tests?.join(", ") || "build + test padrão"}\n\nExecutando em segundo plano...`;
+        await db.addMessage(1, "assistant", statusMsg);
+
+        try {
+          // Executar o self-improvement
+          const result = await selfImprove(
+            {
+              area: "Auto-improvement",
+              description: input.description,
+              filesToChange: input.files.map(f => f.path),
+              testsNeeded: input.tests || [],
+            },
+            input.files
+          );
+
+          // Registrar resultado
+          const resultMsg = result.success
+            ? `✅ **Auto-Melhoria Concluída com Sucesso!**\n\n${result.message}\n\n**Testes executados:** ${result.testResults.length}/${result.testResults.length} passes\n${result.testResults.map(r => `- Tentativa ${r.run}: ${r.passed ? "✅ Passou" : "❌ Falhou"}`).join("\n")}`
+            : `❌ **Auto-Melhoria Falhou**\n\n${result.message}\n\n**Testes executados:**\n${result.testResults.map(r => `- Tentativa ${r.run}: ${r.passed ? "✅ Passou" : "❌ Falhou"}`).join("\n")}\n\nMudanças foram revertidas para proteger o repositório.`;
+
+          await db.addMessage(1, "assistant", resultMsg);
+
+          return { success: result.success, result } as const;
+        } catch (err) {
+          const errorMsg = `💥 **Erro Fatal na Auto-Melhoria**\n\n${(err as Error).message}\n\nNenhuma mudança foi aplicada.`;
+          await db.addMessage(1, "assistant", errorMsg);
+          return { success: false, error: (err as Error).message } as const;
+        }
+      }),
+
+    /**
+     * Executar comando do sistema (para análise de arquivos)
+     */
+    executeCommand: protectedProcedure
+      .input(z.object({
+        command: z.string().describe("Comando do sistema a ser executado"),
+      }))
+      .mutation(async ({ ctx, input }) => {
+        if (!ctx.user) throw new TRPCError({ code: "UNAUTHORIZED" });
+
+        // Whitelist de comandos seguros
+        const safeCommands = ["file", "strings", "hexdump", "unzip", "ls", "cat", "head", "tail", "wc", "grep", "find", "du", "stat"];
+        const cmdParts = input.command.split(/\s+/);
+        const baseCmd = cmdParts[0];
+
+        if (!safeCommands.includes(baseCmd)) {
+          return {
+            success: false,
+            output: "",
+            error: `Comando não permitido: ${baseCmd}. Comandos permitidos: ${safeCommands.join(", ")}`,
+          } as const;
+        }
+
+        try {
+          const result = executeSystemCommand(input.command, undefined, 30000);
+          return {
+            success: result.exitCode === 0,
+            output: result.stdout.slice(0, 5000),
+            error: result.stderr.slice(0, 2000),
+          } as const;
+        } catch (err) {
+          return {
+            success: false,
+            output: "",
+            error: (err as Error).message,
+          } as const;
+        }
       }),
   }),
 });
