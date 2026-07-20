@@ -7,8 +7,16 @@ import { z } from "zod";
 import * as db from "./db.js";
 import { invokeGroq } from "./_core/groq.js";
 import { storagePut } from "./storage.js";
-import { analyzeBinaryFile, detectFileTypeByHeader, isTextFile, isImageFile, extractTextFromBuffer } from "./_core/file-analyzer.js";
-import { selfImprove, analyzeForImprovements, executeSystemCommand, type SelfImprovementResult } from "./_core/self-improvement.js";
+import { analyzeBinaryFile, isTextFile, isImageFile, extractTextFromBuffer } from "./_core/file-analyzer.js";
+import {
+  executeApprovedImprovement,
+  createImprovementProposal,
+  approveProposal,
+  rejectProposal,
+  listProposals,
+  getProposal,
+  executeSystemCommand,
+} from "./_core/self-improvement.js";
 
 const SYSTEM_PROMPT = `Você é o DevAI, um assistente de programação e produtividade extremamente competente.
 Responda de forma clara, concisa e direta.
@@ -29,24 +37,27 @@ Se for uma imagem, descreva o que vê em detalhes.
 Se for um arquivo binário/executável, analise as strings e identifique o propósito.
 Se for um ZIP, liste todo o conteúdo e destaque os arquivos importantes.
 
-=== AUTO-MELHORIA ===
-Você TEM a capacidade de melhorar a si mesma. Quando:
-1. O usuário pedir para melhorar algo
-2. Você identificar que uma funcionalidade está faltando ou com bug
-3. Você detectar que pode otimizar algum processo
+=== AUTO-MELHORIA COM APROVAÇÃO OBRIGATÓRIA ===
+Você TEM a capacidade de melhorar a si mesma, MAS NUNCA pode aplicar mudanças sem aprovação do usuário.
 
-Você DEVE usar a ferramenta de self-improvement. O processo é:
-1. Analisar o que precisa ser melhorado
-2. Planejar as mudanças necessárias
-3. Implementar as mudanças no clone
-4. Testar 20 vezes consecutivas para garantir estabilidade TOTAL
-5. Se algum teste falhar → corrigir automaticamente e testar de novo
-6. Repetir até TODOS os 20 testes passarem consecutivamente
-7. Máximo de 3 rodadas de correção
-8. Só aplicar (push) se 20/20 testes passarem
+Quando você identificar que precisa melhorar algo:
+1. CRIE UMA PROPOSTA detalhada e MOSTRE AO USUÁRIO
+2. AGUARDE a aprovação do usuário
+3. NUNCA aplique mudanças sem que o usuário diga "sim" ou "aprovo"
+4. Se o usuário disser "não" ou "não aprovo", descarte a proposta
+
+Quando aprovada, o processo é:
+1. Clonar o repositório em um diretório temporário
+2. Implementar as mudanças no clone
+3. Testar 20 vezes consecutivas para garantir estabilidade TOTAL
+4. Se algum teste falhar → corrigir automaticamente e testar de novo
+5. Repetir até TODOS os 20 testes passarem consecutivamente
+6. Máximo de 3 rodadas de correção
+7. Só aplicar (push) se 20/20 testes passarem
 
 NUNCA aplique mudanças sem testar. Segurança é prioridade.
-Se não conseguir passar após 3 rodadas de correção, reverta e informe o usuário sobre o problema encontrado.
+Se não conseguir passar após 3 rodadas de correção, reverta e informe o usuário.
+APROVAÇÃO DO USUÁRIO É OBRIGATÓRIA ANTES DE QUALQUER MUDANÇA.`;
 
 function truncateMessagesForContext(messages: any[], maxContentLength: number = 200000): any[] {
   let totalLength = 0;
@@ -125,7 +136,7 @@ export const appRouter = router({
       .input(z.object({
         conversationId: z.number(),
         fileName: z.string(),
-        fileContent: z.string(), // base64
+        fileContent: z.string(),
         fileType: z.string(),
         userMessage: z.string().optional(),
       }))
@@ -134,19 +145,17 @@ export const appRouter = router({
         const { conversationId, fileName, fileContent, fileType, userMessage } = input;
         const buffer = Buffer.from(fileContent, "base64");
 
-        // Salvar o arquivo no storage
         let fileUrl = "";
         try {
           const res = await storagePut(fileName, buffer, fileType);
           fileUrl = res.url;
         } catch (storageErr) {
-          console.warn("[Upload] Storage save failed, continuing without fileUrl:", (storageErr as Error).message);
+          console.warn("[Upload] Storage save failed:", (storageErr as Error).message);
         }
 
         const isImage = isImageFile(fileType);
         const isText = isTextFile(fileName, fileType);
 
-        // Construir o conteúdo da mensagem do usuário
         let content: string;
         if (isImage) {
           content = `${userMessage || ""}\n[Imagem anexada: ${fileName}]`;
@@ -154,22 +163,15 @@ export const appRouter = router({
           const text = extractTextFromBuffer(buffer, fileName, fileType);
           content = `${userMessage || ""}\n[Arquivo: ${fileName}]\n\nConteúdo:\n\`\`\`\n${text}\n\`\`\``;
         } else {
-          // Para arquivos binários: usar o file-analyzer
           const analysis = analyzeBinaryFile(buffer, fileName, fileType);
           content = `${userMessage || ""}\n\n${analysis}`;
         }
 
-        // Salvar mensagem do usuário
         await db.addMessage(conversationId, "user", content, fileUrl, fileName);
-
-        // Obter histórico da conversa
         const history = await db.getConversationMessages(conversationId);
-
-        // Truncar mensagens antigas se necessário
         const truncatedHistory = truncateMessagesForContext(history);
 
         try {
-          // Construir mensagens para o Groq
           const groqMessages: any[] = [
             { role: "system", content: SYSTEM_PROMPT }
           ];
@@ -178,8 +180,7 @@ export const appRouter = router({
             if (msg.role === "system") continue;
 
             if (msg.role === "user" && isImage && msg.fileName === fileName) {
-              // Para a última mensagem de usuário que contém a imagem, usar vision
-              const imageText = userMessage || "Analise esta imagem e me diga o que você vê. Se for um código, explique o que ele faz.";
+              const imageText = userMessage || "Analise esta imagem e me diga o que você vê.";
               groqMessages.push({
                 role: "user",
                 content: [
@@ -201,21 +202,13 @@ export const appRouter = router({
             }
           }
 
-          // Usar o modelo de visão se for imagem, senão usar o modelo padrão
           const model = isImage ? "qwen/qwen3.6-27b" : "llama-3.3-70b-versatile";
-
-          const response = await invokeGroq({
-            model,
-            messages: groqMessages,
-            maxTokens: 4000,
-            temperature: 0.7,
-          });
-
+          const response = await invokeGroq({ model, messages: groqMessages, maxTokens: 4000, temperature: 0.7 });
           const aiMsg = response.choices[0]?.message?.content || "Desculpe, não consegui gerar uma resposta.";
           await db.addMessage(conversationId, "assistant", aiMsg);
         } catch (err) {
-          console.error("[Upload] Groq invocation error:", err);
-          await db.addMessage(conversationId, "assistant", `Desculpe, ocorreu um erro ao processar o arquivo: ${(err as Error).message}`);
+          console.error("[Upload] Groq error:", err);
+          await db.addMessage(conversationId, "assistant", `Erro ao processar: ${(err as Error).message}`);
         }
 
         return { success: true, messages: await db.getConversationMessages(conversationId) };
@@ -233,30 +226,20 @@ export const appRouter = router({
         if (!ctx.user) throw new TRPCError({ code: "UNAUTHORIZED" });
         await db.addMessage(input.conversationId, "user", input.content);
         const history = await db.getConversationMessages(input.conversationId);
-
-        // Truncar mensagens antigas se necessário
         const truncatedHistory = truncateMessagesForContext(history);
 
         try {
-          // Construir mensagens para o Groq
           const groqMessages: any[] = [
             { role: "system", content: SYSTEM_PROMPT }
           ];
 
           for (const msg of truncatedHistory) {
             if (msg.role === "system") continue;
-            groqMessages.push({
-              role: msg.role,
-              content: msg.content,
-            });
+            groqMessages.push({ role: msg.role, content: msg.content });
           }
 
-          const model = input.useAdvancedReasoning
-            ? "llama-3.3-70b-versatile"
-            : "llama-3.3-70b-versatile";
-
           const response = await invokeGroq({
-            model,
+            model: "llama-3.3-70b-versatile",
             messages: groqMessages,
             maxTokens: 4000,
             temperature: 0.7,
@@ -265,83 +248,173 @@ export const appRouter = router({
           const aiMsg = response.choices[0]?.message?.content || "Desculpe, não consegui gerar uma resposta.";
           await db.addMessage(input.conversationId, "assistant", aiMsg);
         } catch (err) {
-          console.error("[Chat] Groq invocation error:", err);
-          await db.addMessage(input.conversationId, "assistant", `Desculpe, ocorreu um erro ao processar sua solicitação: ${(err as Error).message}`);
+          console.error("[Chat] Groq error:", err);
+          await db.addMessage(input.conversationId, "assistant", `Erro: ${(err as Error).message}`);
         }
 
         return { success: true, messages: await db.getConversationMessages(input.conversationId) };
       }),
   }),
 
-  // ─── Self-Improvement Router ───
+  // ─── Self-Improvement Router (COM APROVAÇÃO OBRIGATÓRIA) ───
   selfImprove: router({
     /**
-     * Analisar o repositório e sugerir melhorias necessárias
+     * Criar uma proposta de melhoria (mostra ao usuário para aprovação)
+     * A IA chama isso para SUGERIR melhorias, NÃO para aplicar
      */
-    analyze: protectedProcedure.mutation(async ({ ctx }) => {
-      if (!ctx.user) throw new TRPCError({ code: "UNAUTHORIZED" });
-
-      try {
-        const improvements = await analyzeForImprovements();
-        await db.addMessage(
-          1, // Usar primeira conversa ou criar uma de sistema
-          "assistant",
-          `📋 **Análise de Auto-Melhoria Concluída**\n\n${improvements.length > 0
-            ? improvements.map(imp => `- **${imp.area}**: ${imp.description}`).join("\n")
-            : "Nenhuma melhoria necessária encontrada no momento."
-          }`
-        );
-        return { success: true, improvements };
-      } catch (err) {
-        console.error("[SelfImprove] Analysis error:", err);
-        return { success: false, improvements: [], error: (err as Error).message };
-      }
-    }),
-
-    /**
-     * Executar uma melhoria no código (clone → melhorar → testar 5x → push se passar)
-     */
-    execute: protectedProcedure
+    propose: protectedProcedure
       .input(z.object({
-        description: z.string().describe("Descrição da melhoria a ser implementada"),
-        files: z.array(z.object({
-          path: z.string().describe("Caminho do arquivo no repositório"),
-          content: z.string().describe("Conteúdo completo do arquivo corrigido"),
-        })),
-        tests: z.array(z.string()).describe("Comandos de teste a serem executados").optional(),
+        title: z.string().describe("Título da melhoria proposta"),
+        description: z.string().describe("Descrição detalhada do que será feito"),
+        filesToChange: z.array(z.object({
+          path: z.string().describe("Caminho do arquivo"),
+          summary: z.string().describe("Resumo do que será mudado neste arquivo"),
+        })).describe("Lista de arquivos que serão modificados"),
+        risks: z.array(z.string()).describe("Riscos potenciais da mudança").optional(),
+        benefits: z.array(z.string()).describe("Benefícios esperados").optional(),
+        estimatedTime: z.string().describe("Tempo estimado para a melhoria").optional(),
       }))
       .mutation(async ({ ctx, input }) => {
         if (!ctx.user) throw new TRPCError({ code: "UNAUTHORIZED" });
 
-        // Registrar que começou a melhoria
-        const statusMsg = `🔧 **Iniciando Auto-Melhoria**\n\n**Melhoria:** ${input.description}\n**Arquivos a modificar:** ${input.files.map(f => f.path).join(", ")}\n**Testes:** ${input.tests?.join(", ") || "build + test padrão"}\n\nExecutando em segundo plano...`;
-        await db.addMessage(1, "assistant", statusMsg);
+        const proposal = await createImprovementProposal(
+          input.title,
+          input.description,
+          input.filesToChange,
+          input.risks || [],
+          input.benefits || [],
+          input.estimatedTime || "10-30 minutos"
+        );
+
+        // Enviar mensagem ao usuário pedindo aprovação
+        let msg = `📋 **Proposta de Auto-Melhoria**\n\n`;
+        msg += `**ID:** \`${proposal.id}\`\n`;
+        msg += `**Título:** ${proposal.title}\n`;
+        msg += `**Descrição:** ${proposal.description}\n\n`;
+        msg += `**Arquivos a modificar:**\n`;
+        msg += proposal.filesToChange.map(f => `- \`${f.path}\`: ${f.summary}`).join("\n");
+        msg += `\n\n`;
+        msg += `**Riscos:** ${proposal.risks.length > 0 ? proposal.risks.join(", ") : "Baixo"}`;
+        msg += `\n**Benefícios:** ${proposal.benefits.length > 0 ? proposal.benefits.join(", ") : "N/A"}`;
+        msg += `\n**Tempo estimado:** ${proposal.estimatedTime}\n\n`;
+        msg += `---\n`;
+        msg += `⏳ **Aguardando sua aprovação.** Diga "aprovo" ou "sim" para executar, ou "não" para rejeitar.`;
+
+        await db.addMessage(1, "assistant", msg);
+
+        return { success: true, proposalId: proposal.id, proposal } as const;
+      }),
+
+    /**
+     * O USUÁRIO aprova a proposta — a IA só executa APÓS isso
+     */
+    approve: protectedProcedure
+      .input(z.object({
+        proposalId: z.string().describe("ID da proposta a ser aprovada"),
+      }))
+      .mutation(async ({ ctx, input }) => {
+        if (!ctx.user) throw new TRPCError({ code: "UNAUTHORIZED" });
+
+        const proposal = getProposal(input.proposalId);
+        if (!proposal) {
+          return { success: false, message: "Proposta não encontrada. Peça para eu gerar uma nova proposta." };
+        }
+
+        if (proposal.status === "approved") {
+          return { success: false, message: "Esta proposta já está aprovada e em execução." };
+        }
+
+        if (proposal.status === "rejected") {
+          return { success: false, message: "Esta proposta foi rejeitada. Peça uma nova proposta." };
+        }
+
+        approveProposal(input.proposalId);
+
+        const msg = `✅ **Proposta aprovada!** Iniciando execução...\n\n**${proposal.title}**\nClonando repositório, aplicando mudanças e testando 20 vezes consecutivas...`;
+        await db.addMessage(1, "assistant", msg);
+
+        return { success: true, message: "Proposta aprovada. Executando..." };
+      }),
+
+    /**
+     * O USUÁRIO rejeita a proposta
+     */
+    reject: protectedProcedure
+      .input(z.object({
+        proposalId: z.string().describe("ID da proposta a ser rejeitada"),
+      }))
+      .mutation(async ({ ctx, input }) => {
+        if (!ctx.user) throw new TRPCError({ code: "UNAUTHORIZED" });
+
+        rejectProposal(input.proposalId);
+
+        const msg = `❌ **Proposta rejeitada.** As mudanças foram descartadas.`;
+        await db.addMessage(1, "assistant", msg);
+
+        return { success: true, message: "Proposta rejeitada e descartada." };
+      }),
+
+    /**
+     * Executar a melhoria (só pode ser chamado pelo próprio sistema após aprovação)
+     */
+    execute: protectedProcedure
+      .input(z.object({
+        proposalId: z.string().describe("ID da proposta aprovada"),
+        files: z.array(z.object({
+          path: z.string().describe("Caminho do arquivo"),
+          content: z.string().describe("Conteúdo completo do arquivo"),
+        })).describe("Arquivos com as mudanças"),
+      }))
+      .mutation(async ({ ctx, input }) => {
+        if (!ctx.user) throw new TRPCError({ code: "UNAUTHORIZED" });
+
+        const proposal = getProposal(input.proposalId);
+        if (!proposal) {
+          return { success: false, message: "Proposta não encontrada." };
+        }
+
+        if (proposal.status !== "approved") {
+          return {
+            success: false,
+            message: `Proposta não está aprovada (status: ${proposal.status}). Você precisa aprovar antes de executar.`,
+          };
+        }
+
+        // Registrar início
+        await db.addMessage(1, "assistant", `🔧 **Executando:** ${proposal.title}\nTestando 20 vezes consecutivas...`);
 
         try {
-          // Executar o self-improvement
-          const result = await selfImprove(
-            {
-              area: "Auto-improvement",
-              description: input.description,
-              filesToChange: input.files.map(f => f.path),
-              testsNeeded: input.tests || [],
-            },
-            input.files
-          );
+          const result = await executeApprovedImprovement(input.proposalId, input.files);
 
-          // Registrar resultado
           const resultMsg = result.success
-            ? `✅ **Auto-Melhoria Concluída com Sucesso!**\n\n${result.message}\n\n**Testes executados:** ${result.testResults.length}/${result.testResults.length} passes\n${result.testResults.map(r => `- Tentativa ${r.run}: ${r.passed ? "✅ Passou" : "❌ Falhou"}`).join("\n")}`
-            : `❌ **Auto-Melhoria Falhou**\n\n${result.message}\n\n**Testes executados:**\n${result.testResults.map(r => `- Tentativa ${r.run}: ${r.passed ? "✅ Passou" : "❌ Falhou"}`).join("\n")}\n\nMudanças foram revertidas para proteger o repositório.`;
+            ? `✅ **Auto-Melhoria Concluída!**\n\n${result.message}\n\n**Resultados dos testes:** ${result.testsPassed}/${result.totalTestsRun} passaram\n**Push:** ${result.pushed ? "Sim" : "Não"}`
+            : `❌ **Auto-Melhoria Falhou**\n\n${result.message}\n\n**Resultados dos testes:** ${result.testsPassed}/${result.totalTestsRun} passaram\nMudanças revertidas para proteger o repositório.`;
 
           await db.addMessage(1, "assistant", resultMsg);
-
           return { success: result.success, result } as const;
         } catch (err) {
-          const errorMsg = `💥 **Erro Fatal na Auto-Melhoria**\n\n${(err as Error).message}\n\nNenhuma mudança foi aplicada.`;
+          const errorMsg = `💥 **Erro na Auto-Melhoria**\n\n${(err as Error).message}\nNenhuma mudança foi aplicada.`;
           await db.addMessage(1, "assistant", errorMsg);
           return { success: false, error: (err as Error).message } as const;
         }
+      }),
+
+    /**
+     * Listar todas as propostas de melhoria
+     */
+    list: protectedProcedure.query(async ({ ctx }) => {
+      if (!ctx.user) throw new TRPCError({ code: "UNAUTHORIZED" });
+      return listProposals();
+    }),
+
+    /**
+     * Obter detalhes de uma proposta específica
+     */
+    get: protectedProcedure
+      .input(z.object({ proposalId: z.string() }))
+      .query(async ({ ctx, input }) => {
+        if (!ctx.user) throw new TRPCError({ code: "UNAUTHORIZED" });
+        return getProposal(input.proposalId);
       }),
 
     /**
@@ -354,7 +427,6 @@ export const appRouter = router({
       .mutation(async ({ ctx, input }) => {
         if (!ctx.user) throw new TRPCError({ code: "UNAUTHORIZED" });
 
-        // Whitelist de comandos seguros
         const safeCommands = ["file", "strings", "hexdump", "unzip", "ls", "cat", "head", "tail", "wc", "grep", "find", "du", "stat"];
         const cmdParts = input.command.split(/\s+/);
         const baseCmd = cmdParts[0];
@@ -363,7 +435,7 @@ export const appRouter = router({
           return {
             success: false,
             output: "",
-            error: `Comando não permitido: ${baseCmd}. Comandos permitidos: ${safeCommands.join(", ")}`,
+            error: `Comando não permitido: ${baseCmd}. Permitidos: ${safeCommands.join(", ")}`,
           } as const;
         }
 
@@ -375,11 +447,7 @@ export const appRouter = router({
             error: result.stderr.slice(0, 2000),
           } as const;
         } catch (err) {
-          return {
-            success: false,
-            output: "",
-            error: (err as Error).message,
-          } as const;
+          return { success: false, output: "", error: (err as Error).message } as const;
         }
       }),
   }),
