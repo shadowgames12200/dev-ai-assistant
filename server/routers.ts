@@ -5,71 +5,33 @@ import { publicProcedure, protectedProcedure, router } from "./_core/trpc.js";
 import { TRPCError } from "@trpc/server";
 import { z } from "zod";
 import * as db from "./db.js";
-import { invokeGroq, buildGroqUserMessage } from "./_core/groq.js";
+import { invokeGroq } from "./_core/groq.js";
 import { storagePut } from "./storage.js";
+import { analyzeBinaryFile, detectFileTypeByHeader, isTextFile, isImageFile, extractTextFromBuffer } from "./_core/file-analyzer.js";
 
 const SYSTEM_PROMPT = `Você é o DevAI, um assistente de programação e produtividade extremamente competente.
 Responda de forma clara, concisa e direta.
-Quando o usuário enviar um arquivo (imagem, código, documento, etc.), analise-o completamente e forneça feedback detalhado.
-Você pode analisar imagens, código-fonte, arquivos de texto, logs, documentos e muito mais.
-Se o arquivo for código, sugira melhorias, corrija bugs e explique o que está acontecendo.
-Se o arquivo for uma imagem, descreva o que vê e forneça insights relevantes.
-Se o arquivo for um documento ou texto, resuma, analise e forneça recomendações.`;
 
-// Extensões de arquivos de texto que podem ser lidos como texto puro
-const TEXT_EXTENSIONS = new Set([
-  "txt", "md", "markdown", "csv", "json", "xml", "yaml", "yml",
-  "toml", "ini", "env", "log", "sh", "bash",
-  "js", "jsx", "ts", "tsx", "mjs", "cjs",
-  "py", "rb", "php", "java", "kt", "scala",
-  "c", "cpp", "h", "hpp", "cs", "go", "rs",
-  "swift", "dart", "lua", "r", "sql", "graphql",
-  "html", "htm", "css", "scss", "vue", "svelte",
-  "dockerfile", "makefile", "gitignore", "toml", "cfg", "conf",
-]);
+Você pode analisar:
+- **Imagens**: Descreva o que vê, identifique código, diagramas, erros na tela, etc.
+- **Código-fonte**: Analise, corrija bugs, sugira melhorias, explique a lógica
+- **Documentos de texto**: Resuma, analise, extraia informações
+- **Arquivos ZIP**: Liste o conteúdo, identifique executáveis, código e configurações
+- **Executáveis (.exe, .dll, ELF)**: Analise as strings, identifique arquitetura, detecte comportamento
+- **PDFs**: Extraia texto e analise o conteúdo
+- **Arquivos de configuração**: Analise configs, .env, YAML, JSON, etc.
+- **Logs**: Identifique erros, warnings e padrões
 
-// Tipos MIME de imagens suportados pelo modelo de visão do Groq
-const IMAGE_MIME_TYPES = new Set([
-  "image/jpeg", "image/jpg", "image/png", "image/gif", "image/webp", "image/bmp", "image/svg+xml",
-]);
-
-function isTextFile(fileName: string, fileType: string): boolean {
-  const ext = fileName.split(".").pop()?.toLowerCase() ?? "";
-  return fileType.startsWith("text/") ||
-    fileType === "application/json" ||
-    fileType === "application/javascript" ||
-    fileType === "application/typescript" ||
-    TEXT_EXTENSIONS.has(ext);
-}
-
-function isImageFile(fileType: string): boolean {
-  return IMAGE_MIME_TYPES.has(fileType.toLowerCase());
-}
-
-function extractTextFromBuffer(buffer: Buffer, fileName: string, fileType: string): string {
-  const ext = fileName.split(".").pop()?.toLowerCase() ?? "";
-  const isText = isTextFile(fileName, fileType);
-
-  if (isText) {
-    const text = buffer.toString("utf-8");
-    return text.length > 80000 ? text.slice(0, 80000) + "\n\n[... conteúdo truncado ...]" : text;
-  }
-
-  // Para PDFs, tentar extrair texto básico (se vier como texto)
-  if (fileType === "application/pdf" || ext === "pdf") {
-    return "[Arquivo PDF anexado - conteúdo binário não pode ser lido diretamente como texto. O modelo de visão pode analisá-lo se convertido em imagem.]";
-  }
-
-  return `[Arquivo binário: ${fileName} (${fileType || 'tipo desconhecido'})]`;
-}
+Quando o usuário enviar um arquivo, analise-o completamente.
+Se for código, sugira melhorias e corrija bugs.
+Se for uma imagem, descreva o que vê em detalhes.
+Se for um arquivo binário/executável, analise as strings e identifique o propósito.
+Se for um ZIP, liste todo o conteúdo e destaque os arquivos importantes.`;
 
 function truncateMessagesForContext(messages: any[], maxContentLength: number = 200000): any[] {
-  // Remove system messages from history (we'll inject a fresh one)
-  // Truncate old messages if the total content is too large
   let totalLength = 0;
   const truncated = [];
 
-  // Always include the last few messages to maintain context
   for (let i = messages.length - 1; i >= 0; i--) {
     const msg = messages[i];
     const content = typeof msg.content === 'string' ? msg.content : JSON.stringify(msg.content);
@@ -132,7 +94,6 @@ export const appRouter = router({
       .input(z.object({ id: z.number() }))
       .query(async ({ ctx, input }) => {
         if (!ctx.user) throw new TRPCError({ code: "UNAUTHORIZED" });
-        // Verify ownership
         const conv = await db.getConversation(input.id, ctx.user.id);
         if (!conv) throw new TRPCError({ code: "NOT_FOUND", message: "Conversation not found" });
         return db.getConversationMessages(input.id);
@@ -168,14 +129,14 @@ export const appRouter = router({
         // Construir o conteúdo da mensagem do usuário
         let content: string;
         if (isImage) {
-          // Para imagens: embutir como texto descritivo + base64 data URI
           content = `${userMessage || ""}\n[Imagem anexada: ${fileName}]`;
         } else if (isText) {
           const text = extractTextFromBuffer(buffer, fileName, fileType);
           content = `${userMessage || ""}\n[Arquivo: ${fileName}]\n\nConteúdo:\n\`\`\`\n${text}\n\`\`\``;
         } else {
-          // Para outros binários
-          content = `${userMessage || ""}\n[Arquivo binário: ${fileName} (${(buffer.length / 1024).toFixed(1)} KB)]\nEste é um arquivo binário. O que você gostaria que eu analisasse sobre ele?`;
+          // Para arquivos binários: usar o file-analyzer
+          const analysis = analyzeBinaryFile(buffer, fileName, fileType);
+          content = `${userMessage || ""}\n\n${analysis}`;
         }
 
         // Salvar mensagem do usuário
