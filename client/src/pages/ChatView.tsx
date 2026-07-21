@@ -127,30 +127,29 @@ export default function ChatView() {
     setActiveConversationId(convId);
   }, []);
 
-  // Efeito para carregar mensagens quando a conversa muda
+  // Hook tRPC correto para buscar mensagens da conversa ativa
+  const messagesQuery = trpc.conversations.messages.useQuery(
+    { id: activeConversationId! },
+    { enabled: !!activeConversationId }
+  );
+
+  // Sincronizar mensagens quando a query retornar dados
   useEffect(() => {
     if (!activeConversationId) {
       setConversationMessages([]);
       setMessages([]);
       return;
     }
-
-    // Usar tRPC para buscar mensagens da conversa
-    trpc.conversations.messages.query(
-      { id: activeConversationId },
-      {
-        onSuccess: (data) => {
-          setConversationMessages(data);
-          setMessages(data);
-        },
-        onError: (error) => {
-          console.error("Failed to fetch messages:", error);
-          setConversationMessages([]);
-          setMessages([]);
-        },
-      }
-    );
-  }, [activeConversationId]);
+    if (messagesQuery.data) {
+      setConversationMessages(messagesQuery.data);
+      setMessages(messagesQuery.data);
+    }
+    if (messagesQuery.error) {
+      console.error("Failed to fetch messages:", messagesQuery.error);
+      setConversationMessages([]);
+      setMessages([]);
+    }
+  }, [activeConversationId, messagesQuery.data, messagesQuery.error]);
 
   const chatMutation = trpc.chat.send.useMutation({
     onSuccess: (data) => {
