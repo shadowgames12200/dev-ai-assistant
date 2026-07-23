@@ -1,6 +1,6 @@
 import { trpc } from "@/lib/trpc";
 import { useQueryClient } from "@tanstack/react-query";
-import { useState, useRef, useEffect, useCallback } from "react";
+import { useState, useRef, useEffect, useCallback, Component, ReactNode } from "react";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
 import { ScrollArea } from "@/components/ui/scroll-area";
@@ -192,7 +192,7 @@ export default function ChatView() {
     // Detectar erros de parse JSON (servidor retornando HTML)
     if (msg.includes("Unexpected token") || msg.includes("is not valid JSON")) {
       toast.error(
-        "Erro de conexão com o servidor. Verifique se a GROQ_API_KEY está configurada nas variáveis de ambiente do Vercel.",
+        "Erro de conexão com o servidor. Verifique se a GROQ_API_KEY está configurada nas variáveis de ambiente.",
         { duration: 8000 }
       );
       return;
@@ -201,7 +201,7 @@ export default function ChatView() {
     // Detectar erros de API key
     if (msg.includes("GROQ_API_KEY")) {
       toast.error(
-        "Configuração necessária: Adicione a variável GROQ_API_KEY nas configurações do Vercel (Settings > Environment Variables).",
+        "Configuração necessária: Adicione a variável GROQ_API_KEY nas variáveis de ambiente do servidor.",
         { duration: 10000 }
       );
       return;
@@ -283,12 +283,13 @@ export default function ChatView() {
       return;
     }
 
-    // Aviso para arquivos grandes no Vercel (limite de 4.5MB no plano free)
-    const vercelLimit = 4.5 * 1024 * 1024;
-    if (file.size > vercelLimit) {
-      toast.info(`Arquivo de ${Math.round(file.size / 1024 / 1024)}MB. Se estiver usando Vercel free, o limite é 4.5MB.`, {
+    // Aviso para arquivos grandes
+    const fileSizeLimit = 100 * 1024 * 1024; // 100MB
+    if (file.size > fileSizeLimit) {
+      toast.error(`Arquivo de ${Math.round(file.size / 1024 / 1024)}MB excede o limite de ${fileSizeLimit / 1024 / 1024}MB.`, {
         duration: 6000,
       });
+      return;
     }
 
     setSelectedFile(file);
@@ -379,7 +380,81 @@ export default function ChatView() {
     }
   };
 
-  const displayMessages = messages.filter((m) => m.role !== "system");
+  /**
+ * ErrorBoundary local para proteger a renderização de mensagens.
+ * O erro insertBefore ocorre quando o DOM é manipulado enquanto React
+ * tenta re-renderizar (ex: após aprovação ou update simultâneo).
+ * Este boundary captura o erro e força um re-render seguro.
+ */
+class MessageErrorBoundary extends Component<{ children: ReactNode }, { hasError: boolean; error: Error | null }> {
+  constructor(props: { children: ReactNode }) {
+    super(props);
+    this.state = { hasError: false, error: null };
+  }
+
+  static getDerivedStateFromError(error: Error) {
+    return { hasError: true, error };
+  }
+
+  render() {
+    if (this.state.hasError) {
+      return (
+        <div className="p-4 text-center text-sm text-muted-foreground">
+          <p>Erro de renderização. <button onClick={() => this.setState({ hasError: false, error: null })} className="underline text-primary">Tentar novamente</button></p>
+        </div>
+      );
+    }
+    return this.props.children;
+  }
+}
+
+function MessageItem({ msg }: { msg: DbMessage }) {
+  return (
+    <div
+      key={msg.id}
+      className={cn(
+        "flex gap-3",
+        msg.role === "user" ? "justify-end" : "justify-start"
+      )}
+    >
+      {msg.role === "assistant" && (
+        <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-primary/10">
+          <Bot className="h-4 w-4 text-primary" />
+        </div>
+      )}
+      <div
+        className={cn(
+          "max-w-[80%] rounded-xl px-4 py-2",
+          msg.role === "user"
+            ? "bg-primary text-primary-foreground"
+            : "bg-muted"
+        )}
+      >
+        {msg.fileName && (
+          <div className="mb-1 flex items-center gap-1 text-xs opacity-70">
+            {(() => {
+              const Icon = getFileIcon(msg.fileName);
+              return <Icon className="h-3 w-3" />;
+            })()}
+            {msg.fileName}
+          </div>
+        )}
+        {msg.role === "assistant" ? (
+          <Streamdown>{msg.content}</Streamdown>
+        ) : (
+          <p className="whitespace-pre-wrap break-words">{msg.content}</p>
+        )}
+      </div>
+      {msg.role === "user" && (
+        <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-muted">
+          <User className="h-4 w-4" />
+        </div>
+      )}
+    </div>
+  );
+}
+
+const displayMessages = messages.filter((m) => m.role !== "system");
 
   const FileIcon = selectedFile ? getFileIcon(selectedFile.name) : Paperclip;
 
@@ -536,47 +611,9 @@ export default function ChatView() {
           <ScrollArea ref={scrollAreaRef} className="flex-1">
             <div className="p-4 space-y-4">
               {displayMessages.map((msg) => (
-                <div
-                  key={msg.id}
-                  className={cn(
-                    "flex gap-3",
-                    msg.role === "user" ? "justify-end" : "justify-start"
-                  )}
-                >
-                  {msg.role === "assistant" && (
-                    <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-primary/10">
-                      <Bot className="h-4 w-4 text-primary" />
-                    </div>
-                  )}
-                  <div
-                    className={cn(
-                      "max-w-[80%] rounded-xl px-4 py-2",
-                      msg.role === "user"
-                        ? "bg-primary text-primary-foreground"
-                        : "bg-muted"
-                    )}
-                  >
-                    {msg.fileName && (
-                      <div className="mb-1 flex items-center gap-1 text-xs opacity-70">
-                        {(() => {
-                          const Icon = getFileIcon(msg.fileName);
-                          return <Icon className="h-3 w-3" />;
-                        })()}
-                        {msg.fileName}
-                      </div>
-                    )}
-                    {msg.role === "assistant" ? (
-                      <Streamdown>{msg.content}</Streamdown>
-                    ) : (
-                      <p className="whitespace-pre-wrap break-words">{msg.content}</p>
-                    )}
-                  </div>
-                  {msg.role === "user" && (
-                    <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-muted">
-                      <User className="h-4 w-4" />
-                    </div>
-                  )}
-                </div>
+                <MessageErrorBoundary key={msg.id}>
+                  <MessageItem msg={msg} />
+                </MessageErrorBoundary>
               ))}
               {isLoading && (
                 <div className="flex justify-start gap-3">

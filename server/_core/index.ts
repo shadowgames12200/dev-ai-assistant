@@ -55,7 +55,7 @@ async function startServer() {
   if (process.env.NODE_ENV === "development") {
     await setupVite(app, server);
   } else {
-    // Na Vercel, servimos os arquivos estáticos da pasta dist
+    // Em produção, servimos os arquivos estáticos da pasta dist
     const distPath = path.resolve(process.cwd(), "dist/public");
     app.use(express.static(distPath));
     app.get("*", (req, res) => {

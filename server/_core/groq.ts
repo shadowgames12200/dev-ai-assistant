@@ -66,7 +66,7 @@ const assertGroqApiKey = () => {
   if (!ENV.groqApiKey) {
     throw new Error(
       "GROQ_API_KEY is not configured. " +
-      "Please add the GROQ_API_KEY environment variable to your Vercel project settings. " +
+      "Please add the GROQ_API_KEY environment variable to your server settings. " +
       "Get your key at https://console.groq.com/keys"
     );
   }
