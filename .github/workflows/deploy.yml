@@ -1,0 +1,47 @@
+name: Auto Deploy to Azure VM
+
+on:
+  push:
+    branches:
+      - main
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Deploy to Azure VM via SSH
+        uses: appleboy/ssh-action@master
+        with:
+          host: ${{ secrets.VM_HOST }}
+          username: ${{ secrets.VM_USERNAME }}
+          key: ${{ secrets.VM_SSH_KEY }}
+          port: 22
+          script: |
+            export HOME=/home/${{ secrets.VM_USERNAME }}
+            echo "=== Deploying DevAI Assistant ==="
+            
+            # Pull latest changes
+            echo "📥 Pulling changes..."
+            cd /home/${{ secrets.VM_USERNAME }}/dev-ai-assistant
+            git config --global --add safe.directory /home/${{ secrets.VM_USERNAME }}/dev-ai-assistant
+            git pull origin main
+            
+            # Install dependencies
+            echo "📦 Installing dependencies..."
+            pnpm install --no-frozen-lockfile
+            
+            # Stop PM2 to free memory
+            echo "🛑 Stopping PM2..."
+            pm2 stop devai
+            
+            # Build with memory limit
+            echo "🏗️ Building..."
+            export NODE_OPTIONS=--max-old-space-size=1536
+            npx vite build
+            
+            # Start PM2
+            echo "🚀 Starting PM2..."
+            pm2 start devai
+            
+            echo "=== Deploy Complete ==="
+            pm2 list
