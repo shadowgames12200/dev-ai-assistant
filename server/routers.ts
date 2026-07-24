@@ -17,18 +17,50 @@ import {
   getProposal,
   executeSystemCommand,
 } from "./_core/self-improvement.js";
+import {
+  buildSmartContext,
+  extractMemoryFacts,
+  summarizeConversation,
+  getOrCreateUserMemory,
+  addFact,
+  getMemoryContext,
+  createAgentContext,
+  addToWorkingMemory,
+  clearAgentContext,
+  type AgentContext,
+} from "./_core/memory.js";
+import {
+  runAgentLoop,
+  enhancedChat,
+  type AgentResult,
+  type AgentLoopConfig,
+} from "./_core/agent-loop.js";
+import {
+  planTask,
+  executeTaskStep,
+  createTask,
+  getTask,
+  listTasks,
+  reflectOnResults,
+  type Task,
+  type PlanStep,
+} from "./_core/planner.js";
+import {
+  formatResponse,
+  analyzeResponseType,
+  checkResponseQuality,
+  postProcessResponse,
+} from "./_core/structured-response.js";
 
-const SYSTEM_PROMPT = `Você é o DevAI, um assistente de programação e produtividade extremamente competente. Você foi inspirado no Manus AI.
+const SYSTEM_PROMPT = `Você é o DevAI, um assistente de IA avançado inspirado no Manus AI. Você é capaz de entender contexto, executar tarefas complexas, manter memória da conversa e responder de forma inteligente e estruturada.
 
-=== COMO RESPONDER ===
-Sempre responda de forma profissional, estruturada e organizada. Use Markdown para formatar suas respostas com:
-- Títulos e subtítulos (## e ###)
-- Listas organizadas
-- Blocos de código com linguagem especificada
-- Negrito para destacar conceitos importantes
-- Tabelas quando apropriado para comparar opções
-
-Suas respostas devem ser completas, detalhadas e úteis. Não seja superficial. Quando o usuário pedir algo, entregue o resultado completo e funcional.
+=== PERSONALIDADE ===
+- Profissional, direto e inteligente
+- Responde de forma estruturada com Markdown
+- Usa tabelas, listas, código formatado quando apropriado
+- Mantém contexto da conversa inteira
+- Lembra de informações relevantes do usuário
+- Quando o usuário pede algo, entrega o resultado COMPLETO e funcional
 
 === CAPACIDADES DE ANÁLISE ===
 Você pode analisar:
@@ -40,6 +72,16 @@ Você pode analisar:
 - **PDFs**: Extraia texto e analise o conteúdo
 - **Arquivos de configuração**: Analise configs, .env, YAML, JSON, etc.
 - **Logs**: Identifique erros, warnings e padrões
+
+=== FORMATO DE RESPOSTA ===
+- Use ## para títulos principais e ### para subtítulos
+- Use **negrito** para conceitos importantes
+- Use blocos de código com linguagem especificada (ex: \`\`\`python)
+- Use tabelas Markdown quando comparar opções
+- Use listas numeradas para passos e listas com marcadores para itens
+- Quando gerar código, entregue COMPLETO e funcional
+- Quando analisar algo, seja detalhado e profissional
+- NUNCA seja superficial — entregue o resultado completo
 
 === QUANDO O USUÁRIO ENVIA UM ARQUIVO COM UM PEDIDO ===
 Se o usuário enviar um arquivo (RAR, ZIP, APK, executável, etc.) junto com um pedido como "crie um igual", "faça algo parecido", "clone esse projeto", etc.:
@@ -109,6 +151,19 @@ function truncateMessagesForContext(messages: any[], maxContentLength: number = 
   }
 
   return truncated;
+}
+
+// Detect if message is an agent mode request
+function isAgentMode(content: string): boolean {
+  const lower = content.toLowerCase();
+  return lower.includes("[modo agente]") || lower.includes("[agent mode]");
+}
+
+// Detect if message requests self-improvement
+function isSelfImprovement(content: string): boolean {
+  const lower = content.toLowerCase();
+  const improvementKeywords = ["melhore a ia", "melhore o sistema", "melhore o devai", "auto-melhoria", "self-improvement"];
+  return improvementKeywords.some(kw => lower.includes(kw));
 }
 
 export const appRouter = router({
@@ -206,7 +261,8 @@ export const appRouter = router({
         const truncatedHistory = truncateMessagesForContext(history);
 
         try {
-          const groqMessages: any[] = [
+          // Use enhanced chat with tool support
+          const messages: any[] = [
             { role: "system", content: SYSTEM_PROMPT }
           ];
 
@@ -215,7 +271,7 @@ export const appRouter = router({
 
             if (msg.role === "user" && isImage && msg.fileName === fileName) {
               const imageText = userMessage || "Analise esta imagem e me diga o que você vê.";
-              groqMessages.push({
+              messages.push({
                 role: "user",
                 content: [
                   { type: "text", text: imageText },
@@ -229,17 +285,20 @@ export const appRouter = router({
                 ],
               });
             } else {
-              groqMessages.push({
+              messages.push({
                 role: msg.role,
                 content: msg.content,
               });
             }
           }
 
-          const model = isImage ? "qwen/qwen3.6-27b" : "llama-3.3-70b-versatile";
-          const response = await invokeGroq({ model, messages: groqMessages, maxTokens: 4000, temperature: 0.7 });
-          const aiMsg = response.choices[0]?.message?.content || "Desculpe, não consegui gerar uma resposta.";
-          await db.addMessage(conversationId, "assistant", aiMsg);
+          // Use enhanced chat with tool loop
+          const result = await enhancedChat(messages, {
+            model: isImage ? "qwen/qwen3.6-27b" : "llama-3.3-70b-versatile",
+            maxIterations: 10,
+          });
+
+          await db.addMessage(conversationId, "assistant", result.content);
         } catch (err) {
           console.error("[Upload] Groq error:", err);
           await db.addMessage(conversationId, "assistant", `Erro ao processar: ${(err as Error).message}`);
@@ -263,24 +322,57 @@ export const appRouter = router({
         const truncatedHistory = truncateMessagesForContext(history);
 
         try {
-          const groqMessages: any[] = [
-            { role: "system", content: SYSTEM_PROMPT }
-          ];
+          // Check if this is an agent mode request
+          if (isAgentMode(input.content)) {
+            // Run the autonomous agent loop
+            const agentResult = await runAgentLoop(input.content, {
+              model: "llama-3.3-70b-versatile",
+              maxIterations: 15,
+            });
 
-          for (const msg of truncatedHistory) {
-            if (msg.role === "system") continue;
-            groqMessages.push({ role: msg.role, content: msg.content });
+            const agentOutput = `**Modo Agente Concluído**\n\n**Iterações:** ${agentResult.totalIterations}\n**Ferramentas usadas:** ${agentResult.iterations.filter(i => i.type === "tool_call").length} chamada(s)\n**Tempo total:** ${(agentResult.totalDuration / 1000).toFixed(1)}s\n\n---\n\n${agentResult.finalOutput}`;
+
+            await db.addMessage(input.conversationId, "assistant", agentOutput);
+
+            // Extract memory facts from this interaction
+            extractMemoryFacts(ctx.user.id, truncatedHistory.map(m => ({ role: m.role, content: m.content })));
+          } else {
+            // Regular chat with enhanced context and tool loop
+            const { messages } = await buildSmartContext(
+              ctx.user.id,
+              input.conversationId,
+              input.content,
+              truncatedHistory.map(m => ({ role: m.role, content: m.content }))
+            );
+
+            // Use enhanced chat with tool support
+            const result = await enhancedChat(messages, {
+              model: "llama-3.3-70b-versatile",
+              maxIterations: 10,
+            });
+
+            // Post-process the response for quality
+            const formatted = formatResponse(result.content);
+            const issues = checkResponseQuality(result.content, input.content);
+            const finalContent = issues.length > 0 ? postProcessResponse(result.content, issues) : result.content;
+
+            await db.addMessage(input.conversationId, "assistant", finalContent);
+
+            // Extract memory facts (runs in background)
+            extractMemoryFacts(ctx.user.id, truncatedHistory.map(m => ({ role: m.role, content: m.content })));
+
+            // Summarize if conversation is long enough
+            if (truncatedHistory.length >= 10) {
+              const conv = await db.getConversation(input.conversationId, ctx.user.id);
+              if (conv) {
+                summarizeConversation(
+                  truncatedHistory.map(m => ({ role: m.role, content: m.content })),
+                  input.conversationId,
+                  conv.title
+                );
+              }
+            }
           }
-
-          const response = await invokeGroq({
-            model: "llama-3.3-70b-versatile",
-            messages: groqMessages,
-            maxTokens: 4000,
-            temperature: 0.7,
-          });
-
-          const aiMsg = response.choices[0]?.message?.content || "Desculpe, não consegui gerar uma resposta.";
-          await db.addMessage(input.conversationId, "assistant", aiMsg);
         } catch (err) {
           console.error("[Chat] Groq error:", err);
           await db.addMessage(input.conversationId, "assistant", `Erro: ${(err as Error).message}`);
@@ -288,6 +380,172 @@ export const appRouter = router({
 
         return { success: true, messages: await db.getConversationMessages(input.conversationId) };
       }),
+  }),
+
+  // ─── Agent Router (Real Agent Mode) ───
+  agent: router({
+    /**
+     * Run a full agent task with planning and execution
+     */
+    run: protectedProcedure
+      .input(z.object({
+        goal: z.string().describe("Objetivo da tarefa do agente"),
+      }))
+      .mutation(async ({ ctx, input }) => {
+        if (!ctx.user) throw new TRPCError({ code: "UNAUTHORIZED" });
+
+        // Step 1: Plan
+        const planning = await planTask(input.goal);
+        const task = createTask(input.goal);
+        task.plan = planning.plan;
+
+        // Create conversation for this agent task
+        const convId = await db.createConversation(ctx.user.id, `Agente: ${input.goal.slice(0, 50)}`);
+
+        // Send initial plan to conversation
+        const planMessage = `🤖 **Agente DevAI — Plano de Execução**\n\n**Objetivo:** ${input.goal}\n**Complexidade:** ${planning.complexity}\n**Passos:** ${planning.estimatedSteps}\n\n**Plano:**\n${planning.plan.map((s, i) => `${i + 1}. [${s.type}] **${s.title}** — ${s.description}`).join("\n")}\n\n---\n🔄 Iniciando execução...`;
+
+        await db.addMessage(convId, "assistant", planMessage);
+
+        // Step 2: Execute each step
+        let stepResults: string[] = [];
+        for (let i = 0; i < task.plan.length; i++) {
+          const step = task.plan[i];
+
+          // Skip if depends on a failed step
+          if (step.dependsOn?.some(depId => {
+            const depStep = task.plan.find(s => s.id === depId);
+            return depStep?.status === "error";
+          })) {
+            step.status = "skipped";
+            continue;
+          }
+
+          const { success, result } = await executeTaskStep(
+            task.id,
+            step.id,
+            stepResults
+          );
+
+          stepResults.push(result);
+
+          // Report progress
+          const progressMsg = `**Passo ${i + 1}/${task.plan.length}:** ${step.title}\n**Status:** ${success ? "Concluído ✅" : "Falhou ❌"}\n\n${result.slice(0, 500)}${result.length > 500 ? "\n..." : ""}`;
+          await db.addMessage(convId, "assistant", progressMsg);
+        }
+
+        // Step 3: Reflection (check if re-planning needed)
+        const lastResult = stepResults[stepResults.length - 1] || "";
+        const reflection = await reflectOnResults(
+          input.goal,
+          task.plan,
+          stepResults,
+          lastResult
+        );
+
+        if (reflection.needsReplan && reflection.newSteps) {
+          // Append new steps
+          for (const newStep of reflection.newSteps) {
+            task.plan.push(newStep);
+            const { success, result } = await executeTaskStep(
+              task.id,
+              newStep.id,
+              stepResults
+            );
+            stepResults.push(result);
+            await db.addMessage(convId, "assistant", `**Re-planejamento:** Novo passo — ${newStep.title}\n${result.slice(0, 300)}`);
+          }
+        }
+
+        // Step 4: Final output
+        const allDone = task.plan.every(s => s.status === "done" || s.status === "skipped");
+        task.status = allDone ? "completed" : "failed";
+
+        const finalMsg = allDone
+          ? `✅ **Tarefa Concluída!**\n\n**Passos executados:** ${task.plan.filter(s => s.status === "done").length}/${task.plan.length}\n**Resultados:** ${stepResults.length} passos processados\n\n---\n\n**Resultado Final:**\n${stepResults.join("\n\n---\n\n")}`
+          : `❌ **Tarefa Falhou**\n\nAlguns passos não puderam ser concluídos. Tente novamente ou reformule o pedido.\n\n**Passos concluídos:** ${task.plan.filter(s => s.status === "done").length}/${task.plan.length}`;
+
+        await db.addMessage(convId, "assistant", finalMsg);
+
+        return {
+          success: allDone,
+          conversationId: convId,
+          task,
+          stepResults,
+        };
+      }),
+
+    /**
+     * Get task progress
+     */
+    getProgress: protectedProcedure
+      .input(z.object({ taskId: z.string() }))
+      .query(async ({ ctx, input }) => {
+        if (!ctx.user) throw new TRPCError({ code: "UNAUTHORIZED" });
+        const task = getTask(input.taskId);
+        if (!task) throw new TRPCError({ code: "NOT_FOUND", message: "Task not found" });
+        return task;
+      }),
+
+    /**
+     * List all agent tasks
+     */
+    list: protectedProcedure.query(async ({ ctx }) => {
+      if (!ctx.user) throw new TRPCError({ code: "UNAUTHORIZED" });
+      return listTasks();
+    }),
+  }),
+
+  // ─── Memory Router ───
+  memory: router({
+    /**
+     * Get user memory profile
+     */
+    get: protectedProcedure.query(async ({ ctx }) => {
+      if (!ctx.user) throw new TRPCError({ code: "UNAUTHORIZED" });
+      const memoryContext = getMemoryContext(ctx.user.id);
+      const memory = getOrCreateUserMemory(ctx.user.id);
+      return {
+        preferences: memory.preferences,
+        facts: memory.facts,
+        skills: memory.skills,
+        lastSummary: memory.lastSummary,
+        lastUpdatedAt: memory.lastUpdatedAt,
+        context: memoryContext,
+      };
+    }),
+
+    /**
+     * Add a fact to memory manually
+     */
+    addFact: protectedProcedure
+      .input(z.object({
+        content: z.string(),
+        importance: z.enum(["low", "medium", "high"]).optional(),
+      }))
+      .mutation(async ({ ctx, input }) => {
+        if (!ctx.user) throw new TRPCError({ code: "UNAUTHORIZED" });
+        addFact(ctx.user.id, {
+          content: input.content,
+          importance: input.importance || "medium",
+          source: "manual",
+        });
+        return { success: true };
+      }),
+
+    /**
+     * Clear all memory
+     */
+    clear: protectedProcedure.mutation(async ({ ctx }) => {
+      if (!ctx.user) throw new TRPCError({ code: "UNAUTHORIZED" });
+      // Clear in-memory data
+      const memory = getOrCreateUserMemory(ctx.user.id);
+      memory.preferences = [];
+      memory.facts = [];
+      memory.skills = [];
+      memory.lastSummary = "";
+      return { success: true };
+    }),
   }),
 
   // ─── Self-Improvement Router (COM APROVAÇÃO OBRIGATÓRIA) ───
@@ -352,7 +610,6 @@ export const appRouter = router({
         if (!ctx.user) throw new TRPCError({ code: "UNAUTHORIZED" });
 
         // Verificar se a approval key é válida
-        // A chave deve ser configurada no .env como APPROVAL_KEY
         const expectedKey = process.env.APPROVAL_KEY || "";
 
         if (!expectedKey) {
@@ -360,7 +617,6 @@ export const appRouter = router({
         }
 
         if (input.approvalKey !== expectedKey) {
-          // Registrar tentativa não autorizada
           const proposal = getProposal(input.proposalId);
           const msg = `⚠️ **TENTATIVA DE APROVAÇÃO NÃO AUTORIZADA**\n\nAlguém tentou aprovar a proposta "${proposal?.title || input.proposalId}" sem a chave correta.\n**Só o dono pode aprovar melhorias.**`;
           await db.addMessage(1, "assistant", msg);
@@ -413,7 +669,7 @@ export const appRouter = router({
       .input(z.object({
         proposalId: z.string().describe("ID da proposta aprovada"),
         files: z.array(z.object({
-          path: z.string().describe("Caminho do arquivo"),
+          file: z.string().describe("Caminho do arquivo"),
           content: z.string().describe("Conteúdo completo do arquivo"),
         })).describe("Arquivos com as mudanças"),
       }))

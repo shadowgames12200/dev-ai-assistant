@@ -11,4 +11,6 @@ export const ENV = {
   groqApiUrl: process.env.GROQ_API_BASE ?? "https://api.groq.com/openai/v1",
   supabaseUrl: process.env.SUPABASE_URL ?? process.env.VITE_SUPABASE_URL ?? "",
   supabaseAnonKey: process.env.SUPABASE_ANON_KEY ?? process.env.VITE_SUPABASE_ANON_KEY ?? "",
+  githubToken: process.env.GITHUB_TOKEN ?? "",
+  approvalKey: process.env.APPROVAL_KEY ?? "",
 };

@@ -20,73 +20,148 @@ import {
   CheckCircle2,
   Circle,
   AlertCircle,
+  Clock,
+  Brain,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { toast } from "sonner";
 
 type AgentStep = {
-  id: number;
-  type: "thinking" | "action" | "result" | "error";
+  id: string;
+  type: "research" | "plan" | "execute" | "code" | "analyze" | "verify" | "output" | "reflect" | "thinking" | "action" | "result" | "error";
   title: string;
-  content: string;
-  status: "pending" | "running" | "done" | "error";
+  description: string;
+  status: "pending" | "running" | "done" | "skipped" | "error";
+  result?: string;
   expanded: boolean;
+  toolsNeeded?: string[];
 };
 
 type AgentTask = {
-  id: number;
+  id: string;
   goal: string;
   steps: AgentStep[];
-  status: "idle" | "running" | "done" | "error";
+  status: "planning" | "running" | "done" | "failed" | "cancelled";
   finalAnswer?: string;
+  totalIterations?: number;
+  duration?: number;
 };
 
 const AGENT_EXAMPLES = [
-  { icon: Globe, text: "Pesquise as últimas novidades sobre React 19 e me dê um resumo", desc: "Pesquisa Web" },
+  { icon: Globe, text: "Pesquise as últimas novidades sobre React 19 e me dê um resumo completo", desc: "Pesquisa Web" },
   { icon: Code2, text: "Crie um script Python completo para monitorar uso de CPU e memória", desc: "Geração de Código" },
   { icon: Terminal, text: "Explique passo a passo como configurar um servidor Nginx com SSL", desc: "Tutorial Técnico" },
   { icon: Zap, text: "Analise e otimize este algoritmo de busca: [cole seu código aqui]", desc: "Otimização" },
 ];
 
+function getStepIcon(step: AgentStep) {
+  if (step.status === "running") return <Loader2 className="h-4 w-4 animate-spin text-blue-500" />;
+  if (step.status === "done") return <CheckCircle2 className="h-4 w-4 text-green-500" />;
+  if (step.status === "error") return <AlertCircle className="h-4 w-4 text-red-500" />;
+  if (step.status === "skipped") return <Circle className="h-4 w-4 text-muted-foreground/50" />;
+  return <Circle className="h-4 w-4 text-muted-foreground" />;
+}
+
+function getStepTypeColor(step: AgentStep) {
+  const colors: Record<string, string> = {
+    research: "text-purple-500 bg-purple-500/10",
+    plan: "text-blue-500 bg-blue-500/10",
+    execute: "text-amber-500 bg-amber-500/10",
+    code: "text-green-500 bg-green-500/10",
+    analyze: "text-cyan-500 bg-cyan-500/10",
+    verify: "text-emerald-500 bg-emerald-500/10",
+    output: "text-indigo-500 bg-indigo-500/10",
+    reflect: "text-pink-500 bg-pink-500/10",
+    thinking: "text-blue-500 bg-blue-500/10",
+    action: "text-amber-500 bg-amber-500/10",
+    result: "text-green-500 bg-green-500/10",
+    error: "text-red-500 bg-red-500/10",
+  };
+  return colors[step.type] || colors.plan;
+}
+
+function StepItem({ step, onToggle }: { step: AgentStep; onToggle: () => void }) {
+  const colorClass = getStepTypeColor(step);
+
+  return (
+    <div className="px-4 py-3">
+      <button
+        onClick={onToggle}
+        className="flex items-center gap-3 w-full text-left group"
+      >
+        {getStepIcon(step)}
+        <div className={cn("flex h-6 w-6 shrink-0 items-center justify-center rounded-md", colorClass)}>
+          <span className="text-[10px] font-bold uppercase">{step.type.slice(0, 2)}</span>
+        </div>
+        <div className="flex-1 min-w-0">
+          <span className="text-sm font-medium block truncate">{step.title}</span>
+          {step.toolsNeeded && step.toolsNeeded.length > 0 && (
+            <span className="text-[10px] text-muted-foreground">
+              {step.toolsNeeded.join(", ")}
+            </span>
+          )}
+        </div>
+        <Badge
+          variant={
+            step.status === "done" ? "default" :
+            step.status === "running" ? "secondary" :
+            step.status === "error" ? "destructive" :
+            step.status === "skipped" ? "outline" : "outline"
+          }
+          className="text-[10px]"
+        >
+          {step.status === "running" ? "Executando..." :
+           step.status === "done" ? "OK" :
+           step.status === "error" ? "Erro" :
+           step.status === "skipped" ? "Skip" : "Pendente"}
+        </Badge>
+        {step.expanded ? (
+          <ChevronUp className="h-4 w-4 text-muted-foreground opacity-0 group-hover:opacity-100 transition-opacity" />
+        ) : (
+          <ChevronDown className="h-4 w-4 text-muted-foreground opacity-0 group-hover:opacity-100 transition-opacity" />
+        )}
+      </button>
+      {step.expanded && step.result && (
+        <div className="mt-2 ml-10 text-xs text-muted-foreground leading-relaxed bg-muted/30 rounded-lg p-3">
+          <Streamdown>{step.result}</Streamdown>
+        </div>
+      )}
+    </div>
+  );
+}
+
 export default function Agent() {
   const [goal, setGoal] = useState("");
   const [tasks, setTasks] = useState<AgentTask[]>([]);
   const [isRunning, setIsRunning] = useState(false);
-  const [taskIdCounter, setTaskIdCounter] = useState(1);
   const scrollRef = useRef<HTMLDivElement>(null);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
 
-  const chatMutation = trpc.chat.send.useMutation({
+  const agentRunMutation = trpc.agent.run.useMutation({
     onSuccess: (data) => {
-      const lastMsg = data.messages[data.messages.length - 1];
-      if (lastMsg?.role === "assistant") {
-        setTasks(prev => {
-          const updated = [...prev];
-          const current = updated[updated.length - 1];
-          if (current) {
-            current.status = "done";
-            current.finalAnswer = lastMsg.content;
-            current.steps = current.steps.map(s => ({ ...s, status: "done" }));
-          }
-          return updated;
-        });
+      if (!data.success) {
+        toast.error("A tarefa do agente falhou em alguns passos.");
+      } else {
+        toast.success("Tarefa do agente concluída com sucesso!");
       }
-      setIsRunning(false);
-    },
-    onError: () => {
+
       setTasks(prev => {
         const updated = [...prev];
-        const current = updated[updated.length - 1];
-        if (current) {
-          current.status = "error";
-          current.steps.push({
-            id: Date.now(),
-            type: "error",
-            title: "Erro na execução",
-            content: "Ocorreu um erro ao processar a tarefa. Tente novamente.",
-            status: "error",
-            expanded: true,
-          });
+        const lastTask = updated[updated.length - 1];
+        if (lastTask) {
+          lastTask.status = data.success ? "done" : "failed";
+          lastTask.finalAnswer = data.stepResults.join("\n\n---\n\n");
+        }
+        return updated;
+      });
+      setIsRunning(false);
+    },
+    onError: (error: any) => {
+      setTasks(prev => {
+        const updated = [...prev];
+        const lastTask = updated[updated.length - 1];
+        if (lastTask) {
+          lastTask.status = "failed";
         }
         return updated;
       });
@@ -94,8 +169,6 @@ export default function Agent() {
       setIsRunning(false);
     },
   });
-
-  const createConvMutation = trpc.conversations.create.useMutation();
 
   const scrollToBottom = () => {
     if (scrollRef.current) {
@@ -114,20 +187,19 @@ export default function Agent() {
     setIsRunning(true);
     setGoal("");
 
-    const taskId = taskIdCounter;
-    setTaskIdCounter(prev => prev + 1);
+    const taskId = `task_${Date.now()}`;
 
-    // Simula passos do agente de forma progressiva
+    // Create initial task with planning state
     const newTask: AgentTask = {
       id: taskId,
       goal: taskGoal,
-      status: "running",
+      status: "planning",
       steps: [
         {
-          id: 1,
-          type: "thinking",
-          title: "Analisando objetivo",
-          content: `Processando: "${taskGoal.slice(0, 80)}${taskGoal.length > 80 ? "..." : ""}"`,
+          id: "planning",
+          type: "plan",
+          title: "Analisando e planejando",
+          description: "O agente está analisando o objetivo e criando um plano de execução...",
           status: "running",
           expanded: true,
         },
@@ -136,65 +208,51 @@ export default function Agent() {
 
     setTasks(prev => [...prev, newTask]);
 
-    // Adiciona passos progressivamente para simular raciocínio
-    setTimeout(() => {
+    // Call the real agent backend
+    agentRunMutation.mutate({ goal: taskGoal });
+
+    // Poll for progress (simulated with step updates)
+    const pollInterval = setInterval(() => {
       setTasks(prev => {
         const updated = [...prev];
         const current = updated.find(t => t.id === taskId);
-        if (current) {
-          current.steps[0].status = "done";
-          current.steps.push({
-            id: 2,
-            type: "action",
-            title: "Executando com ferramentas disponíveis",
-            content: "Usando capacidades de busca e geração de código conforme necessário...",
-            status: "running",
-            expanded: false,
-          });
+        if (current && current.status === "running") {
+          // Check if we should add progress steps
+          const doneSteps = current.steps.filter(s => s.status === "done").length;
+          const totalSteps = current.steps.length;
+
+          // Add a progress step if needed
+          if (doneSteps === 0 && current.steps.some(s => s.type === "plan")) {
+            current.steps = [
+              {
+                id: "plan_done",
+                type: "plan",
+                title: "Plano criado",
+                description: "O plano foi gerado com sucesso. Iniciando execução...",
+                status: "done",
+                expanded: false,
+              },
+              {
+                id: "exec_start",
+                type: "execute",
+                title: "Executando tarefa",
+                description: "O agente está trabalhando na tarefa. Aguarde...",
+                status: "running",
+                expanded: true,
+              },
+            ];
+          }
         }
         return updated;
       });
-    }, 800);
+    }, 2000);
 
-    setTimeout(() => {
-      setTasks(prev => {
-        const updated = [...prev];
-        const current = updated.find(t => t.id === taskId);
-        if (current) {
-          current.steps[1].status = "done";
-          current.steps.push({
-            id: 3,
-            type: "result",
-            title: "Gerando resposta final",
-            content: "Compilando resultado...",
-            status: "running",
-            expanded: false,
-          });
-        }
-        return updated;
-      });
-
-      // Cria conversa e envia para o LLM
-      createConvMutation.mutate(
-        { title: `Agente: ${taskGoal.slice(0, 40)}` },
-        {
-          onSuccess: (conv) => {
-            chatMutation.mutate({
-              conversationId: conv.id,
-              content: `[MODO AGENTE] Objetivo: ${taskGoal}\n\nExecute esta tarefa de forma autônoma, usando todas as ferramentas disponíveis. Seja detalhado, estruturado e entregue um resultado completo e prático.`,
-              useAdvancedReasoning: true,
-            });
-          },
-          onError: () => {
-            toast.error("Erro ao criar tarefa do agente.");
-            setIsRunning(false);
-          },
-        }
-      );
-    }, 1600);
+    // Clean up interval when done
+    const cleanup = () => clearInterval(pollInterval);
+    // The mutation will eventually complete and we'll handle it via onSuccess
   };
 
-  const toggleStep = (taskId: number, stepId: number) => {
+  const toggleStep = (taskId: string, stepId: string) => {
     setTasks(prev =>
       prev.map(t =>
         t.id === taskId
@@ -202,13 +260,6 @@ export default function Agent() {
           : t
       )
     );
-  };
-
-  const getStepIcon = (step: AgentStep) => {
-    if (step.status === "running") return <Loader2 className="h-4 w-4 animate-spin text-blue-500" />;
-    if (step.status === "done") return <CheckCircle2 className="h-4 w-4 text-green-500" />;
-    if (step.status === "error") return <AlertCircle className="h-4 w-4 text-red-500" />;
-    return <Circle className="h-4 w-4 text-muted-foreground" />;
   };
 
   return (
@@ -221,11 +272,11 @@ export default function Agent() {
           </div>
           <div>
             <h1 className="text-lg font-semibold">Agente DevAI</h1>
-            <p className="text-xs text-muted-foreground">Execução autônoma de tarefas complexas com raciocínio em cadeia</p>
+            <p className="text-xs text-muted-foreground">Execução autônoma de tarefas complexas com planejamento, ferramentas e reflexão</p>
           </div>
           <Badge variant="secondary" className="ml-auto text-xs">
             <Zap className="h-3 w-3 mr-1" />
-            Beta
+            v2.0
           </Badge>
         </div>
       </div>
@@ -243,8 +294,13 @@ export default function Agent() {
                   <div className="text-center space-y-2">
                     <h2 className="text-xl font-bold">Modo Agente</h2>
                     <p className="text-sm text-muted-foreground max-w-md">
-                      O agente executa tarefas complexas de forma autônoma, dividindo o objetivo em etapas, usando ferramentas e entregando resultados completos.
+                      O agente executa tarefas complexas de forma autônoma, planejando passos, usando ferramentas, refletindo sobre resultados e iterando até completar o objetivo.
                     </p>
+                  </div>
+                  <div className="flex gap-4 text-xs text-muted-foreground">
+                    <span className="flex items-center gap-1"><Brain className="h-3 w-3" /> Planejamento IA</span>
+                    <span className="flex items-center gap-1"><Globe className="h-3 w-3" /> Ferramentas</span>
+                    <span className="flex items-center gap-1"><RefreshCw className="h-3 w-3" /> Reflexão</span>
                   </div>
                 </div>
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
@@ -272,7 +328,7 @@ export default function Agent() {
                   {/* Task Header */}
                   <div className="flex items-start gap-3 p-4 border-b bg-muted/30">
                     <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-gradient-to-br from-blue-500 to-cyan-600">
-                      {task.status === "running" ? (
+                      {task.status === "running" || task.status === "planning" ? (
                         <Loader2 className="h-4 w-4 text-white animate-spin" />
                       ) : task.status === "done" ? (
                         <CheckCircle2 className="h-4 w-4 text-white" />
@@ -282,14 +338,23 @@ export default function Agent() {
                     </div>
                     <div className="flex-1 min-w-0">
                       <p className="text-sm font-medium leading-relaxed">{task.goal}</p>
-                      <div className="flex items-center gap-2 mt-1">
+                      <div className="flex items-center gap-2 mt-1 flex-wrap">
                         <Badge
-                          variant={task.status === "done" ? "default" : task.status === "error" ? "destructive" : "secondary"}
+                          variant={task.status === "done" ? "default" : task.status === "failed" ? "destructive" : "secondary"}
                           className="text-xs"
                         >
-                          {task.status === "running" ? "Executando..." : task.status === "done" ? "Concluído" : "Erro"}
+                          {task.status === "running" ? "Executando..." :
+                           task.status === "planning" ? "Planejando..." :
+                           task.status === "done" ? "Concluído" : "Falhou"}
                         </Badge>
-                        <span className="text-xs text-muted-foreground">{task.steps.length} etapa(s)</span>
+                        <span className="text-xs text-muted-foreground">
+                          {task.steps.length} passo(s)
+                        </span>
+                        {task.status === "done" && (
+                          <span className="text-xs text-green-600">
+                            {task.steps.filter(s => s.status === "done").length}/{task.steps.length} concluídos
+                          </span>
+                        )}
                       </div>
                     </div>
                   </div>
@@ -297,23 +362,11 @@ export default function Agent() {
                   {/* Steps */}
                   <div className="divide-y">
                     {task.steps.map(step => (
-                      <div key={step.id} className="px-4 py-3">
-                        <button
-                          onClick={() => toggleStep(task.id, step.id)}
-                          className="flex items-center gap-2 w-full text-left"
-                        >
-                          {getStepIcon(step)}
-                          <span className="flex-1 text-sm font-medium">{step.title}</span>
-                          {step.expanded ? (
-                            <ChevronUp className="h-4 w-4 text-muted-foreground" />
-                          ) : (
-                            <ChevronDown className="h-4 w-4 text-muted-foreground" />
-                          )}
-                        </button>
-                        {step.expanded && (
-                          <p className="mt-2 text-xs text-muted-foreground pl-6 leading-relaxed">{step.content}</p>
-                        )}
-                      </div>
+                      <StepItem
+                        key={step.id}
+                        step={step}
+                        onToggle={() => toggleStep(task.id, step.id)}
+                      />
                     ))}
                   </div>
 
@@ -336,7 +389,7 @@ export default function Agent() {
             {isRunning && tasks.length > 0 && !tasks[tasks.length - 1]?.finalAnswer && (
               <div className="flex items-center gap-2 text-sm text-muted-foreground px-2">
                 <Loader2 className="h-4 w-4 animate-spin" />
-                <span>Agente processando...</span>
+                <span>Agente processando... Isso pode levar alguns instantes.</span>
               </div>
             )}
           </div>
@@ -372,7 +425,7 @@ export default function Agent() {
             </Button>
           </form>
           <p className="mt-1.5 text-center text-[11px] text-muted-foreground/70">
-            O agente usa raciocínio em cadeia e ferramentas para executar tarefas complexas.
+            O agente planeja, executa com ferramentas, reflete e itera até completar a tarefa.
           </p>
         </div>
       </div>

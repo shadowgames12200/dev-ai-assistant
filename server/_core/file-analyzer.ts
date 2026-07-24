@@ -70,7 +70,6 @@ const MAGIC_HEADERS: Record<string, { hex: string; type: string; description: st
   "377abcaf271c": { hex: "377abcaf271c", type: "7Z", description: "Arquivo 7-Zip" },
   "1f8b": { hex: "1f8b", type: "GZIP", description: "Arquivo GZIP comprimido" },
   "d0cf11e0": { hex: "d0cf11e0", type: "DOC_OLE", description: "Documento Microsoft Office (OLE2 - DOC/XLS/PPT)" },
-  "504b0304": { hex: "504b0304", type: "DOCX", description: "Documento Office OOXML (DOCX/XLSX/PPTX)" },
 };
 
 /**
