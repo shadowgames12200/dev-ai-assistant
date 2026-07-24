@@ -128,23 +128,26 @@ const fetchWithBackoff = async (url: string, init: RequestInit): Promise<Respons
 
 // ─── Invoke Groq ───
 
-export async function invokeGroq(params: GroqInvokeParams): Promise<GroqResponse> {
+export type GroqInvokeParamsWithStream = GroqInvokeParams & { stream?: boolean };
+
+export async function invokeGroq(params: GroqInvokeParamsWithStream): Promise<GroqResponse | ReadableStream> {
   assertGroqApiKey();
 
-  const { messages, maxTokens, temperature = 0.7 } = params;
+  const { messages, maxTokens, temperature = 0.7, stream = false } = params;
   const model = params.model ?? "llama-3.3-70b-versatile";
 
   const payload: Record<string, unknown> = {
     model,
     messages,
     temperature,
+    stream,
   };
 
   if (typeof maxTokens === "number") {
     payload.max_tokens = maxTokens;
   }
 
-  console.log(`[Groq] Calling model: ${model}`);
+  console.log(`[Groq] Calling model: ${model} (stream: ${stream})`);
 
   const response = await fetchWithBackoff(GROQ_API_URL(), {
     method: "POST",
@@ -170,6 +173,10 @@ export async function invokeGroq(params: GroqInvokeParams): Promise<GroqResponse
     }
 
     throw new Error(errorMsg);
+  }
+
+  if (stream) {
+    return response.body!;
   }
 
   return (await response.json()) as GroqResponse;

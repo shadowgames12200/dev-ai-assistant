@@ -42,9 +42,10 @@ jobs:
             export NODE_OPTIONS=--max-old-space-size=2048
             pnpm run build || { echo "❌ Erro no build"; exit 1; }
             
-            # Restart
-            echo "🔄 Reiniciando serviço..."
-            pkill -f "server/_core/index.ts" || true
-            nohup pnpm start > ia.log 2>&1 &
+            # Reiniciar com PM2 (Zero-Downtime)
+            echo "🔄 Reiniciando serviço com PM2..."
+            # Tenta recarregar a aplicação. Se ela não estiver rodando, inicia.
+            pm2 reload dev-ai-assistant || pm2 start dist/server/_core/index.js --name dev-ai-assistant
+            pm2 save # Salva o estado atual do PM2 para persistência
             
             echo "✅ Deploy finalizado com sucesso!"

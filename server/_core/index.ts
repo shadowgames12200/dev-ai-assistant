@@ -43,6 +43,72 @@ async function startServer() {
   registerStorageProxy(app);
   registerOAuthRoutes(app);
   registerLocalAuthRoutes(app);
+
+  // SSE Streaming Endpoint
+  app.get("/api/chat/stream", async (req, res) => {
+    const conversationId = parseInt(req.query.conversationId as string);
+    const content = req.query.content as string;
+
+    if (isNaN(conversationId) || !content) {
+      return res.status(400).json({ error: "Missing conversationId or content" });
+    }
+
+    // Configurar headers SSE
+    res.setHeader("Content-Type", "text/event-stream");
+    res.setHeader("Cache-Control", "no-cache");
+    res.setHeader("Connection", "keep-alive");
+    res.flushHeaders();
+
+    try {
+      // Import dinâmico para evitar dependência circular se necessário
+      const { invokeGroq } = await import("./groq.js");
+      
+      const stream = await invokeGroq({
+        messages: [{ role: "user", content }],
+        stream: true
+      }) as ReadableStream;
+
+      const reader = stream.getReader();
+      const decoder = new TextDecoder();
+      let fullContent = "";
+
+      while (true) {
+        const { done, value } = await reader.read();
+        if (done) break;
+
+        const chunk = decoder.decode(value);
+        const lines = chunk.split("\n");
+
+        for (const line of lines) {
+          if (line.startsWith("data: ")) {
+            const data = line.slice(6).trim();
+            if (data === "[DONE]") break;
+            
+            try {
+              const parsed = JSON.parse(data);
+              const token = parsed.choices[0]?.delta?.content || "";
+              if (token) {
+                fullContent += token;
+                res.write(`data: ${JSON.stringify({ token })}\n\n`);
+              }
+            } catch (e) {}
+          }
+        }
+      }
+
+      // Salvar a mensagem final no banco de dados
+      const { addMessage } = await import("../db.js");
+      await addMessage(conversationId, "assistant", fullContent);
+      
+      res.write(`data: [DONE]\n\n`);
+    } catch (error) {
+      console.error("[SSE] Error:", error);
+      res.write(`data: ${JSON.stringify({ error: (error as Error).message })}\n\n`);
+    } finally {
+      res.end();
+    }
+  });
+
   // tRPC API
   app.use(
     "/api/trpc",
