@@ -15,16 +15,16 @@ jobs:
       - name: Deploy to Azure VM via SSH
         uses: appleboy/ssh-action@master
         with:
-          host: ${{ secrets.VM_IP }}
-          username: ${{ secrets.VM_USER }}
-          key: ${{ secrets.SSH_PRIVATE_KEY }}
-          port: 22
+          host: ${{ secrets.VM_HOST }}
+          username: ${{ secrets.VM_USERNAME }}
+          key: ${{ secrets.VM_SSH_KEY }}
+          port: ${{ secrets.VM_PORT || 22 }}
           script: |
-            export HOME=/home/${{ secrets.VM_USER }}
+            export HOME=/home/${{ secrets.VM_USERNAME }}
             echo "=== Iniciando Deploy do DevAI Assistant ==="
             
             cd ~/dev-ai-assistant
-            git config --global --add safe.directory /home/${{ secrets.VM_USER }}/dev-ai-assistant
+            git config --global --add safe.directory /home/${{ secrets.VM_USERNAME }}/dev-ai-assistant
             
             # Pull latest changes
             echo "📥 Baixando novas alterações..."
