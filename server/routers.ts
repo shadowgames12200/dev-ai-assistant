@@ -29,6 +29,7 @@ import {
   clearAgentContext,
   type AgentContext,
 } from "./_core/memory.js";
+import { buildMemoryContext, extractAndSaveSemanticMemories } from "./_core/semantic-memory.js";
 import {
   runAgentLoop,
   enhancedChat,
@@ -345,6 +346,12 @@ export const appRouter = router({
               truncatedHistory.map(m => ({ role: m.role, content: m.content }))
             );
 
+            // Adicionar memória semântica (longo prazo) ao contexto
+            const semanticContext = await buildMemoryContext(ctx.user.id, input.content);
+            if (semanticContext) {
+              messages.splice(1, 0, { role: "system", content: semanticContext });
+            }
+
             // Use enhanced chat with tool support
             const result = await enhancedChat(messages, {
               model: "llama-3.3-70b-versatile",
@@ -358,8 +365,15 @@ export const appRouter = router({
 
             await db.addMessage(input.conversationId, "assistant", finalContent);
 
-            // Extract memory facts (runs in background)
-            extractMemoryFacts(ctx.user.id, truncatedHistory.map(m => ({ role: m.role, content: m.content })));
+            // Extract memory facts (standard and semantic)
+            const recentMessages = [
+              ...truncatedHistory.map(m => ({ role: m.role, content: m.content })),
+              { role: "user", content: input.content },
+              { role: "assistant", content: finalContent }
+            ];
+            
+            extractMemoryFacts(ctx.user.id, recentMessages);
+            extractAndSaveSemanticMemories(ctx.user.id, recentMessages);
 
             // Summarize if conversation is long enough
             if (truncatedHistory.length >= 10) {
