@@ -23,6 +23,16 @@ jobs:
           script: |
             echo "🚀 Iniciando Deploy..."
             
+            # 1. Gerenciar Swap para evitar erro de memória (OOM)
+            if [ ! -f /swapfile ]; then
+              echo "⚙️ Criando arquivo de Swap (2GB)..."
+              sudo fallocate -l 2G /swapfile
+              sudo chmod 600 /swapfile
+              sudo mkswap /swapfile
+              sudo swapon /swapfile
+              echo '/swapfile none swap sw 0 0' | sudo tee -a /etc/fstab
+            fi
+            
             # Navega para o diretório
             cd ~/dev-ai-assistant || { echo "❌ Erro: Diretório não encontrado"; exit 1; }
             
@@ -37,9 +47,11 @@ jobs:
             echo "📦 Instalando dependências..."
             pnpm install || { echo "❌ Erro no pnpm install"; exit 1; }
             
-            # Build
+            # Build (Otimizado para baixa memória)
             echo "🏗️ Gerando build..."
-            export NODE_OPTIONS=--max-old-space-size=2048
+            export NODE_OPTIONS=--max-old-space-size=1024
+            # Limpa cache do vite para economizar espaço/memória
+            rm -rf node_modules/.vite
             pnpm run build || { echo "❌ Erro no build"; exit 1; }
             
             # Reiniciar com PM2 (Zero-Downtime)
