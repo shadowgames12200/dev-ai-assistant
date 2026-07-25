@@ -88,6 +88,16 @@ export default function ChatView() {
   const fileInputRef = useRef<HTMLInputElement>(null);
   const scrollAreaRef = useRef<HTMLDivElement>(null);
 
+  // Ajuste para altura total em dispositivos móveis (evita problemas com barra de endereço)
+  useEffect(() => {
+    const setAppHeight = () => {
+      document.documentElement.style.setProperty('--vh', `${window.innerHeight * 0.01}px`);
+    };
+    window.addEventListener('resize', setAppHeight);
+    setAppHeight();
+    return () => window.removeEventListener('resize', setAppHeight);
+  }, []);
+
   const conversationsQuery = trpc.conversations.list.useQuery(undefined, {
     enabled: true,
     staleTime: 30_000,
@@ -413,43 +423,49 @@ function MessageItem({ msg }: { msg: DbMessage }) {
     <div
       key={msg.id}
       className={cn(
-        "flex gap-3",
-        msg.role === "user" ? "justify-end" : "justify-start"
+        "flex gap-3 w-full",
+        msg.role === "user" ? "flex-row-reverse" : "flex-row"
       )}
     >
-      {msg.role === "assistant" && (
-        <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-primary/10">
-          <Bot className="h-4 w-4 text-primary" />
-        </div>
-      )}
+      <div className={cn(
+        "flex h-8 w-8 shrink-0 items-center justify-center rounded-full",
+        msg.role === "assistant" ? "bg-primary/10" : "bg-muted"
+      )}>
+        {msg.role === "assistant" ? <Bot className="h-4 w-4 text-primary" /> : <User className="h-4 w-4" />}
+      </div>
+      
       <div
         className={cn(
-          "max-w-[80%] rounded-xl px-4 py-2",
+          "max-w-[85%] sm:max-w-[75%] rounded-2xl px-4 py-3 shadow-sm",
           msg.role === "user"
-            ? "bg-primary text-primary-foreground"
-            : "bg-muted"
+            ? "bg-primary text-primary-foreground rounded-tr-none"
+            : "bg-card border rounded-tl-none"
         )}
       >
         {msg.fileName && (
-          <div className="mb-1 flex items-center gap-1 text-xs opacity-70">
+          <div className={cn(
+            "mb-3 flex items-center gap-2 rounded-lg p-2 text-xs border",
+            msg.role === "user" ? "bg-primary-foreground/10 border-primary-foreground/20" : "bg-muted/50 border-border"
+          )}>
             {(() => {
               const Icon = getFileIcon(msg.fileName);
-              return <Icon className="h-3 w-3" />;
+              return <Icon className="h-4 w-4" />;
             })()}
-            {msg.fileName}
+            <span className="font-medium truncate">{msg.fileName}</span>
           </div>
         )}
-        {msg.role === "assistant" ? (
-          <Streamdown>{msg.content}</Streamdown>
-        ) : (
-          <p className="whitespace-pre-wrap break-words">{msg.content}</p>
-        )}
-      </div>
-      {msg.role === "user" && (
-        <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-muted">
-          <User className="h-4 w-4" />
+        
+        <div className={cn(
+          "prose prose-sm max-w-none break-words",
+          msg.role === "user" ? "prose-invert" : "dark:prose-invert"
+        )}>
+          {msg.role === "assistant" ? (
+            <Streamdown>{msg.content}</Streamdown>
+          ) : (
+            <p className="whitespace-pre-wrap">{msg.content}</p>
+          )}
         </div>
-      )}
+      </div>
     </div>
   );
 }
@@ -459,7 +475,10 @@ const displayMessages = messages.filter((m) => m.role !== "system");
   const FileIcon = selectedFile ? getFileIcon(selectedFile.name) : Paperclip;
 
   return (
-    <div className="flex h-[calc(100vh-3.5rem)] overflow-hidden">
+    <div 
+      className="flex overflow-hidden w-full" 
+      style={{ height: 'calc(var(--vh, 1vh) * 100 - 3.5rem)' }}
+    >
       {/* ─── Sidebar ─── */}
       <div className="hidden lg:flex w-72 flex-col border-r bg-sidebar/50">
         <div className="p-3">
@@ -633,7 +652,7 @@ const displayMessages = messages.filter((m) => m.role !== "system");
         )}
 
         {/* ─── Input Area ─── */}
-        <div className="border-t bg-background p-3">
+        <div className="sticky bottom-0 z-10 border-t bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60 p-3 pb-safe">
           {imagePreview && (
             <div className="mb-2 relative inline-block">
               <img
