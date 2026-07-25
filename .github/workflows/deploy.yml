@@ -95,7 +95,3 @@ jobs:
             pm2 start dist/server/_core/index.js --name dev-ai-assistant --update-env
             pm2 save
             echo "✅ Deploy finalizado!"
-
-            
-            echo "✅ Deploy finalizado com sucesso!"
-
