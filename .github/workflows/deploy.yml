@@ -54,10 +54,11 @@ jobs:
             rm -rf node_modules/.vite
             pnpm run build || { echo "❌ Erro no build"; exit 1; }
             
-            # Reiniciar com PM2 (Zero-Downtime)
+            # Reiniciar com PM2 (Forçado para garantir atualização)
             echo "🔄 Reiniciando serviço com PM2..."
-            # Tenta recarregar a aplicação. Se ela não estiver rodando, inicia.
-            pm2 reload dev-ai-assistant || pm2 start dist/server/_core/index.js --name dev-ai-assistant
+            # Limpa o cache do PM2 e força a reinicialização total
+            pm2 delete dev-ai-assistant || true
+            pm2 start dist/server/_core/index.js --name dev-ai-assistant --update-env
             pm2 save # Salva o estado atual do PM2 para persistência
             
             echo "✅ Deploy finalizado com sucesso!"
