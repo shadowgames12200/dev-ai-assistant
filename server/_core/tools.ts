@@ -82,26 +82,35 @@ export const tools: Tool[] = [
 
 export const toolHandlers: Record<string, (args: any) => Promise<string>> = {
   web_search: async ({ query }: { query: string }) => {
+    if (!ENV.tavilyApiKey) {
+      return "Erro: TAVILY_API_KEY não configurada no servidor. Avise o usuário para configurar no .env.";
+    }
     try {
-      const encodedQuery = encodeURIComponent(query);
-      const response = await fetch(`https://duckduckgo.com/html/?q=${encodedQuery}`, {
-        headers: { "User-Agent": "Mozilla/5.0" }
+      const response = await fetch("https://api.tavily.com/search", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          api_key: ENV.tavilyApiKey,
+          query: query,
+          search_depth: "smart",
+          max_results: 5,
+          include_answer: true,
+        }),
       });
-      if (!response.ok) throw new Error(`HTTP ${response.status}`);
-      const html = await response.text();
+      if (!response.ok) throw new Error(`Tavily API ${response.status}`);
+      const data = await response.json();
       
-      // Extração simplificada para brevidade
-      const results: string[] = [];
-      const titleRegex = /<a[^>]*class="result__a"[^>]*>([^<]*)<\/a>/gi;
-      let match;
-      let index = 0;
-      while ((match = titleRegex.exec(html)) !== null && index < 5) {
-        results.push(`[${index + 1}] ${match[1]}`);
-        index++;
-      }
-      return results.length > 0 ? `Resultados:\n${results.join("\n")}` : "Nenhum resultado encontrado.";
+      let result = `Busca realizada para: "${query}"\n\n`;
+      if (data.answer) result += `**Resposta Direta:** ${data.answer}\n\n`;
+      
+      result += "**Resultados:**\n";
+      data.results.forEach((r: any, i: number) => {
+        result += `[${i + 1}] ${r.title}\nURL: ${r.url}\nResumo: ${r.content}\n\n`;
+      });
+      
+      return result;
     } catch (error) {
-      return `Erro na busca: ${error}`;
+      return `Erro na busca Tavily: ${error}`;
     }
   },
 

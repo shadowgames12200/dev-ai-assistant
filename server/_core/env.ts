@@ -13,4 +13,5 @@ export const ENV = {
   supabaseAnonKey: process.env.SUPABASE_ANON_KEY ?? process.env.VITE_SUPABASE_ANON_KEY ?? "",
   githubToken: process.env.GITHUB_TOKEN ?? "",
   approvalKey: process.env.APPROVAL_KEY ?? "",
+  tavilyApiKey: process.env.TAVILY_API_KEY ?? "",
 };

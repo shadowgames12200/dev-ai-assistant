@@ -341,6 +341,13 @@ export async function buildSmartContext(
     });
   }
 
+  // Hierarchical Memory: Automatically summarize long conversations
+  if (history.length >= 15 && !prevSummary) {
+    console.log(`[Memory] Auto-summarizing conversation ${conversationId} due to length (${history.length} messages)`);
+    // Run in background to not block the request
+    summarizeConversation(history, conversationId, "Auto-Resumo").catch(console.error);
+  }
+
   // Add history (truncated intelligently)
   const truncatedHistory = smartTruncateHistory(history);
   for (const msg of truncatedHistory) {
