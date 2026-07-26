@@ -286,15 +286,15 @@ export default function ChatView() {
     const file = event.target.files?.[0];
     if (!file) return;
 
-    // Limite de 100MB para upload via JSON
-    const maxSize = 100 * 1024 * 1024;
+    // Limite de 150MB para upload via JSON
+    const maxSize = 150 * 1024 * 1024;
     if (file.size > maxSize) {
       toast.error(`Arquivo muito grande. Limite: ${maxSize / 1024 / 1024}MB.`);
       return;
     }
 
     // Aviso para arquivos grandes
-    const fileSizeLimit = 100 * 1024 * 1024; // 100MB
+    const fileSizeLimit = 150 * 1024 * 1024; // 150MB
     if (file.size > fileSizeLimit) {
       toast.error(`Arquivo de ${Math.round(file.size / 1024 / 1024)}MB excede o limite de ${fileSizeLimit / 1024 / 1024}MB.`, {
         duration: 6000,
@@ -697,7 +697,7 @@ const displayMessages = messages.filter((m) => m.role !== "system");
               ref={fileInputRef}
               type="file"
               className="hidden"
-              accept="image/*,.js,.jsx,.ts,.tsx,.py,.java,.go,.rs,.c,.cpp,.h,.cs,.php,.rb,.swift,.kt,.dart,.lua,.r,.sql,.json,.xml,.yaml,.yml,.md,.txt,.csv,.log,.env,.html,.css,.sh,.bash,.dockerfile,.makefile,.gitignore,.zip,.tar,.gz,.pdf,.doc,.docx"
+              accept="*/*"
               onChange={handleFileChange}
             />
             <Button

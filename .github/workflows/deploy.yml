@@ -6,7 +6,7 @@ on:
       - main
 
 jobs:
-  build:
+  deploy:
     runs-on: ubuntu-latest
     steps:
       - name: Checkout code
@@ -17,7 +17,7 @@ jobs:
         with:
           node-version: '22'
 
-      - name: Setup pnpm
+      - name: Install pnpm
         uses: pnpm/action-setup@v4
         with:
           version: latest
@@ -28,48 +28,7 @@ jobs:
       - name: Build frontend
         run: pnpm run build
 
-      - name: Archive dist folder
-        uses: actions/upload-artifact@v4
-        with:
-          name: dist
-          path: dist/
-          retention-days: 1
-
-  deploy:
-    needs: build
-    runs-on: ubuntu-latest
-    steps:
-      - name: Download build artifacts
-        uses: actions/download-artifact@v4
-        with:
-          name: dist
-          path: dist
-
-      - name: Deploy to Azure VM
-        uses: appleboy/ssh-action@v1.0.3
-        with:
-          host: ${{ secrets.VM_HOST }}
-          username: ${{ secrets.VM_USERNAME }}
-          key: ${{ secrets.VM_SSH_KEY }}
-          port: ${{ secrets.VM_PORT || 22 }}
-          command_timeout: 5m
-          script: |
-            echo "🚀 Iniciando Deploy..."
-            
-            mkdir -p ~/dev-ai-assistant
-            cd ~/dev-ai-assistant
-            
-            git config --global --add safe.directory /home/azureuser/dev-ai-assistant
-            
-            echo "📥 Atualizando código..."
-            git pull origin main
-            
-            echo "📦 Instalando dependências..."
-            pnpm install
-            
-            echo "✅ Dependências instaladas."
-
-      - name: Copy dist to VM
+      - name: Copy built files to VM
         uses: appleboy/scp-action@v0.1.7
         with:
           host: ${{ secrets.VM_HOST }}
@@ -78,20 +37,33 @@ jobs:
           port: ${{ secrets.VM_PORT || 22 }}
           source: "dist/*"
           target: "/home/azureuser/dev-ai-assistant/dist/"
+          strip_components: 0
 
-      - name: Restart PM2
+      - name: Update code and restart on VM
         uses: appleboy/ssh-action@v1.0.3
         with:
           host: ${{ secrets.VM_HOST }}
           username: ${{ secrets.VM_USERNAME }}
           key: ${{ secrets.VM_SSH_KEY }}
           port: ${{ secrets.VM_PORT || 22 }}
-          command_timeout: 2m
+          command_timeout: 10m
           script: |
-            echo "🔄 Reiniciando serviço..."
-            pm2 delete dev-ai-assistant || true
-            pm2 delete devai || true
+            echo "🚀 Iniciando Deploy..."
+            
             cd /home/azureuser/dev-ai-assistant
+            
+            git config --global --add safe.directory /home/azureuser/dev-ai-assistant
+            
+            echo "📥 Atualizando código..."
+            git pull origin main
+            
+            echo "📦 Instalando dependências do backend..."
+            pnpm install
+            
+            echo "🔄 Reiniciando serviço com PM2..."
+            pm2 restart dev-ai-assistant || pm2 delete dev-ai-assistant || true
+            pm2 delete devai || true
             pm2 start dist/server/_core/index.js --name dev-ai-assistant --update-env
             pm2 save
-            echo "✅ Deploy finalizado!"
+            
+            echo "✅ Deploy finalizado com sucesso!"

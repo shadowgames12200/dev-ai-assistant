@@ -16,6 +16,9 @@ export const TEXT_EXTENSIONS = new Set([
   "swift", "dart", "lua", "r", "sql", "graphql",
   "html", "htm", "css", "scss", "vue", "svelte",
   "dockerfile", "makefile", "gitignore", "toml", "cfg", "conf",
+  "ra", "ps1", "psm1", "bat", "cmd", "vbs", "wsf",
+  "nfo", "readme", "license", "changelog", "install",
+  "properties", "plist", "strings", "pro",
 ]);
 
 export const IMAGE_MIME_TYPES = new Set([
@@ -44,9 +47,52 @@ export function extractTextFromBuffer(buffer: Buffer, fileName: string, fileType
     return text.length > 80000 ? text.slice(0, 80000) + "\n\n[... conteúdo truncado ...]" : text;
   }
 
-  // Para PDFs
+  // Para PDFs - extrair texto básico
   if (fileType === "application/pdf" || ext === "pdf") {
-    return "[Arquivo PDF anexado - conteúdo binário não pode ser lido diretamente como texto.]";
+    const text = buffer.toString("utf-8");
+    // Tentar extrair texto entre tags BT/ET do PDF
+    const textMatches: string[] = [];
+    const btMatches = text.match(/BT\s*([\s\S]*?)ET/g);
+    if (btMatches) {
+      for (const match of btMatches) {
+        // Extrair strings Tj e TJ
+        const tjMatches = match.match(/\(([^)]*)\)\s*Tj/g);
+        if (tjMatches) {
+          for (const tj of tjMatches) {
+            const extracted = tj.match(/\(([^)]*)\)/);
+            if (extracted) textMatches.push(extracted[1]);
+          }
+        }
+        // Extrair arrays TJ
+        const tjArrayMatches = match.match(/\[([\s\S]*?)\]\s*TJ/g);
+        if (tjArrayMatches) {
+          for (const tjArr of tjArrayMatches) {
+            const strMatches = tjArr.match(/\(([^)]*)\)/g);
+            if (strMatches) {
+              for (const s of strMatches) {
+                const extracted = s.match(/\(([^)]*)\)/);
+                if (extracted) textMatches.push(extracted[1]);
+              }
+            }
+          }
+        }
+      }
+    }
+    if (textMatches.length > 0) {
+      const pdfText = textMatches.join(" ").slice(0, 80000);
+      return `[PDF: ${fileName}]\n\nTexto extraído:\n${pdfText}`;
+    }
+    return `[Arquivo PDF anexado: ${fileName} - conteúdo binário não pode ser lido diretamente como texto.]`;
+  }
+
+  // Para Office docs (DOCX, XLSX, PPTX são ZIPs)
+  if (["docx", "xlsx", "pptx"].includes(ext)) {
+    return `[Documento Office: ${fileName} - formato ${ext.toUpperCase()}]`;
+  }
+
+  // Para executáveis e loaders
+  if (["exe", "dll", "bin", "apk", "jar", "class", "so", "dylib", "app"].includes(ext)) {
+    return `[Executável/Loader: ${fileName} - tipo ${ext.toUpperCase()}]`;
   }
 
   return `[Arquivo binário: ${fileName} (${fileType || 'tipo desconhecido'})]`;
