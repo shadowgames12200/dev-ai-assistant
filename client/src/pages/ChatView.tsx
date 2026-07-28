@@ -433,39 +433,52 @@ function MessageItem({ msg }: { msg: DbMessage }) {
       )}>
         {msg.role === "assistant" ? <Bot className="h-4 w-4 text-primary" /> : <User className="h-4 w-4" />}
       </div>
-      
-      <div
-        className={cn(
-          "max-w-[85%] sm:max-w-[75%] rounded-2xl px-4 py-3 shadow-sm",
-          msg.role === "user"
-            ? "bg-primary text-primary-foreground rounded-tr-none"
-            : "bg-card border rounded-tl-none"
-        )}
-      >
-        {msg.fileName && (
-          <div className={cn(
-            "mb-3 flex items-center gap-2 rounded-lg p-2 text-xs border",
-            msg.role === "user" ? "bg-primary-foreground/10 border-primary-foreground/20" : "bg-muted/50 border-border"
-          )}>
+
+      {/* Mensagem do usuário com arquivo: blocos separados e limpos */}
+      {msg.role === "user" && msg.fileName ? (
+        <div className="flex flex-col items-end gap-2 max-w-[85%] sm:max-w-[75%]">
+          {/* Bloco do arquivo - separado e destacado */}
+          <div className="flex items-center gap-2 bg-card border border-border rounded-xl px-3 py-2 shadow-sm">
             {(() => {
               const Icon = getFileIcon(msg.fileName);
-              return <Icon className="h-4 w-4" />;
+              return <Icon className="h-4 w-4 text-muted-foreground shrink-0" />;
             })()}
-            <span className="font-medium truncate">{msg.fileName}</span>
+            <span className="text-sm font-medium text-foreground truncate max-w-[200px]">{msg.fileName}</span>
+            {msg.fileUrl && (
+              <a href={msg.fileUrl} download={msg.fileName} className="text-muted-foreground hover:text-primary transition-colors">
+                <FileText className="h-3.5 w-3.5" />
+              </a>
+            )}
           </div>
-        )}
-        
-        <div className={cn(
-          "prose prose-sm max-w-none break-words",
-          msg.role === "user" ? "prose-invert" : "dark:prose-invert"
-        )}>
-          {msg.role === "assistant" ? (
-            <Streamdown>{msg.content}</Streamdown>
-          ) : (
-            <p className="whitespace-pre-wrap">{msg.content}</p>
+          {/* Texto da mensagem do usuário - bolha separada e limpa */}
+          {msg.content && (
+            <div className="bg-primary text-primary-foreground rounded-2xl rounded-tr-none px-4 py-3 shadow-sm">
+              <p className="whitespace-pre-wrap text-sm leading-relaxed">{msg.content}</p>
+            </div>
           )}
         </div>
-      </div>
+      ) : msg.role === "user" ? (
+        /* Mensagem do usuário sem arquivo - bolha normal */
+        <div className="bg-primary text-primary-foreground rounded-2xl rounded-tr-none max-w-[85%] sm:max-w-[75%] px-4 py-3 shadow-sm">
+          <p className="whitespace-pre-wrap text-sm leading-relaxed">{msg.content}</p>
+        </div>
+      ) : (
+        /* Mensagem do assistente */
+        <div className="bg-card border border-border rounded-2xl rounded-tl-none max-w-[85%] sm:max-w-[75%] px-4 py-3 shadow-sm">
+          {msg.fileName && (
+            <div className="flex items-center gap-2 bg-muted/50 border border-border rounded-lg p-2 mb-3 text-xs">
+              {(() => {
+                const Icon = getFileIcon(msg.fileName);
+                return <Icon className="h-4 w-4" />;
+              })()}
+              <span className="font-medium truncate">{msg.fileName}</span>
+            </div>
+          )}
+          <div className="prose prose-sm max-w-none break-words dark:prose-invert">
+            <Streamdown>{msg.content}</Streamdown>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
