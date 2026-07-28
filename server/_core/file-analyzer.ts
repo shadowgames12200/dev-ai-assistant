@@ -19,10 +19,13 @@ export const TEXT_EXTENSIONS = new Set([
   "ra", "ps1", "psm1", "bat", "cmd", "vbs", "wsf",
   "nfo", "readme", "license", "changelog", "install",
   "properties", "plist", "strings", "pro",
+  "gradle", "sbt", "cmake", "meson",
+  "tf", "hcl", "docker-compose",
 ]);
 
 export const IMAGE_MIME_TYPES = new Set([
   "image/jpeg", "image/jpg", "image/png", "image/gif", "image/webp", "image/bmp", "image/svg+xml",
+  "image/tiff", "image/heic", "image/heif",
 ]);
 
 export function isTextFile(fileName: string, fileType: string): boolean {
@@ -44,18 +47,16 @@ export function extractTextFromBuffer(buffer: Buffer, fileName: string, fileType
 
   if (isText) {
     const text = buffer.toString("utf-8");
-    return text.length > 80000 ? text.slice(0, 80000) + "\n\n[... conteúdo truncado ...]" : text;
+    return text.length > 100000 ? text.slice(0, 100000) + "\n\n[... conteúdo truncado ...]" : text;
   }
 
   // Para PDFs - extrair texto básico
   if (fileType === "application/pdf" || ext === "pdf") {
     const text = buffer.toString("utf-8");
-    // Tentar extrair texto entre tags BT/ET do PDF
     const textMatches: string[] = [];
     const btMatches = text.match(/BT\s*([\s\S]*?)ET/g);
     if (btMatches) {
       for (const match of btMatches) {
-        // Extrair strings Tj e TJ
         const tjMatches = match.match(/\(([^)]*)\)\s*Tj/g);
         if (tjMatches) {
           for (const tj of tjMatches) {
@@ -63,7 +64,6 @@ export function extractTextFromBuffer(buffer: Buffer, fileName: string, fileType
             if (extracted) textMatches.push(extracted[1]);
           }
         }
-        // Extrair arrays TJ
         const tjArrayMatches = match.match(/\[([\s\S]*?)\]\s*TJ/g);
         if (tjArrayMatches) {
           for (const tjArr of tjArrayMatches) {
@@ -79,23 +79,63 @@ export function extractTextFromBuffer(buffer: Buffer, fileName: string, fileType
       }
     }
     if (textMatches.length > 0) {
-      const pdfText = textMatches.join(" ").slice(0, 80000);
+      const pdfText = textMatches.join(" ").slice(0, 100000);
       return `[PDF: ${fileName}]\n\nTexto extraído:\n${pdfText}`;
+    }
+    // Tentar extrair strings legíveis do PDF
+    const strings = extractStrings(buffer, 5, 30);
+    if (strings.length > 5) {
+      return `[PDF: ${fileName}]\n\nFragmentos de texto encontrados:\n${strings.slice(0, 30).join("\n")}`;
     }
     return `[Arquivo PDF anexado: ${fileName} - conteúdo binário não pode ser lido diretamente como texto.]`;
   }
 
   // Para Office docs (DOCX, XLSX, PPTX são ZIPs)
   if (["docx", "xlsx", "pptx"].includes(ext)) {
-    return `[Documento Office: ${fileName} - formato ${ext.toUpperCase()}]`;
+    const detection = detectFileTypeByHeader(buffer);
+    const entries = listZipContents(buffer);
+    let result = `[Documento Office: ${fileName} - formato ${ext.toUpperCase()}]\n`;
+    result += `\n**Estrutura interna (${entries.length} arquivos):**\n`;
+    for (const entry of entries.slice(0, 20)) {
+      result += `  - ${entry.name}\n`;
+    }
+    return result;
   }
 
   // Para executáveis e loaders
-  if (["exe", "dll", "bin", "apk", "jar", "class", "so", "dylib", "app"].includes(ext)) {
-    return `[Executável/Loader: ${fileName} - tipo ${ext.toUpperCase()}]`;
+  if (["exe", "dll", "bin", "apk", "jar", "class", "so", "dylib", "app", "ra", "loader"].includes(ext)) {
+    const analysis = analyzeBinaryFile(buffer, fileName, fileType);
+    return `[Executável/Loader: ${fileName}]\n\n${analysis}`;
   }
 
-  return `[Arquivo binário: ${fileName} (${fileType || 'tipo desconhecido'})]`;
+  // Para arquivos de vídeo/áudio
+  if (["mp4", "avi", "mkv", "mov", "webm", "mp3", "wav", "ogg", "flac", "aac"].includes(ext)) {
+    return `[Arquivo de mídia: ${fileName} (${ext.toUpperCase()}) - ${buffer.length} bytes]`;
+  }
+
+  // Para arquivos de imagem
+  if (["jpg", "jpeg", "png", "gif", "webp", "bmp", "svg", "tiff", "ico", "heic"].includes(ext)) {
+    return `[Imagem: ${fileName} (${fileType || ext.toUpperCase()}) - ${buffer.length} bytes]`;
+  }
+
+  // Para arquivos comprimidos
+  if (["zip", "rar", "7z", "tar", "gz", "bz2", "xz", "cab"].includes(ext)) {
+    const entries = listZipContents(buffer);
+    if (entries.length > 0) {
+      let result = `[Arquivo comprimido: ${fileName} (${ext.toUpperCase()})]\n\n`;
+      result += `**Conteúdo (${entries.length} arquivos):**\n`;
+      for (const entry of entries.slice(0, 30)) {
+        result += `  - ${entry.name} (${entry.size} bytes)\n`;
+      }
+      if (entries.length > 30) {
+        result += `  ... e mais ${entries.length - 30} arquivos\n`;
+      }
+      return result;
+    }
+    return `[Arquivo comprimido: ${fileName} (${ext.toUpperCase()}) - ${buffer.length} bytes]`;
+  }
+
+  return `[Arquivo binário: ${fileName} (${fileType || 'tipo desconhecido'}) - ${buffer.length} bytes]`;
 }
 
 // ─── ZIP Analysis ───
@@ -124,59 +164,25 @@ const MAGIC_HEADERS: Record<string, { hex: string; type: string; description: st
 export function detectFileTypeByHeader(buffer: Buffer): { type: string; description: string; confidence: "high" | "medium" | "low" } {
   const hex = buffer.toString("hex", 0, Math.min(12, buffer.length)).toLowerCase();
 
-  // ZIP (também é DOCX/XLSX/PPTX)
-  if (hex.startsWith("504b0304")) {
-    return { type: "ZIP", description: "Arquivo ZIP/Office (DOCX/XLSX/PPTX)", confidence: "high" };
-  }
-
-  // PDF
-  if (hex.startsWith("25504446")) {
-    return { type: "PDF", description: "Documento PDF", confidence: "high" };
-  }
-
-  // EXE Windows
-  if (hex.startsWith("4d5a")) {
-    return { type: "EXE", description: "Executável Windows (PE)", confidence: "high" };
-  }
-
-  // ELF Linux
-  if (hex.startsWith("7f454c46")) {
-    return { type: "ELF", description: "Executável Linux (ELF)", confidence: "high" };
-  }
-
-  // RAR
-  if (hex.startsWith("52617221")) {
-    return { type: "RAR", description: "Arquivo RAR comprimido", confidence: "high" };
-  }
-
-  // 7-Zip
-  if (hex.startsWith("377abcaf271c")) {
-    return { type: "7Z", description: "Arquivo 7-Zip comprimido", confidence: "high" };
-  }
-
-  // GZIP
-  if (hex.startsWith("1f8b")) {
-    return { type: "GZIP", description: "Arquivo GZIP comprimido", confidence: "high" };
-  }
-
-  // OLE2 (DOC/XLS antigo)
-  if (hex.startsWith("d0cf11e0")) {
-    return { type: "OLE2", description: "Documento Microsoft Office antigo (DOC/XLS/PPT)", confidence: "high" };
-  }
+  if (hex.startsWith("504b0304")) return { type: "ZIP", description: "Arquivo ZIP/Office (DOCX/XLSX/PPTX)", confidence: "high" };
+  if (hex.startsWith("25504446")) return { type: "PDF", description: "Documento PDF", confidence: "high" };
+  if (hex.startsWith("4d5a")) return { type: "EXE", description: "Executável Windows (PE)", confidence: "high" };
+  if (hex.startsWith("7f454c46")) return { type: "ELF", description: "Executável Linux (ELF)", confidence: "high" };
+  if (hex.startsWith("52617221")) return { type: "RAR", description: "Arquivo RAR comprimido", confidence: "high" };
+  if (hex.startsWith("377abcaf271c")) return { type: "7Z", description: "Arquivo 7-Zip comprimido", confidence: "high" };
+  if (hex.startsWith("1f8b")) return { type: "GZIP", description: "Arquivo GZIP comprimido", confidence: "high" };
+  if (hex.startsWith("d0cf11e0")) return { type: "OLE2", description: "Documento Microsoft Office antigo (DOC/XLS/PPT)", confidence: "high" };
 
   return { type: "UNKNOWN", description: "Tipo de arquivo desconhecido", confidence: "low" };
 }
 
 /**
  * Lista o conteúdo de um arquivo ZIP (entries) sem extrair
- * Lê o central directory do ZIP para listar os arquivos
  */
 export function listZipContents(buffer: Buffer): { name: string; size: number; compressed: boolean }[] {
   const entries: { name: string; size: number; compressed: boolean }[] = [];
 
   try {
-    // Procurar pelo End of Central Directory (EOCD)
-    // O EOCD termina com a signature 0x06054b50 (PK\x05\x06)
     let eocdOffset = -1;
     for (let i = buffer.length - 22; i >= Math.max(0, buffer.length - 65557); i--) {
       if (
@@ -194,17 +200,14 @@ export function listZipContents(buffer: Buffer): { name: string; size: number; c
       return [{ name: "(erro ao ler ZIP: Central Directory não encontrado)", size: 0, compressed: false }];
     }
 
-    // Extrair informações do EOCD
     const numEntries = buffer.readUInt16LE(eocdOffset + 10);
     const cdSize = buffer.readUInt32LE(eocdOffset + 12);
     const cdOffset = buffer.readUInt32LE(eocdOffset + 16);
 
-    // Ler cada entrada do Central Directory
     let offset = cdOffset;
     for (let i = 0; i < numEntries; i++) {
       if (offset + 46 > buffer.length) break;
 
-      // Verificar signature do Central Directory File Header
       if (
         buffer[offset] !== 0x50 ||
         buffer[offset + 1] !== 0x4b ||
@@ -270,7 +273,6 @@ export function analyzeBinaryFile(buffer: Buffer, fileName: string, fileType: st
     }
     analysis += "```\n\n";
 
-    // Detectar tipos de arquivos dentro do ZIP
     const extCounts: Record<string, number> = {};
     for (const entry of entries) {
       const ext = entry.name.split(".").pop()?.toLowerCase() || "";
@@ -285,10 +287,9 @@ export function analyzeBinaryFile(buffer: Buffer, fileName: string, fileType: st
       analysis += "\n";
     }
 
-    // Detectar executáveis dentro do ZIP
     const executables = entries.filter(e => {
       const ext = e.name.split(".").pop()?.toLowerCase() || "";
-      return ["exe", "dll", "bat", "cmd", "ps1", "scr", "msi"].includes(ext);
+      return ["exe", "dll", "bat", "cmd", "ps1", "scr", "msi", "bin", "ra"].includes(ext);
     });
 
     if (executables.length > 0) {
@@ -299,7 +300,6 @@ export function analyzeBinaryFile(buffer: Buffer, fileName: string, fileType: st
       analysis += "\n";
     }
 
-    // Detectar código-fonte dentro do ZIP
     const codeFiles = entries.filter(e => {
       const ext = e.name.split(".").pop()?.toLowerCase() || "";
       return ["js", "ts", "py", "java", "c", "cpp", "h", "cs", "go", "rs", "html", "css", "json", "xml", "sql", "sh", "bash", "rb", "php"].includes(ext);
@@ -313,24 +313,9 @@ export function analyzeBinaryFile(buffer: Buffer, fileName: string, fileType: st
       analysis += "\n";
     }
 
-    // Tentar ler arquivos de texto dentro do ZIP
-    const textFiles = entries.filter(e => {
-      const ext = e.name.split(".").pop()?.toLowerCase() || "";
-      return ["txt", "md", "cfg", "ini", "env", "log", "conf", "properties", "yaml", "yml", "toml"].includes(ext);
-    });
-
-    if (textFiles.length > 0) {
-      analysis += `**📄 Arquivos de configuração/texto encontrados (${textFiles.length}):**\n`;
-      for (const text of textFiles) {
-        analysis += `- ${text.name}\n`;
-      }
-      analysis += "\n";
-    }
-
-    analysis += "**Nota:** Este ZIP pode conter executáveis, scripts ou configurações. Posso tentar extrair e ler os arquivos de texto/ código se você pedir.";
+    analysis += "**Nota:** Posso tentar extrair e ler os arquivos de texto/código se você pedir.";
 
   } else if (detection.type === "EXE" || detection.type === "DLL") {
-    // Análise básica de PE (Portable Executable)
     analysis += `**Análise do Executável Windows:**\n\n`;
 
     if (buffer.length >= 64) {
@@ -346,7 +331,6 @@ export function analyzeBinaryFile(buffer: Buffer, fileName: string, fileType: st
           const numSections = buffer.readUInt16LE(peOffset + 6);
           analysis += `- Seções: ${numSections}\n`;
 
-          // Tentar ler strings do executável
           const strings = extractStrings(buffer, 8, 20);
           if (strings.length > 0) {
             analysis += `- Strings relevantes encontradas: ${strings.length}\n`;
@@ -376,8 +360,6 @@ export function analyzeBinaryFile(buffer: Buffer, fileName: string, fileType: st
       }
     }
 
-    analysis += `\n**Nota:** Este é um executável Linux. Posso analisar suas bibliotecas e comportamento baseado nas strings.`;
-
   } else if (detection.type === "PDF") {
     analysis += `**Análise do PDF:**\n\n`;
     const strings = extractStrings(buffer, 6, 30);
@@ -386,28 +368,22 @@ export function analyzeBinaryFile(buffer: Buffer, fileName: string, fileType: st
       const combined = strings.join(" ").slice(0, 500);
       analysis += `- Conteúdo: "${combined}"\n`;
     }
-    analysis += `\n**Nota:** Posso tentar converter páginas do PDF em imagens para análise visual.`;
 
   } else if (detection.type === "RAR" || detection.type === "7Z" || detection.type === "GZIP") {
     analysis += `**Arquivo comprimido:**\n`;
     analysis += `- Formato: ${detection.description}\n`;
-    analysis += `- Tamanho: ${fileSizeKB} KB\n\n`;
-    analysis += `**Nota:** Posso listar o conteúdo se você me pedir para extrair informações deste arquivo.`;
+    analysis += `- Tamanho: ${fileSizeKB} KB\n`;
 
   } else if (detection.type === "DOCX") {
     analysis += `**Documento Office:**\n`;
     analysis += `- Formato: DOCX/XLSX/PPTX (Office OOXML)\n`;
-    analysis += `- Tamanho: ${fileSizeMB} MB\n\n`;
+    analysis += `- Tamanho: ${fileSizeMB} MB\n`;
 
-    // DOCX é um ZIP, então listar conteúdo
     const entries = listZipContents(buffer);
     analysis += `**Conteúdo (${entries.length} arquivos internos):**\n`;
     analysis += "```\n";
     for (const entry of entries.slice(0, 20)) {
       analysis += `  ${entry.name}\n`;
-    }
-    if (entries.length > 20) {
-      analysis += `  ... e mais ${entries.length - 20} arquivos\n`;
     }
     analysis += "```\n";
 
@@ -428,7 +404,6 @@ export function analyzeBinaryFile(buffer: Buffer, fileName: string, fileType: st
       analysis += "```\n";
     } else {
       analysis += `- Nenhuma string legível encontrada no arquivo.\n`;
-      analysis += `- O arquivo pode ser criptografado ou conter dados puramente binários.\n`;
     }
   }
 
@@ -448,7 +423,6 @@ function extractStrings(buffer: Buffer, minLength: number = 6, maxLength: number
       current += String.fromCharCode(byte);
     } else {
       if (current.length >= minLength && current.length <= maxLength) {
-        // Filtrar strings que parecem ser caminhos ou identificadores úteis
         if (/[a-zA-Z]/.test(current) && !/^.{0,2}$/.test(current)) {
           strings.push(current);
         }
@@ -457,6 +431,5 @@ function extractStrings(buffer: Buffer, minLength: number = 6, maxLength: number
     }
   }
 
-  // Limpar duplicatas e limitar
   return [...new Set(strings)].slice(0, 50);
 }
