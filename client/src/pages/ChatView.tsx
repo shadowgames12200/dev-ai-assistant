@@ -29,6 +29,9 @@ import {
   FileArchive,
   AlertCircle,
   RefreshCw,
+  Menu,
+  ChevronLeft,
+  History,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { toast } from "sonner";
@@ -51,7 +54,6 @@ type Conversation = {
   updatedAt: Date;
 };
 
-// Tipos MIME de imagens para preview
 const IMAGE_MIME_TYPES = new Set([
   "image/jpeg", "image/jpg", "image/png", "image/gif", "image/webp", "image/bmp", "image/svg+xml",
 ]);
@@ -63,7 +65,7 @@ function isImageFile(file: File): boolean {
 function getFileIcon(fileName: string) {
   const ext = fileName.split(".").pop()?.toLowerCase() ?? "";
   const imageExts = ["jpg", "jpeg", "png", "gif", "webp", "bmp", "svg"];
-  const codeExts = ["js", "jsx", "ts", "tsx", "py", "java", "go", "rs", "c", "cpp", "h", "cs", "php", "rb", "swift", "kt", "dart", "lua", "r"];
+  const codeExts = ["js", "jsx", "ts", "tsx", "py", "java", "go", "rs", "c", "cpp", "h", "cs", "php", "rb", "swift", "kt", "dart", "lua", "r", "ps1", "bat", "sh", "ra"];
   const docExts = ["json", "xml", "yaml", "yml", "md", "csv", "txt", "log", "env", "ini", "toml", "cfg", "conf", "sql", "graphql"];
 
   if (imageExts.includes(ext)) return ImageIcon;
@@ -73,9 +75,27 @@ function getFileIcon(fileName: string) {
   return File;
 }
 
+function formatTimeAgo(date: Date): string {
+  const now = new Date();
+  const diff = now.getTime() - new Date(date).getTime();
+  const minutes = Math.floor(diff / 60000);
+  const hours = Math.floor(diff / 3600000);
+  const days = Math.floor(diff / 86400000);
+
+  if (minutes < 1) return "Agora mesmo";
+  if (minutes < 60) return `Há ${minutes} min`;
+  if (hours < 24) return `Há ${hours}h`;
+  if (days < 7) return `Há ${days}d`;
+  return new Date(date).toLocaleDateString("pt-BR");
+}
+
 export default function ChatView() {
   const queryClient = useQueryClient();
-  const [activeConversationId, setActiveConversationId] = useState<number | null>(null);
+  const [activeConversationId, setActiveConversationId] = useState<number | null>(() => {
+    // Restaurar última conversa do localStorage
+    const saved = localStorage.getItem("devai-last-conversation");
+    return saved ? parseInt(saved, 10) : null;
+  });
   const [input, setInput] = useState("");
   const [isLoading, setIsLoading] = useState(false);
   const [messages, setMessages] = useState<DbMessage[]>([]);
@@ -84,11 +104,40 @@ export default function ChatView() {
   const [useAdvancedReasoning, setUseAdvancedReasoning] = useState(false);
   const [editingId, setEditingId] = useState<number | null>(null);
   const [editingTitle, setEditingTitle] = useState("");
+  const [sidebarOpen, setSidebarOpen] = useState(false);
+  const [thinkingDots, setThinkingDots] = useState("");
   const textareaRef = useRef<HTMLTextAreaElement>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const scrollAreaRef = useRef<HTMLDivElement>(null);
 
-  // Ajuste para altura total em dispositivos móveis (evita problemas com barra de endereço)
+  // Animação de pontos no loading
+  useEffect(() => {
+    if (!isLoading) {
+      setThinkingDots("");
+      return;
+    }
+    const interval = setInterval(() => {
+      setThinkingDots(prev => prev.length >= 3 ? "" : prev + ".");
+    }, 500);
+    return () => clearInterval(interval);
+  }, [isLoading]);
+
+  // Salvar última conversa no localStorage
+  useEffect(() => {
+    if (activeConversationId) {
+      localStorage.setItem("devai-last-conversation", activeConversationId.toString());
+    } else {
+      localStorage.removeItem("devai-last-conversation");
+    }
+  }, [activeConversationId]);
+
+  // Fechar sidebar ao selecionar conversa no mobile
+  const handleConversationSelect = useCallback((convId: number) => {
+    setActiveConversationId(convId);
+    setSidebarOpen(false);
+  }, []);
+
+  // Ajuste para altura total em dispositivos móveis
   useEffect(() => {
     const setAppHeight = () => {
       document.documentElement.style.setProperty('--vh', `${window.innerHeight * 0.01}px`);
@@ -103,12 +152,11 @@ export default function ChatView() {
     staleTime: 30_000,
   });
 
-
-
   const createConversationMutation = trpc.conversations.create.useMutation({
     onSuccess: (data) => {
       setActiveConversationId(data.id);
       queryClient.invalidateQueries({ queryKey: ["conversations", "list"] });
+      setSidebarOpen(false);
     },
   });
 
@@ -130,33 +178,21 @@ export default function ChatView() {
     },
   });
 
-  // Carregar mensagens da conversa ativa
-  const [conversationMessages, setConversationMessages] = useState<DbMessage[]>([]);
-
-  const handleConversationSelect = useCallback((convId: number) => {
-    setActiveConversationId(convId);
-  }, []);
-
-  // Hook tRPC correto para buscar mensagens da conversa ativa
   const messagesQuery = trpc.conversations.messages.useQuery(
     { id: activeConversationId! },
     { enabled: !!activeConversationId }
   );
 
-  // Sincronizar mensagens quando a query retornar dados
   useEffect(() => {
     if (!activeConversationId) {
-      setConversationMessages([]);
       setMessages([]);
       return;
     }
     if (messagesQuery.data) {
-      setConversationMessages(messagesQuery.data);
       setMessages(messagesQuery.data);
     }
     if (messagesQuery.error) {
       console.error("Failed to fetch messages:", messagesQuery.error);
-      setConversationMessages([]);
       setMessages([]);
     }
   }, [activeConversationId, messagesQuery.data, messagesQuery.error]);
@@ -164,7 +200,6 @@ export default function ChatView() {
   const chatMutation = trpc.chat.send.useMutation({
     onSuccess: (data) => {
       setMessages(data.messages);
-      setConversationMessages(data.messages);
       setIsLoading(false);
       setInput("");
       queryClient.invalidateQueries({ queryKey: ["conversations", "list"] });
@@ -178,7 +213,6 @@ export default function ChatView() {
   const uploadFileMutation = trpc.upload.uploadFile.useMutation({
     onSuccess: (data) => {
       setMessages(data.messages);
-      setConversationMessages(data.messages);
       setIsLoading(false);
       setSelectedFile(null);
       setImagePreview(null);
@@ -194,45 +228,27 @@ export default function ChatView() {
     },
   });
 
-  // Função unificada para tratar erros de API
   function handleApiError(error: any, context: string) {
     console.error(`[${context}] Error:`, error);
     const msg = error?.message || error?.toString() || "";
 
-    // Detectar erros de parse JSON (servidor retornando HTML)
     if (msg.includes("Unexpected token") || msg.includes("is not valid JSON")) {
-      toast.error(
-        "Erro de conexão com o servidor. Verifique se a GROQ_API_KEY está configurada nas variáveis de ambiente.",
-        { duration: 8000 }
-      );
+      toast.error("Erro de conexão com o servidor. Verifique se a GROQ_API_KEY está configurada.", { duration: 8000 });
       return;
     }
-
-    // Detectar erros de API key
     if (msg.includes("GROQ_API_KEY")) {
-      toast.error(
-        "Configuração necessária: Adicione a variável GROQ_API_KEY nas variáveis de ambiente do servidor.",
-        { duration: 10000 }
-      );
+      toast.error("Configuração necessária: Adicione GROQ_API_KEY nas variáveis de ambiente.", { duration: 10000 });
       return;
     }
-
-    // Detectar rate limit
     if (msg.includes("rate limit") || msg.includes("429")) {
-      toast.error("Limite de requisições atingido. Aguarde um momento e tente novamente.");
+      toast.error("Limite de requisições atingido. Aguarde um momento.");
       return;
     }
-
-    // Erro genérico
-    toast.error(msg || `Erro ao enviar ${context === "upload" ? "arquivo" : "mensagem"}. Tente novamente.`);
+    toast.error(msg || `Erro ao enviar ${context === "upload" ? "arquivo" : "mensagem"}.`);
   }
 
-
-
   const scrollToBottom = useCallback(() => {
-    const viewport = scrollAreaRef.current?.querySelector(
-      "[data-radix-scroll-area-viewport]"
-    ) as HTMLDivElement;
+    const viewport = scrollAreaRef.current?.querySelector("[data-radix-scroll-area-viewport]") as HTMLDivElement;
     if (viewport) {
       requestAnimationFrame(() => {
         viewport.scrollTo({ top: viewport.scrollHeight, behavior: "smooth" });
@@ -286,45 +302,28 @@ export default function ChatView() {
     const file = event.target.files?.[0];
     if (!file) return;
 
-    // Limite de 150MB para upload via JSON
     const maxSize = 150 * 1024 * 1024;
     if (file.size > maxSize) {
       toast.error(`Arquivo muito grande. Limite: ${maxSize / 1024 / 1024}MB.`);
       return;
     }
 
-    // Aviso para arquivos grandes
-    const fileSizeLimit = 150 * 1024 * 1024; // 150MB
-    if (file.size > fileSizeLimit) {
-      toast.error(`Arquivo de ${Math.round(file.size / 1024 / 1024)}MB excede o limite de ${fileSizeLimit / 1024 / 1024}MB.`, {
-        duration: 6000,
-      });
-      return;
-    }
-
     setSelectedFile(file);
 
-    // Gerar preview para imagens
     if (isImageFile(file)) {
       const reader = new FileReader();
-      reader.onload = (e) => {
-        setImagePreview(e.target?.result as string);
-      };
+      reader.onload = (e) => setImagePreview(e.target?.result as string);
       reader.readAsDataURL(file);
     } else {
       setImagePreview(null);
     }
 
-    // Foca no textarea para o usuário digitar uma mensagem opcional
     setTimeout(() => textareaRef.current?.focus(), 100);
-
-    // Reset o input de arquivo para permitir selecionar o mesmo arquivo novamente
     if (fileInputRef.current) fileInputRef.current.value = "";
   };
 
   const handleFileUpload = async (convId: number) => {
     if (!selectedFile || isLoading) return;
-
     setIsLoading(true);
     const reader = new FileReader();
     reader.readAsDataURL(selectedFile);
@@ -351,7 +350,6 @@ export default function ChatView() {
     if (isLoading) return;
 
     if (selectedFile) {
-      // Se há arquivo selecionado, precisa de uma conversa ativa
       if (!activeConversationId) {
         const title = selectedFile.name.slice(0, 50);
         createConversationMutation.mutate(
@@ -390,110 +388,124 @@ export default function ChatView() {
     }
   };
 
-  /**
- * ErrorBoundary local para proteger a renderização de mensagens.
- * O erro insertBefore ocorre quando o DOM é manipulado enquanto React
- * tenta re-renderizar (ex: após aprovação ou update simultâneo).
- * Este boundary captura o erro e força um re-render seguro.
- */
-class MessageErrorBoundary extends Component<{ children: ReactNode }, { hasError: boolean; error: Error | null }> {
-  constructor(props: { children: ReactNode }) {
-    super(props);
-    this.state = { hasError: false, error: null };
-  }
-
-  static getDerivedStateFromError(error: Error) {
-    return { hasError: true, error };
-  }
-
-  render() {
-    if (this.state.hasError) {
-      return (
-        <div className="p-4 text-center text-sm text-muted-foreground">
-          <p>Erro de renderização. <button onClick={() => this.setState({ hasError: false, error: null })} className="underline text-primary">Tentar novamente</button></p>
-        </div>
-      );
+  class MessageErrorBoundary extends Component<{ children: ReactNode }, { hasError: boolean; error: Error | null }> {
+    constructor(props: { children: ReactNode }) {
+      super(props);
+      this.state = { hasError: false, error: null };
     }
-    return this.props.children;
-  }
-}
-
-function MessageItem({ msg }: { msg: DbMessage }) {
-  return (
-    <div
-      key={msg.id}
-      className={cn(
-        "flex gap-3 w-full",
-        msg.role === "user" ? "flex-row-reverse" : "flex-row"
-      )}
-    >
-      <div className={cn(
-        "flex h-8 w-8 shrink-0 items-center justify-center rounded-full",
-        msg.role === "assistant" ? "bg-primary/10" : "bg-muted"
-      )}>
-        {msg.role === "assistant" ? <Bot className="h-4 w-4 text-primary" /> : <User className="h-4 w-4" />}
-      </div>
-
-      {/* Mensagem do usuário com arquivo: blocos separados e limpos */}
-      {msg.role === "user" && msg.fileName ? (
-        <div className="flex flex-col items-end gap-2 max-w-[85%] sm:max-w-[75%]">
-          {/* Bloco do arquivo - separado e destacado */}
-          <div className="flex items-center gap-2 bg-card border border-border rounded-xl px-3 py-2 shadow-sm">
-            {(() => {
-              const Icon = getFileIcon(msg.fileName);
-              return <Icon className="h-4 w-4 text-muted-foreground shrink-0" />;
-            })()}
-            <span className="text-sm font-medium text-foreground truncate max-w-[200px]">{msg.fileName}</span>
-            {msg.fileUrl && (
-              <a href={msg.fileUrl} download={msg.fileName} className="text-muted-foreground hover:text-primary transition-colors">
-                <FileText className="h-3.5 w-3.5" />
-              </a>
-            )}
+    static getDerivedStateFromError(error: Error) {
+      return { hasError: true, error };
+    }
+    render() {
+      if (this.state.hasError) {
+        return (
+          <div className="p-4 text-center text-sm text-muted-foreground">
+            <p>Erro de renderização. <button onClick={() => this.setState({ hasError: false, error: null })} className="underline text-primary">Tentar novamente</button></p>
           </div>
-          {/* Texto da mensagem do usuário - bolha separada e limpa */}
-          {msg.content && (
-            <div className="bg-primary text-primary-foreground rounded-2xl rounded-tr-none px-4 py-3 shadow-sm">
-              <p className="whitespace-pre-wrap text-sm leading-relaxed">{msg.content}</p>
-            </div>
-          )}
+        );
+      }
+      return this.props.children;
+    }
+  }
+
+  function MessageItem({ msg }: { msg: DbMessage }) {
+    return (
+      <div
+        key={msg.id}
+        className={cn(
+          "flex gap-3 w-full",
+          msg.role === "user" ? "flex-row-reverse" : "flex-row"
+        )}
+      >
+        <div className={cn(
+          "flex h-8 w-8 shrink-0 items-center justify-center rounded-full",
+          msg.role === "assistant" ? "bg-primary/10" : "bg-muted"
+        )}>
+          {msg.role === "assistant" ? <Bot className="h-4 w-4 text-primary" /> : <User className="h-4 w-4" />}
         </div>
-      ) : msg.role === "user" ? (
-        /* Mensagem do usuário sem arquivo - bolha normal */
-        <div className="bg-primary text-primary-foreground rounded-2xl rounded-tr-none max-w-[85%] sm:max-w-[75%] px-4 py-3 shadow-sm">
-          <p className="whitespace-pre-wrap text-sm leading-relaxed">{msg.content}</p>
-        </div>
-      ) : (
-        /* Mensagem do assistente */
-        <div className="bg-card border border-border rounded-2xl rounded-tl-none max-w-[85%] sm:max-w-[75%] px-4 py-3 shadow-sm">
-          {msg.fileName && (
-            <div className="flex items-center gap-2 bg-muted/50 border border-border rounded-lg p-2 mb-3 text-xs">
+
+        {msg.role === "user" && msg.fileName ? (
+          <div className="flex flex-col items-end gap-2 max-w-[85%] sm:max-w-[75%]">
+            <div className="flex items-center gap-2 bg-card border border-border rounded-xl px-3 py-2 shadow-sm">
               {(() => {
                 const Icon = getFileIcon(msg.fileName);
-                return <Icon className="h-4 w-4" />;
+                return <Icon className="h-4 w-4 text-muted-foreground shrink-0" />;
               })()}
-              <span className="font-medium truncate">{msg.fileName}</span>
+              <span className="text-sm font-medium text-foreground truncate max-w-[200px]">{msg.fileName}</span>
+              {msg.fileUrl && (
+                <a href={msg.fileUrl} download={msg.fileName} className="text-muted-foreground hover:text-primary transition-colors">
+                  <FileText className="h-3.5 w-3.5" />
+                </a>
+              )}
             </div>
-          )}
-          <div className="prose prose-sm max-w-none break-words dark:prose-invert">
-            <Streamdown>{msg.content}</Streamdown>
+            {msg.content && (
+              <div className="bg-primary text-primary-foreground rounded-2xl rounded-tr-none px-4 py-3 shadow-sm">
+                <p className="whitespace-pre-wrap text-sm leading-relaxed">{msg.content}</p>
+              </div>
+            )}
           </div>
-        </div>
-      )}
-    </div>
-  );
-}
+        ) : msg.role === "user" ? (
+          <div className="bg-primary text-primary-foreground rounded-2xl rounded-tr-none max-w-[85%] sm:max-w-[75%] px-4 py-3 shadow-sm">
+            <p className="whitespace-pre-wrap text-sm leading-relaxed">{msg.content}</p>
+          </div>
+        ) : (
+          <div className="bg-card border border-border rounded-2xl rounded-tl-none max-w-[85%] sm:max-w-[75%] px-4 py-3 shadow-sm">
+            {msg.fileName && (
+              <div className="flex items-center gap-2 bg-muted/50 border border-border rounded-lg p-2 mb-3 text-xs">
+                {(() => {
+                  const Icon = getFileIcon(msg.fileName);
+                  return <Icon className="h-4 w-4" />;
+                })()}
+                <span className="font-medium truncate">{msg.fileName}</span>
+              </div>
+            )}
+            <div className="prose prose-sm max-w-none break-words dark:prose-invert">
+              <Streamdown>{msg.content}</Streamdown>
+            </div>
+          </div>
+        )}
+      </div>
+    );
+  }
 
-const displayMessages = messages.filter((m) => m.role !== "system");
-
+  const displayMessages = messages.filter((m) => m.role !== "system");
   const FileIcon = selectedFile ? getFileIcon(selectedFile.name) : Paperclip;
 
   return (
-    <div 
-      className="flex overflow-hidden w-full" 
+    <div
+      className="flex overflow-hidden w-full"
       style={{ height: 'calc(var(--vh, 1vh) * 100 - 3.5rem)' }}
     >
+      {/* ─── Overlay para mobile quando sidebar está aberta ─── */}
+      {sidebarOpen && (
+        <div
+          className="fixed inset-0 bg-black/50 z-40 lg:hidden"
+          onClick={() => setSidebarOpen(false)}
+        />
+      )}
+
       {/* ─── Sidebar ─── */}
-      <div className="hidden lg:flex w-72 flex-col border-r bg-sidebar/50">
+      <div className={cn(
+        "fixed lg:relative inset-y-0 left-0 z-50 w-80 flex-col border-r bg-background transition-transform duration-300 ease-in-out lg:flex",
+        sidebarOpen ? "translate-x-0" : "-translate-x-full lg:translate-x-0"
+      )}>
+        {/* Header da sidebar */}
+        <div className="flex items-center justify-between p-3 border-b">
+          <h2 className="font-semibold text-sm flex items-center gap-2">
+            <History className="h-4 w-4" />
+            Conversas
+          </h2>
+          <Button
+            variant="ghost"
+            size="icon"
+            className="h-7 w-7 lg:hidden"
+            onClick={() => setSidebarOpen(false)}
+          >
+            <ChevronLeft className="h-4 w-4" />
+          </Button>
+        </div>
+
+        {/* Botão Nova Conversa */}
         <div className="p-3">
           <Button
             onClick={handleNewConversation}
@@ -505,91 +517,68 @@ const displayMessages = messages.filter((m) => m.role !== "system");
           </Button>
         </div>
 
+        {/* Lista de conversas */}
         <div className="flex-1 overflow-y-auto px-2 pb-2">
-          <div className="space-y-0.5">
-            {conversationsQuery.data?.length === 0 && (
-              <div className="px-3 py-6 text-center text-xs text-muted-foreground">
-                Nenhuma conversa ainda.<br />Inicie uma nova!
-              </div>
-            )}
-            {conversationsQuery.data?.map((conv) => (
-              <div
-                key={conv.id}
-                className={cn(
-                  "group flex items-center gap-1 rounded-md px-3 py-2 text-sm transition-colors",
-                  activeConversationId === conv.id
-                    ? "bg-accent text-accent-foreground"
-                    : "hover:bg-accent/50"
-                )}
-                onClick={() => handleConversationSelect(conv.id)}
-              >
-                {editingId === conv.id ? (
-                  <div className="flex flex-1 items-center gap-1">
-                    <input
-                      className="flex-1 rounded border bg-background px-2 py-1 text-sm outline-none"
-                      value={editingTitle}
-                      onChange={(e) => setEditingTitle(e.target.value)}
-                      onKeyDown={(e) => {
-                        if (e.key === "Enter") handleConfirmRename(conv.id);
-                        if (e.key === "Escape") setEditingId(null);
-                      }}
-                      autoFocus
-                    />
-                    <Button
-                      size="icon"
-                      variant="ghost"
-                      className="h-6 w-6"
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        handleConfirmRename(conv.id);
-                      }}
-                    >
-                      <Check className="h-3 w-3" />
-                    </Button>
-                    <Button
-                      size="icon"
-                      variant="ghost"
-                      className="h-6 w-6"
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        setEditingId(null);
-                      }}
-                    >
-                      <X className="h-3 w-3" />
-                    </Button>
-                  </div>
-                ) : (
-                  <>
-                    <span className="flex-1 truncate">{conv.title}</span>
-                    <div className="hidden gap-1 group-hover:flex">
-                      <Button
-                        size="icon"
-                        variant="ghost"
-                        className="h-6 w-6"
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          handleStartRename(conv);
+          {conversationsQuery.isLoading ? (
+            <div className="flex items-center justify-center py-8">
+              <Loader2 className="h-5 w-5 animate-spin text-muted-foreground" />
+            </div>
+          ) : conversationsQuery.data?.length === 0 ? (
+            <div className="px-3 py-6 text-center text-xs text-muted-foreground">
+              Nenhuma conversa ainda.<br />Inicie uma nova!
+            </div>
+          ) : (
+            <div className="space-y-0.5">
+              {conversationsQuery.data?.map((conv) => (
+                <div
+                  key={conv.id}
+                  className={cn(
+                    "group flex items-center gap-1 rounded-lg px-3 py-2.5 text-sm transition-colors cursor-pointer",
+                    activeConversationId === conv.id
+                      ? "bg-primary/10 text-primary font-medium"
+                      : "hover:bg-accent/50 text-muted-foreground"
+                  )}
+                  onClick={() => handleConversationSelect(conv.id)}
+                >
+                  {editingId === conv.id ? (
+                    <div className="flex flex-1 items-center gap-1">
+                      <input
+                        className="flex-1 rounded border bg-background px-2 py-1 text-sm outline-none"
+                        value={editingTitle}
+                        onChange={(e) => setEditingTitle(e.target.value)}
+                        onKeyDown={(e) => {
+                          if (e.key === "Enter") handleConfirmRename(conv.id);
+                          if (e.key === "Escape") setEditingId(null);
                         }}
-                      >
-                        <Pencil className="h-3 w-3" />
+                        autoFocus
+                      />
+                      <Button size="icon" variant="ghost" className="h-6 w-6" onClick={(e) => { e.stopPropagation(); handleConfirmRename(conv.id); }}>
+                        <Check className="h-3 w-3" />
                       </Button>
-                      <Button
-                        size="icon"
-                        variant="ghost"
-                        className="h-6 w-6 text-destructive hover:text-destructive"
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          handleDeleteConversation(conv.id);
-                        }}
-                      >
-                        <Trash2 className="h-3 w-3" />
+                      <Button size="icon" variant="ghost" className="h-6 w-6" onClick={(e) => { e.stopPropagation(); setEditingId(null); }}>
+                        <X className="h-3 w-3" />
                       </Button>
                     </div>
-                  </>
-                )}
-              </div>
-            ))}
-          </div>
+                  ) : (
+                    <>
+                      <div className="flex-1 min-w-0">
+                        <span className="truncate block">{conv.title}</span>
+                        <span className="text-[10px] opacity-60">{formatTimeAgo(conv.updatedAt)}</span>
+                      </div>
+                      <div className="hidden gap-1 group-hover:flex shrink-0">
+                        <Button size="icon" variant="ghost" className="h-6 w-6" onClick={(e) => { e.stopPropagation(); handleStartRename(conv); }}>
+                          <Pencil className="h-3 w-3" />
+                        </Button>
+                        <Button size="icon" variant="ghost" className="h-6 w-6 text-destructive hover:text-destructive" onClick={(e) => { e.stopPropagation(); handleDeleteConversation(conv.id); }}>
+                          <Trash2 className="h-3 w-3" />
+                        </Button>
+                      </div>
+                    </>
+                  )}
+                </div>
+              ))}
+            </div>
+          )}
         </div>
 
         <div className="border-t p-3">
@@ -601,6 +590,19 @@ const displayMessages = messages.filter((m) => m.role !== "system");
 
       {/* ─── Main Chat Area ─── */}
       <div className="flex flex-1 flex-col">
+        {/* Header do chat (mobile) */}
+        <div className="flex items-center gap-2 px-3 py-2 border-b lg:hidden">
+          <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => setSidebarOpen(true)}>
+            <Menu className="h-5 w-5" />
+          </Button>
+          <span className="font-semibold text-sm">
+            {activeConversationId
+              ? conversationsQuery.data?.find(c => c.id === activeConversationId)?.title || "Conversa"
+              : "DevAI Assistant"
+            }
+          </span>
+        </div>
+
         {displayMessages.length === 0 ? (
           /* Empty State */
           <div className="flex flex-1 items-center justify-center p-6">
@@ -611,20 +613,24 @@ const displayMessages = messages.filter((m) => m.role !== "system");
               <div className="space-y-2">
                 <h2 className="text-2xl font-bold">DevAI Assistant</h2>
                 <p className="text-muted-foreground">
-                  Seu assistente de programação e produtividade. Envie arquivos (imagens, código, documentos) para análise e receba feedback inteligente via Groq AI.
+                  Seu assistente de programação e produtividade. Envie arquivos (imagens, código, documentos) para análise e receba feedback inteligente.
                 </p>
               </div>
+              <Button onClick={handleNewConversation} size="lg" className="gap-2">
+                <MessageSquarePlus className="h-4 w-4" />
+                Iniciar nova conversa
+              </Button>
               <div className="grid gap-3 text-left">
                 {[
-                  { icon: Code2, title: "Automação", desc: "Crie um script Python para automatizar tarefas do dia a dia" },
-                  { icon: Brain, title: "Conceito", desc: "Explique como funciona um sistema de autenticação JWT" },
-                  { icon: Zap, title: "Projeto", desc: "Monte uma API REST completa em Node.js com Express" },
+                  { icon: Code2, title: "Automação", desc: "Crie um script Python para automatizar tarefas" },
+                  { icon: Brain, title: "Conceito", desc: "Explique como funciona autenticação JWT" },
+                  { icon: Zap, title: "Projeto", desc: "Monte uma API REST completa em Node.js" },
                   { icon: FileText, title: "Dia a dia", desc: "Me ajude a organizar minha rotina diária" },
                 ].map((item) => (
                   <button
                     key={item.title}
                     onClick={() => handleSendMessage(item.desc)}
-                    className="flex items-start gap-3 rounded-xl border bg-card p-4 text-left transition-colors hover:bg-accent"
+                    className="flex items-start gap-3 rounded-xl border bg-card p-4 text-left transition-colors hover:bg-accent w-full"
                   >
                     <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-primary/10">
                       <item.icon className="h-4 w-4 text-primary" />
@@ -639,51 +645,43 @@ const displayMessages = messages.filter((m) => m.role !== "system");
             </div>
           </div>
         ) : (
-	          /* Messages */
-	          <div 
-	            ref={scrollAreaRef} 
-	            className="flex-1 overflow-y-auto p-4 space-y-4 scroll-smooth"
-	            style={{ height: '100%' }}
-	          >
-	            {displayMessages.map((msg) => (
-	              <MessageErrorBoundary key={msg.id}>
-	                <MessageItem msg={msg} />
-	              </MessageErrorBoundary>
-	            ))}
-	            {isLoading && (
-	              <div className="flex justify-start gap-3">
-	                <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-primary/10">
-	                  <Bot className="h-4 w-4 text-primary" />
-	                </div>
-	                <div className="flex items-center gap-2 rounded-xl bg-muted px-4 py-2">
-	                  <Loader2 className="h-4 w-4 animate-spin" />
-	                  <span className="text-sm text-muted-foreground">
-	                    Pensando...
-	                  </span>
-	                </div>
-	              </div>
-	            )}
-	          </div>
+          /* Messages */
+          <div
+            ref={scrollAreaRef}
+            className="flex-1 overflow-y-auto p-4 space-y-4 scroll-smooth"
+            style={{ height: '100%' }}
+          >
+            {displayMessages.map((msg) => (
+              <MessageErrorBoundary key={msg.id}>
+                <MessageItem msg={msg} />
+              </MessageErrorBoundary>
+            ))}
+
+            {/* Loading / Thinking indicator */}
+            {isLoading && (
+              <div className="flex gap-3">
+                <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-primary/10">
+                  <Bot className="h-4 w-4 text-primary" />
+                </div>
+                <div className="bg-card border border-border rounded-2xl rounded-tl-none px-4 py-3 shadow-sm">
+                  <div className="flex items-center gap-2">
+                    <Loader2 className="h-4 w-4 animate-spin text-primary" />
+                    <span className="text-sm text-muted-foreground">
+                      Seu assistente está pensando{thinkingDots}
+                    </span>
+                  </div>
+                </div>
+              </div>
+            )}
+          </div>
         )}
 
         {/* ─── Input Area ─── */}
         <div className="sticky bottom-0 z-10 border-t bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60 p-3 pb-safe">
           {imagePreview && (
             <div className="mb-2 relative inline-block">
-              <img
-                src={imagePreview}
-                alt="Preview"
-                className="max-h-32 rounded-lg border"
-              />
-              <Button
-                size="icon"
-                variant="destructive"
-                className="absolute -top-2 -right-2 h-6 w-6 rounded-full"
-                onClick={() => {
-                  setImagePreview(null);
-                  setSelectedFile(null);
-                }}
-              >
+              <img src={imagePreview} alt="Preview" className="max-h-32 rounded-lg border" />
+              <Button size="icon" variant="destructive" className="absolute -top-2 -right-2 h-6 w-6 rounded-full" onClick={() => { setImagePreview(null); setSelectedFile(null); }}>
                 <X className="h-3 w-3" />
               </Button>
             </div>
@@ -692,34 +690,14 @@ const displayMessages = messages.filter((m) => m.role !== "system");
             <div className="mb-2 flex items-center gap-2 rounded-lg bg-muted px-3 py-2">
               <FileIcon className="h-4 w-4 text-primary" />
               <span className="text-sm truncate flex-1">{selectedFile.name}</span>
-              <Button
-                size="icon"
-                variant="ghost"
-                className="h-6 w-6"
-                onClick={() => {
-                  setSelectedFile(null);
-                  setImagePreview(null);
-                }}
-              >
+              <Button size="icon" variant="ghost" className="h-6 w-6" onClick={() => { setSelectedFile(null); setImagePreview(null); }}>
                 <X className="h-3 w-3" />
               </Button>
             </div>
           )}
           <form onSubmit={handleFormSubmit} className="flex items-end gap-2">
-            <input
-              ref={fileInputRef}
-              type="file"
-              className="hidden"
-              accept="*/*"
-              onChange={handleFileChange}
-            />
-            <Button
-              type="button"
-              size="icon"
-              variant="outline"
-              className="shrink-0"
-              onClick={() => fileInputRef.current?.click()}
-            >
+            <input ref={fileInputRef} type="file" className="hidden" accept="*/*" onChange={handleFileChange} />
+            <Button type="button" size="icon" variant="outline" className="shrink-0" onClick={() => fileInputRef.current?.click()}>
               <Paperclip className="h-4 w-4" />
             </Button>
             <Textarea
@@ -735,12 +713,7 @@ const displayMessages = messages.filter((m) => m.role !== "system");
                 }
               }}
             />
-            <Button
-              type="submit"
-              size="icon"
-              disabled={isLoading || (!input.trim() && !selectedFile)}
-              className="shrink-0"
-            >
+            <Button type="submit" size="icon" disabled={isLoading || (!input.trim() && !selectedFile)} className="shrink-0">
               <Send className="h-4 w-4" />
             </Button>
           </form>
