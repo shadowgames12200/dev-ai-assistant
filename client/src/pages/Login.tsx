@@ -22,7 +22,21 @@ export default function Login() {
         body: JSON.stringify({ email, password }),
       });
 
-      const data = await response.json();
+      // Verificar se a resposta é JSON válido antes de parsear
+      const contentType = response.headers.get("content-type") || "";
+      if (!contentType.includes("application/json")) {
+        // Resposta não é JSON (provavelmente erro de proxy/upstream)
+        const text = await response.text();
+        console.error("[Auth] Non-JSON response:", text);
+        throw new Error("Serviço temporariamente indisponível. Tente novamente em instantes.");
+      }
+
+      let data: any;
+      try {
+        data = await response.json();
+      } catch {
+        throw new Error("Erro ao processar resposta do servidor. Tente novamente.");
+      }
 
       if (!response.ok) {
         throw new Error(data.error || "Erro ao fazer login");
