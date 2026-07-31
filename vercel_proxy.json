@@ -1,0 +1,17 @@
+{
+  "version": 2,
+  "buildCommand": "vite build",
+  "outputDirectory": "dist/public",
+  "installCommand": "pnpm install",
+  "framework": "vite",
+  "rewrites": [
+    {
+      "source": "/api/(.*)",
+      "destination": "https://SEU-SPACE-URL.hf.space/api/$1"
+    },
+    {
+      "source": "/((?!assets|static|.*\\..*).*)",
+      "destination": "/index.html"
+    }
+  ]
+}

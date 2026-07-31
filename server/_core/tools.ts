@@ -3,6 +3,7 @@ import { ENV } from "./env.js";
 import { executeInSandbox, runJSWithPackages, runPythonWithPackages } from "./sandbox.js";
 import { searchMemories, saveMemory } from "./semantic-memory.js";
 import { multimodalTools, multimodalHandlers } from "./multimodal.js";
+import { starkTools, HomeAutomation } from "./stark-module.js";
 
 export const tools: Tool[] = [
   ...multimodalTools,
@@ -126,6 +127,22 @@ export const tools: Tool[] = [
   {
     type: "function",
     function: {
+      name: "stark_system",
+      description: "Controla a casa inteligente (luzes, ar-condicionado, TV) e fornece status do sistema estilo Jarvis/Sexta-Feira.",
+      parameters: {
+        type: "object",
+        properties: {
+          action: { type: "string", enum: ["control_home", "get_status"], description: "A ação a ser executada." },
+          device: { type: "string", description: "O nome do dispositivo (ex: luz_sala, ar_quarto)." },
+          state: { type: "string", enum: ["on", "off"], description: "O estado desejado." },
+        },
+        required: ["action"],
+      },
+    },
+  },
+  {
+    type: "function",
+    function: {
       name: "analyze_file",
       description: "Analisa o conteúdo de um arquivo binário ou texto. Extrai informações sobre executáveis, documentos, ZIPs, PDFs e outros formatos.",
       parameters: {
@@ -234,6 +251,15 @@ export const toolHandlers: Record<string, (args: any) => Promise<string>> = {
   },
 
   ...multimodalHandlers,
+  stark_system: async ({ action, device, state }: { action: string; device?: string; state?: "on" | "off" }) => {
+    if (action === "control_home" && device && state) {
+      return await HomeAutomation.controlDevice(device, state);
+    }
+    if (action === "get_status") {
+      return await HomeAutomation.getHomeStatus();
+    }
+    return "Ação Stark inválida.";
+  },
 };
 
 function formatSandboxOutput(result: any): string {
