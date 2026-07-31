@@ -182,6 +182,28 @@ export async function invokeGroq(params: GroqInvokeParamsWithStream): Promise<Gr
   return (await response.json()) as GroqResponse;
 }
 
+// ─── Type Guard ───
+
+/**
+ * Type guard para diferenciar GroqResponse de ReadableStream.
+ * Quando invokeGroq é chamado sem stream: true, o retorno é sempre GroqResponse.
+ */
+export function isGroqResponse(response: GroqResponse | ReadableStream): response is GroqResponse {
+  return "choices" in response && Array.isArray(response.choices);
+}
+
+/**
+ * Invoca Groq sem streaming, retornando tipado como GroqResponse.
+ * Use esta função sempre que não precisar de streaming.
+ */
+export async function invokeGroqNonStream(params: GroqInvokeParams): Promise<GroqResponse> {
+  const response = await invokeGroq(params);
+  if (!isGroqResponse(response)) {
+    throw new Error("Unexpected streaming response when non-stream was expected");
+  }
+  return response;
+}
+
 // ─── Helper: Build user message with file content ───
 
 /**

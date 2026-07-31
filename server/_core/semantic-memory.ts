@@ -171,8 +171,8 @@ ${text}
 Responda apenas com uma lista de fatos curtos e diretos, um por linha. Se não houver nada importante, responda "NADA".`;
 
     // Usar Groq para extrair os fatos
-    const { invokeGroq } = await import("./groq.js");
-    const response = await invokeGroq({
+    const { invokeGroqNonStream } = await import("./groq.js");
+    const response = await invokeGroqNonStream({
       messages: [{ role: "user", content: prompt }],
       model: "llama-3.3-70b-versatile",
       maxTokens: 500,
@@ -181,7 +181,7 @@ Responda apenas com uma lista de fatos curtos e diretos, um por linha. Se não h
     const result = response.choices[0]?.message?.content || "";
     if (result.includes("NADA")) return;
 
-    const facts = result.split("\n").filter(f => f.trim().length > 10);
+    const facts = result.split("\n").filter((f: string) => f.trim().length > 10);
 
     for (const fact of facts) {
       await saveMemory({

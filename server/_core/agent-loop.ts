@@ -12,7 +12,7 @@
  * Inspirado no loop de agente do Manus AI.
  */
 
-import { invokeGroq, type GroqMessage, type GroqInvokeParams, type GroqResponse } from "./groq.js";
+import { invokeGroq, invokeGroqNonStream, type GroqMessage, type GroqInvokeParams, type GroqResponse } from "./groq.js";
 import { tools, toolHandlers } from "./tools.js";
 import {
   createTask,
@@ -143,7 +143,7 @@ export async function runAgentLoop(
       }
 
       const planningCallStart = Date.now();
-      const response = await invokeGroq(requestPayload);
+      const response = await invokeGroqNonStream(requestPayload);
       const responseTime = Date.now() - planningCallStart;
 
       const message = response.choices[0]?.message as ExtendedGroqMessage;
@@ -252,7 +252,7 @@ export async function runAgentLoop(
     }
 
     // If we exhausted iterations, generate a final summary
-    const finalResponse = await invokeGroq({
+    const finalResponse = await invokeGroqNonStream({
       model: cfg.model,
       messages: conversationHistory,
       maxTokens: cfg.maxTokens,
@@ -352,7 +352,7 @@ export async function enhancedChat(
       requestPayload.tool_choice = "auto";
     }
 
-    const response = await invokeGroq(requestPayload);
+    const response = await invokeGroqNonStream(requestPayload);
     const message = response.choices[0]?.message as ExtendedGroqMessage;
 
     if (!message) break;
@@ -408,7 +408,7 @@ export async function enhancedChat(
   }
 
   // Fallback: generate final response without tools
-  const finalResponse = await invokeGroq({
+  const finalResponse = await invokeGroqNonStream({
     model: cfg.model,
     messages: conversationHistory,
     maxTokens: cfg.maxTokens,

@@ -12,7 +12,7 @@
 import { promises as fs } from "fs";
 import path from "path";
 import os from "os";
-import { invokeGroq, type GroqMessage } from "./groq.js";
+import { invokeGroqNonStream, type GroqMessage } from "./groq.js";
 
 // ─── Types ───
 
@@ -205,7 +205,7 @@ Gere um JSON com:
   "outcome": "Resultado final da conversa"
 }`;
 
-    const response = await invokeGroq({
+    const response = await invokeGroqNonStream({
       model: "llama-3.3-70b-versatile",
       messages: [{ role: "user", content: prompt }],
       maxTokens: 500,
@@ -603,7 +603,7 @@ Responda em JSON:
   "skills": ["habilidade1"]
 }`;
 
-    const response = await invokeGroq({
+    const response = await invokeGroqNonStream({
       model: "llama-3.3-70b-versatile",
       messages: [{ role: "user", content: prompt }],
       maxTokens: 800,

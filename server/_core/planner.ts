@@ -11,7 +11,7 @@
  * - Reflexão e re-planejamento
  */
 
-import { invokeGroq } from "./groq.js";
+import { invokeGroqNonStream } from "./groq.js";
 
 // ─── Types ───
 
@@ -126,7 +126,7 @@ Tipos de passos:
 - reflect: Refletir e ajustar o plano se necessário`;
 
   try {
-    const response = await invokeGroq({
+    const response = await invokeGroqNonStream({
       model: "llama-3.3-70b-versatile",
       messages: [{ role: "user", content: prompt }],
       maxTokens: 1500,
@@ -269,7 +269,7 @@ Se o passo envolve código, gere o código completo.
 Se envolve pesquisa, apresente as informações encontradas.
 Se envolve análise, seja técnico e detalhado.`;
 
-    const response = await invokeGroq({
+    const response = await invokeGroqNonStream({
       model: "llama-3.3-70b-versatile",
       messages: [
         { role: "system", content: "Você é um executor de tarefas. Execute cada passo de forma completa, detalhada e profissional. Use Markdown para formatar. Entregue resultados úteis e acionáveis." },
@@ -332,7 +332,7 @@ Responda em JSON:
 }`;
 
   try {
-    const response = await invokeGroq({
+    const response = await invokeGroqNonStream({
       model: "llama-3.3-70b-versatile",
       messages: [{ role: "user", content: prompt }],
       maxTokens: 800,
