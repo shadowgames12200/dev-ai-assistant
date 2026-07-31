@@ -1,17 +1,17 @@
 {
   "version": 2,
-  "buildCommand": "pnpm run vercel-build",
+  "buildCommand": "vite build",
   "outputDirectory": "dist/public",
   "installCommand": "pnpm install",
-  "framework": null,
-  "functions": {
-    "api/main.js": {
-      "maxDuration": 60,
-      "memory": 1024
-    }
-  },
+  "framework": "vite",
   "rewrites": [
-    { "source": "/api/(.*)", "destination": "/api/main.js" },
-    { "source": "/((?!assets|static|.*\\..*).*)", "destination": "/api/main.js" }
+    {
+      "source": "/api/(.*)",
+      "destination": "https://p01--dev-ai-assistent--mfj64yvmwmh2.code.run/api/$1"
+    },
+    {
+      "source": "/((?!assets|static|.*\\..*).*)",
+      "destination": "/index.html"
+    }
   ]
 }
