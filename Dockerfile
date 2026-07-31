@@ -1,5 +1,5 @@
 # Use a imagem oficial do Node.js
-FROM node:20-slim
+FROM node:22-slim
 
 # Instalar pnpm e dependências de sistema necessárias
 RUN npm install -g pnpm && \
