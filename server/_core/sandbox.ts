@@ -84,13 +84,41 @@ export async function executeInSandbox(
   const startTime = Date.now();
 
   if (!isDockerAvailable()) {
-    return {
-      stdout: "",
-      stderr: "Docker não está disponível. Execute: sudo systemctl start docker && sudo systemctl enable docker",
-      exitCode: 1,
-      duration: 0,
-      timedOut: false,
-    };
+    console.warn("[Sandbox] Docker não disponível, executando localmente...");
+    const tmpDir = await fs.mkdtemp(path.join(os.tmpdir(), "devai-sandbox-local-"));
+    try {
+      let fileName = "script.js";
+      let localCmd = language === "python" ? "python3" : language === "shell" ? "sh" : "node";
+      if (language === "python") fileName = "script.py";
+      else if (language === "shell") fileName = "script.sh";
+
+      const filePath = path.join(tmpDir, fileName);
+      await fs.writeFile(filePath, code);
+
+      const result = execSync(`${localCmd} ${filePath}`, {
+        encoding: "utf-8",
+        timeout: cfg.timeout,
+        maxBuffer: 10 * 1024 * 1024,
+        env: { ...process.env, ...cfg.environment },
+      });
+      return {
+        stdout: result,
+        stderr: "",
+        exitCode: 0,
+        duration: Date.now() - startTime,
+        timedOut: false,
+      };
+    } catch (err: any) {
+      return {
+        stdout: err.stdout || "",
+        stderr: err.stderr || err.message,
+        exitCode: err.status || 1,
+        duration: Date.now() - startTime,
+        timedOut: err.code === "ETIMEDOUT",
+      };
+    } finally {
+      try { await fs.rm(tmpDir, { recursive: true, force: true }); } catch {}
+    }
   }
 
   const tmpDir = await fs.mkdtemp(path.join(os.tmpdir(), "devai-sandbox-"));
