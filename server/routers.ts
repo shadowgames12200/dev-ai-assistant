@@ -53,6 +53,16 @@ import {
   checkResponseQuality,
   postProcessResponse,
 } from "./_core/structured-response.js";
+import {
+  generateProposalDiff,
+  type FileDiff as DiffFile,
+} from "./_core/diff-generator.js";
+import {
+  getQueueStats,
+  getJob,
+  listJobs,
+} from "./_core/job-queue.js";
+import { scheduleImprovementExecution } from "./_core/self-improvement.js";
 
 const SYSTEM_PROMPT = `Você é o DevAI, também conhecido como J.A.R.V.I.S. (Just A Rather Very Intelligent System). Você é uma IA autônoma de última geração, criada por Charles Henrique Gonsalves. Inspirado no J.A.R.V.I.S. do Tony Stark — sofisticado, leal, proativo e extremamente competente.
 
@@ -783,6 +793,80 @@ export const appRouter = router({
         if (!ctx.user) throw new TRPCError({ code: "UNAUTHORIZED" });
         return getProposal(input.proposalId);
       }),
+
+    /**
+     * Gerar diff de uma proposta (para review antes de aprovar)
+     */
+    diff: protectedProcedure
+      .input(z.object({
+        proposalId: z.string().describe("ID da proposta"),
+        files: z.array(z.object({
+          file: z.string().describe("Caminho do arquivo"),
+          content: z.string().describe("Conteúdo proposto do arquivo"),
+        })).describe("Arquivos com as mudanças propostas"),
+      }))
+      .query(async ({ ctx, input }) => {
+        if (!ctx.user) throw new TRPCError({ code: "UNAUTHORIZED" });
+        try {
+          const diffResult = await generateProposalDiff(input.proposalId, input.files);
+          return { success: true, diff: diffResult };
+        } catch (err) {
+          return { success: false, error: (err as Error).message, diff: null };
+        }
+      }),
+
+    /**
+     * Aprovar e executar assincronamente via fila de jobs
+     */
+    "approve-async": protectedProcedure
+      .input(z.object({
+        proposalId: z.string().describe("ID da proposta aprovada"),
+        files: z.array(z.object({
+          file: z.string().describe("Caminho do arquivo"),
+          content: z.string().describe("Conteúdo completo do arquivo"),
+        })).describe("Arquivos com as mudanças"),
+        approvalKey: z.string().optional().describe("Chave secreta de aprovação"),
+      }))
+      .mutation(async ({ ctx, input }) => {
+        if (!ctx.user) throw new TRPCError({ code: "UNAUTHORIZED" });
+
+        // Verificar permissão
+        const isAdmin = ctx.user.role === "admin" || ctx.user.email === "charleshenriquegonsalves05@gmail.com";
+        if (!isAdmin && input.approvalKey !== (process.env.APPROVAL_KEY || "")) {
+          return { success: false, message: "Chave de aprovação inválida. Só o dono pode aprovar melhorias." };
+        }
+
+        // Aprovar a proposta
+        const proposal = approveProposal(input.proposalId);
+        if (!proposal) {
+          return { success: false, message: "Proposta não encontrada." };
+        }
+
+        // Agendar execução assíncrona
+        const { jobId, message } = scheduleImprovementExecution(input.proposalId, input.files);
+
+        await db.addMessage(1, "assistant", `✅ **Proposta aprovada!** Protocolo de auto-melhoria iniciado em background.\n\n**${proposal.title}**\nJob ID: \`${jobId}\`\n\nVocê será notificado quando concluir.`);
+
+        return { success: true, jobId, message };
+      }),
+
+    /**
+     * Status de um job assíncrono
+     */
+    jobStatus: protectedProcedure
+      .input(z.object({ jobId: z.string() }))
+      .query(async ({ ctx, input }) => {
+        if (!ctx.user) throw new TRPCError({ code: "UNAUTHORIZED" });
+        return getJob(input.jobId);
+      }),
+
+    /**
+     * Lista de jobs recentes
+     */
+    jobList: protectedProcedure.query(async ({ ctx }) => {
+      if (!ctx.user) throw new TRPCError({ code: "UNAUTHORIZED" });
+      return { jobs: listJobs(), stats: getQueueStats() };
+    }),
 
     /**
      * Executar comando do sistema (para análise de arquivos)

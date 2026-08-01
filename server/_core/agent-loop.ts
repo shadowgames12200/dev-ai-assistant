@@ -22,6 +22,7 @@ import {
   type Task,
   type PlanStep,
 } from "./planner.js";
+import { selectToolsForAgent } from "./tool-selector.js";
 import {
   createAgentContext,
   addAgentStep,
@@ -139,8 +140,14 @@ export async function runAgentLoop(
 
       // Add tools if available and we haven't hit the limit
       if (tools.length > 0 && toolCallCount < cfg.maxToolCalls) {
-        requestPayload.tools = tools;
+        // Seleção Dinâmica de Ferramentas: filtrar por relevância
+        const selectedTools = selectToolsForAgent(goal, tools);
+        requestPayload.tools = selectedTools;
         requestPayload.tool_choice = "auto";
+        
+        if (iteration === 1) {
+          console.log(`[Agent] Tool selection: ${selectedTools.length}/${tools.length} tools selected for goal: "${goal.slice(0, 50)}..."`);
+        }
       }
 
       const planningCallStart = Date.now();
@@ -405,8 +412,17 @@ export async function enhancedChat(
     };
 
     if (tools.length > 0 && toolCallCount < cfg.maxToolCalls) {
-      requestPayload.tools = tools;
+      // Seleção Dinâmica de Ferramentas para enhanced chat
+      const userMsg = [...conversationHistory].reverse().find(m => m.role === "user");
+      const lastUserContent = typeof userMsg?.content === "string" ? userMsg.content : "";
+      const { selectTools } = await import("./tool-selector.js");
+      const selectedTools = selectTools(lastUserContent, tools);
+      requestPayload.tools = selectedTools;
       requestPayload.tool_choice = "auto";
+      
+      if (i === 0) {
+        console.log(`[EnhancedChat] Tool selection: ${selectedTools.length}/${tools.length} tools for message: "${lastUserContent.slice(0, 50)}..."`);
+      }
     }
 
     let response: GroqResponse | null = null;

@@ -292,25 +292,32 @@ export const toolHandlers: Record<string, (args: any) => Promise<string>> = {
 
   self_improvement: async (args: any) => {
     const { action, title, description, proposalId, files } = args;
-    const { proposeImprovement, getApprovedProposals, getProposal } = await import("./self-improvement.js");
-    const { executeApprovedImprovement } = await import("./self-improvement.js");
+    const selfImprove = await import("./self-improvement.js");
 
     try {
       if (action === "propose") {
-        const id = proposeImprovement(title, description);
-        return `Proposta de melhoria "${title}" criada com sucesso (ID: ${id}). Aguardando aprovação do Charles no painel de aprovações.`;
+        const proposal = await selfImprove.createImprovementProposal(
+          title || "Melhoria proposta",
+          description || "Sem descrição",
+          [{ path: "N/A", summary: "Aguardando definição de arquivos" }],
+          ["A ser definido"],
+          ["A ser definido"],
+          "A ser estimado"
+        );
+        return `Proposta de melhoria "${title}" criada com sucesso (ID: ${proposal.id}). Aguardando aprovação no painel de aprovações.`;
       }
       if (action === "list_approved") {
-        const approved = getApprovedProposals();
+        const allProposals = selfImprove.listProposals();
+        const approved = allProposals.filter((p: any) => p.status === "approved");
         if (approved.length === 0) return "Nenhuma proposta aprovada no momento.";
-        return "Propostas aprovadas prontas para execução:\n" + approved.map(p => `- [${p.id}] ${p.title}`).join("\n");
+        return "Propostas aprovadas prontas para execução:\n" + approved.map((p: any) => `- [${p.id}] ${p.title}`).join("\n");
       }
       if (action === "execute") {
         if (!proposalId || !files) return "Erro: proposalId e files são obrigatórios para execução.";
-        const proposal = getProposal(proposalId);
+        const proposal = selfImprove.getProposal(proposalId);
         if (!proposal || proposal.status !== "approved") return "Erro: Proposta não encontrada ou ainda não aprovada.";
         
-        const result = await executeApprovedImprovement(proposalId, files);
+        const result = await selfImprove.executeApprovedImprovement(proposalId, files);
         return result.success 
           ? `✅ Sucesso! Melhoria "${proposal.title}" aplicada.\n${result.message}\nTestes: ${result.testsPassed}/${result.totalTestsRun} passaram.`
           : `❌ Falha na aplicação: ${result.message}`;

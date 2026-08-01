@@ -1,4 +1,5 @@
 import { ENV } from "./env.js";
+import { detectComplexity, selectModel } from "./model-router.js";
 
 // ─── Groq Types ───
 
@@ -133,21 +134,36 @@ export type GroqInvokeParamsWithStream = GroqInvokeParams & { stream?: boolean }
 export async function invokeGroq(params: GroqInvokeParamsWithStream): Promise<GroqResponse | ReadableStream> {
   assertGroqApiKey();
 
-  const { messages, maxTokens, temperature = 0.7, stream = false } = params;
-  const model = params.model ?? "llama-3.3-70b-versatile";
+  const { messages, maxTokens, temperature, stream = false } = params;
+  
+  // Model Routing Dinâmico: seleciona modelo automático se não forçado
+  let modelConfig;
+  if (params.model) {
+    modelConfig = { model: params.model, maxTokens: params.maxTokens ?? 4096, temperature: temperature ?? 0.5, label: "Forced" };
+  } else {
+    // Extrai o conteúdo da última mensagem do usuário para detectar complexidade
+    const userMsg = [...messages].reverse().find(m => m.role === "user");
+    const content = typeof userMsg?.content === "string" ? userMsg.content : "";
+    const complexity = detectComplexity(content);
+    modelConfig = selectModel(complexity);
+  }
+  
+  const model = modelConfig.model;
+  const finalMaxTokens = maxTokens ?? modelConfig.maxTokens;
+  const finalTemperature = temperature ?? modelConfig.temperature;
 
   const payload: Record<string, unknown> = {
     model,
     messages,
-    temperature,
+    temperature: finalTemperature,
     stream,
   };
 
-  if (typeof maxTokens === "number") {
-    payload.max_tokens = maxTokens;
+  if (typeof finalMaxTokens === "number") {
+    payload.max_tokens = finalMaxTokens;
   }
 
-  console.log(`[Groq] Calling model: ${model} (stream: ${stream})`);
+  console.log(`[Groq] Calling model: ${model} [${modelConfig.label}] (stream: ${stream}, tokens: ${finalMaxTokens})`);
 
   const response = await fetchWithBackoff(GROQ_API_URL(), {
     method: "POST",

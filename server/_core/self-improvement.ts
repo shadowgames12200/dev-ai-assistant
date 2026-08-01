@@ -419,6 +419,54 @@ function applyChanges(cwd: string, changes: Array<{ file: string; content: strin
 
 // ─── PUBLIC API ───
 
+// ─── Async Execution via Job Queue ───
+
+import { enqueueJob, type Job } from "./job-queue.js";
+
+/**
+ * Agenda a execução assíncrona de uma melhoria aprovada.
+ * Retorna imediatamente com o job ID. O processamento ocorre em background.
+ */
+export function scheduleImprovementExecution(
+  proposalId: string,
+  changes: Array<{ file: string; content: string }>
+): { jobId: string; message: string } {
+  const proposal = pendingProposals.get(proposalId);
+  if (!proposal || proposal.status !== "approved") {
+    return {
+      jobId: "",
+      message: "Proposta não encontrada ou não aprovada. Aprove antes de executar.",
+    };
+  }
+
+  const job = enqueueJob(
+    "self-improvement",
+    `Auto-Melhoria: ${proposal.title}`,
+    async (currentJob) => {
+      currentJob.progress = 10;
+      try {
+        const result = await executeApprovedImprovement(proposalId, changes);
+        currentJob.progress = 100;
+        return {
+          success: result.success,
+          message: result.message,
+        };
+      } catch (err) {
+        return {
+          success: false,
+          message: `Erro na execução: ${(err as Error).message}`,
+        };
+      }
+    },
+    { proposalId, proposalTitle: proposal.title }
+  );
+
+  return {
+    jobId: job.id,
+    message: `Protocolo de auto-melhoria "${proposal.title}" iniciado em background. Job ID: ${job.id}. Você será notificado quando concluir.`,
+  };
+}
+
 /**
  * Criar uma proposta de melhoria (mostra ao usuário para aprovação)
  */
