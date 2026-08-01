@@ -39,6 +39,20 @@ async function startServer() {
       const { invokeGroq } = await import("./groq.js");
       const { buildSmartContext } = await import("./memory.js");
       const { buildMemoryContext } = await import("./semantic-memory.js");
+      const { runAgentLoop } = await import("./agent-loop.js");
+
+      // Verificar se deve entrar em modo agente (J.A.R.V.I.S. autônomo)
+      const lower = content.toLowerCase();
+      const isAgent = lower.includes("jarvis") || lower.includes("melhoria") || lower.includes("auto-melhoria");
+
+      if (isAgent) {
+        res.write(`data: ${JSON.stringify({ token: "### 🤖 J.A.R.V.I.S. - Protocolo de Agente Ativado\n\nProcessando solicitação complexa... Aguarde um momento, senhor.\n\n" })}\n\n`);
+        const result = await runAgentLoop(content);
+        res.write(`data: ${JSON.stringify({ token: result.finalOutput })}\n\n`);
+        await db.addMessage(conversationId, "assistant", result.finalOutput);
+        res.write(`data: [DONE]\n\n`);
+        return;
+      }
       
       // Buscar histórico para contexto
       const history = await db.getConversationMessages(conversationId);

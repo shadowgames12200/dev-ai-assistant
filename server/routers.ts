@@ -179,13 +179,19 @@ function truncateMessagesForContext(messages: any[], maxContentLength: number = 
 // Detect if message is an agent mode request
 function isAgentMode(content: string): boolean {
   const lower = content.toLowerCase();
-  return lower.includes("[modo agente]") || lower.includes("[agent mode]");
+  const agentKeywords = ["[modo agente]", "[agent mode]", "jarvis,", "jarvis ", "sexta-feira", "friday"];
+  return agentKeywords.some(kw => lower.includes(kw)) || isSelfImprovement(content);
 }
 
 // Detect if message requests self-improvement
 function isSelfImprovement(content: string): boolean {
   const lower = content.toLowerCase();
-  const improvementKeywords = ["melhore a ia", "melhore o sistema", "melhore o devai", "auto-melhoria", "self-improvement"];
+  const improvementKeywords = [
+    "melhore a ia", "melhore o sistema", "melhore o devai", 
+    "auto-melhoria", "self-improvement", "auto melhoria",
+    "faça uma melhoria em você", "melhore seu código",
+    "upgrade yourself", "improve your code"
+  ];
   return improvementKeywords.some(kw => lower.includes(kw));
 }
 
@@ -347,13 +353,18 @@ export const appRouter = router({
         try {
           // Check if this is an agent mode request
           if (isAgentMode(input.content)) {
+            // Se for auto-melhoria, dar um prompt específico para o agente
+            const agentGoal = isSelfImprovement(input.content) 
+              ? `Analise seu próprio código-fonte, identifique a melhoria solicitada ("${input.content}") e use a ferramenta self_improvement para propor e, se aprovado, executar as mudanças. Seja proativo como o J.A.R.V.I.S.`
+              : input.content;
+
             // Run the autonomous agent loop
-            const agentResult = await runAgentLoop(input.content, {
+            const agentResult = await runAgentLoop(agentGoal, {
               model: "llama-3.3-70b-versatile",
               maxIterations: 15,
             });
 
-            const agentOutput = `**Modo Agente Concluído**\n\n**Iterações:** ${agentResult.totalIterations}\n**Ferramentas usadas:** ${agentResult.iterations.filter(i => i.type === "tool_call").length} chamada(s)\n**Tempo total:** ${(agentResult.totalDuration / 1000).toFixed(1)}s\n\n---\n\n${agentResult.finalOutput}`;
+            const agentOutput = `### 🤖 J.A.R.V.I.S. - Protocolo de Agente Concluído\n\n**Status:** ${agentResult.success ? "Sucesso" : "Falha"}\n**Iterações:** ${agentResult.totalIterations}\n**Ferramentas:** ${agentResult.iterations.filter(i => i.type === "tool_call").length}\n**Tempo:** ${(agentResult.totalDuration / 1000).toFixed(1)}s\n\n---\n\n${agentResult.finalOutput}`;
 
             await db.addMessage(input.conversationId, "assistant", agentOutput);
 

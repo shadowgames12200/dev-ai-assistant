@@ -20,12 +20,22 @@ export function useJarvisVoice(onTranscription: (text: string) => void) {
     
     if (SpeechRecognition) {
       const recognition = new SpeechRecognition();
-      recognition.continuous = false;
+      recognition.continuous = true; // Modo contínuo ativado
       recognition.interimResults = true;
       recognition.lang = 'pt-BR';
 
       recognition.onstart = () => setIsListening(true);
-      recognition.onend = () => setIsListening(false);
+      recognition.onend = () => {
+        setIsListening(false);
+        // Reiniciar automaticamente se o modo contínuo estiver ativado (estratégia Stark)
+        if (recognitionRef.current && window.localStorage.getItem('jarvis_mic_continuous') === 'true') {
+          try {
+            recognitionRef.current.start();
+          } catch (err) {
+            console.warn('Erro ao reiniciar reconhecimento:', err);
+          }
+        }
+      };
       recognition.onerror = (event: any) => {
         console.error('Erro no reconhecimento:', event.error);
         setError(event.error);

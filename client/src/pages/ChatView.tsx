@@ -117,9 +117,24 @@ export default function ChatView() {
   const fileInputRef = useRef<HTMLInputElement>(null);
   const scrollAreaRef = useRef<HTMLDivElement>(null);
 
+  const [isContinuousMic, setIsContinuousMic] = useState(() => localStorage.getItem('jarvis_mic_continuous') === 'true');
+
   const { isListening, isSpeaking, startListening, stopListening, speak } = useJarvisVoice((text) => {
-    handleSendMessage(text);
+    // Se o Jarvis estiver falando, ignore o que o microfone captar (evita feedback loop)
+    if (isSpeaking) return;
+    
+    if (text.trim()) {
+      handleSendMessage(text);
+    }
   });
+
+  // Gerenciar o estado do microfone contínuo
+  useEffect(() => {
+    localStorage.setItem('jarvis_mic_continuous', String(isContinuousMic));
+    if (isContinuousMic && isJarvisMode && !isListening && !isSpeaking && !isLoading) {
+      startListening();
+    }
+  }, [isContinuousMic, isJarvisMode, isListening, isSpeaking, isLoading, startListening]);
 
   useEffect(() => {
     if (!isLoading) {

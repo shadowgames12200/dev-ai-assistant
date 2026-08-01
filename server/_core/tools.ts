@@ -156,6 +156,35 @@ export const tools: Tool[] = [
       },
     },
   },
+  {
+    type: "function",
+    function: {
+      name: "self_improvement",
+      description: "Permite ao J.A.R.V.I.S. propor e executar melhorias no seu próprio código-fonte. Use para auto-evolução.",
+      parameters: {
+        type: "object",
+        properties: {
+          action: { type: "string", enum: ["propose", "list_approved", "execute"], description: "Ação de melhoria." },
+          title: { type: "string", description: "Título da melhoria (para 'propose')." },
+          description: { type: "string", description: "Descrição detalhada (para 'propose')." },
+          proposalId: { type: "string", description: "ID da proposta (para 'execute')." },
+          files: { 
+            type: "array", 
+            items: { 
+              type: "object",
+              properties: {
+                file: { type: "string", description: "Caminho relativo do arquivo (ex: client/src/App.tsx)." },
+                content: { type: "string", description: "Conteúdo completo e corrigido do arquivo." }
+              },
+              required: ["file", "content"]
+            },
+            description: "Arquivos com as mudanças (para 'execute')."
+          }
+        },
+        required: ["action"],
+      },
+    },
+  },
 ];
 
 export const toolHandlers: Record<string, (args: any) => Promise<string>> = {
@@ -259,6 +288,37 @@ export const toolHandlers: Record<string, (args: any) => Promise<string>> = {
       return await HomeAutomation.getHomeStatus();
     }
     return "Ação Stark inválida.";
+  },
+
+  self_improvement: async (args: any) => {
+    const { action, title, description, proposalId, files } = args;
+    const { proposeImprovement, getApprovedProposals, getProposal } = await import("./self-improvement.js");
+    const { executeApprovedImprovement } = await import("./self-improvement.js");
+
+    try {
+      if (action === "propose") {
+        const id = proposeImprovement(title, description);
+        return `Proposta de melhoria "${title}" criada com sucesso (ID: ${id}). Aguardando aprovação do Charles no painel de aprovações.`;
+      }
+      if (action === "list_approved") {
+        const approved = getApprovedProposals();
+        if (approved.length === 0) return "Nenhuma proposta aprovada no momento.";
+        return "Propostas aprovadas prontas para execução:\n" + approved.map(p => `- [${p.id}] ${p.title}`).join("\n");
+      }
+      if (action === "execute") {
+        if (!proposalId || !files) return "Erro: proposalId e files são obrigatórios para execução.";
+        const proposal = getProposal(proposalId);
+        if (!proposal || proposal.status !== "approved") return "Erro: Proposta não encontrada ou ainda não aprovada.";
+        
+        const result = await executeApprovedImprovement(proposalId, files);
+        return result.success 
+          ? `✅ Sucesso! Melhoria "${proposal.title}" aplicada.\n${result.message}\nTestes: ${result.testsPassed}/${result.totalTestsRun} passaram.`
+          : `❌ Falha na aplicação: ${result.message}`;
+      }
+      return "Ação de auto-melhoria inválida.";
+    } catch (err) {
+      return `Erro no sistema de auto-melhoria: ${(err as Error).message}`;
+    }
   },
 };
 

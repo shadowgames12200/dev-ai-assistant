@@ -212,8 +212,9 @@ function ProposalCard({ proposal, userRole, userEmail }: { proposal: Proposal; u
 function ApprovalsContent() {
   const { user } = useAuth();
 
-  // Se não for admin, não deve ver esta página
-  if (!user || user.role !== "admin") {
+  // Se não for admin ou o dono (Charles), não deve ver esta página
+  const isAdmin = user?.role === "admin" || user?.email === "charleshenriquegonsalves05@gmail.com";
+  if (!user || !isAdmin) {
     return (
       <div className="flex flex-1 items-center justify-center">
         <div className="text-center space-y-3">

@@ -212,21 +212,14 @@ export function postProcessResponse(
 
   for (const issue of issues) {
     switch (issue.type) {
+      // Notas automáticas removidas para manter a limpeza da resposta (Estilo J.A.R.V.I.S.)
       case "incomplete":
-        // Add a note that the response was truncated
-        processed += "\n\n*[Nota: Esta resposta pode estar incompleta. Solicite mais detalhes se necessário.]*";
         break;
       case "no_structure":
-        // Add a gentle reminder about formatting
-        processed += "\n\n*[Sugestão: Respostas longas ficam mais legíveis com formatação Markdown (títulos, negrito, listas).]*";
         break;
       case "no_code":
-        // Add a gentle reminder about code
-        processed += "\n\n*[Sugestão: Blocos de código com linguagem especificada ficam mais legíveis.]*";
         break;
       case "short":
-        // Add a gentle reminder about depth
-        processed += "\n\n*[Nota: Para respostas mais detalhadas, peça para ser mais aprofundado.]*";
         break;
     }
   }
