@@ -6,12 +6,30 @@
   "framework": "vite",
   "rewrites": [
     {
-      "source": "/api/(.*)",
-      "destination": "${BACKEND_URL}/api/$1"
+      "source": "/api/auth/(.*)",
+      "destination": "https://p01--dev-ai-assistent--mfj64yvmwmh2.code.run/api/auth/$1"
+    },
+    {
+      "source": "/api/trpc(.*)",
+      "destination": "https://p01--dev-ai-assistent--mfj64yvmwmh2.code.run/api/trpc$1"
+    },
+    {
+      "source": "/api/health",
+      "destination": "https://p01--dev-ai-assistent--mfj64yvmwmh2.code.run/api/health"
     },
     {
       "source": "/((?!assets|static|.*\\..*).*)",
       "destination": "/index.html"
+    }
+  ],
+  "headers": [
+    {
+      "source": "/api/(.*)",
+      "headers": [
+        { "key": "Access-Control-Allow-Origin", "value": "*" },
+        { "key": "Access-Control-Allow-Methods", "value": "GET,POST,PUT,DELETE,OPTIONS" },
+        { "key": "Access-Control-Allow-Headers", "value": "Content-Type,Authorization" }
+      ]
     }
   ]
 }
