@@ -21,9 +21,9 @@ COPY . .
 # Build do Frontend (Vite) e Backend (TypeScript)
 RUN pnpm run build
 
-# O Hugging Face usa a porta 7860 por padrão
-ENV PORT=7860
-EXPOSE 7860
+# Northflank e outras plataformas de deploy usam porta 8080 por padrão
+ENV PORT=8080
+EXPOSE 8080
 
 # Comando para iniciar a aplicação
 # Nota: Ajustamos para rodar o servidor que serve o frontend e a API
