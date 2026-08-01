@@ -55,10 +55,10 @@ export async function setupVite(app: any, server: Server) {
 
 export function serveStatic(app: any) {
   // @ts-ignore
-  const distPath =
-    process.env.NODE_ENV === "development"
-      ? path.resolve(import.meta.dirname, "../..", "dist", "public")
-      : path.resolve(import.meta.dirname, "public");
+  // The Vite build outputs to dist/public (the root of the project)
+  // import.meta.dirname is /app/dist/server/_core in production (from the Dockerfile WORKDIR /app)
+  // So we need to go up 2 levels: ../.. = /app/dist, then + public = /app/dist/public
+  const distPath = path.resolve(import.meta.dirname, "../..", "public");
   if (!fs.existsSync(distPath)) {
     console.error(
       `Could not find the build directory: ${distPath}, make sure to build the client first`
