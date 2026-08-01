@@ -2,7 +2,7 @@ import { useState, useEffect, useCallback, useRef } from 'react';
 
 /**
  * Hook para gerenciar a voz do J.A.R.V.I.S. (STT e TTS)
- * Utiliza a Web Speech API (Gratuita e Nativa)
+ * Otimizado para latência zero e fala natural.
  */
 export function useJarvisVoice(onTranscription: (text: string) => void) {
   const [isListening, setIsListening] = useState(false);
@@ -11,6 +11,8 @@ export function useJarvisVoice(onTranscription: (text: string) => void) {
   
   const recognitionRef = useRef<any>(null);
   const synthRef = useRef<SpeechSynthesis | null>(null);
+  const queueRef = useRef<string[]>([]);
+  const isProcessingQueue = useRef(false);
 
   // Inicializar Reconhecimento de Fala
   useEffect(() => {
@@ -18,8 +20,8 @@ export function useJarvisVoice(onTranscription: (text: string) => void) {
     
     if (SpeechRecognition) {
       const recognition = new SpeechRecognition();
-      recognition.continuous = false; // Parar após uma frase
-      recognition.interimResults = true; // Mostrar resultados parciais
+      recognition.continuous = false;
+      recognition.interimResults = true;
       recognition.lang = 'pt-BR';
 
       recognition.onstart = () => setIsListening(true);
@@ -42,12 +44,61 @@ export function useJarvisVoice(onTranscription: (text: string) => void) {
       };
 
       recognitionRef.current = recognition;
-    } else {
-      setError('Seu navegador não suporta reconhecimento de fala.');
     }
 
     synthRef.current = window.speechSynthesis;
+    
+    // Forçar carregamento de vozes
+    if (window.speechSynthesis.onvoiceschanged !== undefined) {
+      window.speechSynthesis.onvoiceschanged = () => {
+        console.log("Vozes carregadas:", window.speechSynthesis.getVoices().length);
+      };
+    }
   }, [onTranscription]);
+
+  // Processador de fila de fala (para falar enquanto a resposta chega)
+  const processQueue = useCallback(() => {
+    if (!synthRef.current || isProcessingQueue.current || queueRef.current.length === 0) {
+      return;
+    }
+
+    isProcessingQueue.current = true;
+    const text = queueRef.current.shift()!;
+    
+    // Limpar texto de markdown e caracteres especiais para fala mais limpa
+    const cleanText = text.replace(/[*_#`]/g, '').trim();
+    if (!cleanText) {
+      isProcessingQueue.current = false;
+      processQueue();
+      return;
+    }
+
+    const utterance = new SpeechSynthesisUtterance(cleanText);
+    utterance.lang = 'pt-BR';
+    utterance.rate = 1.05; // Velocidade natural
+    utterance.pitch = 0.95; // Tom sofisticado
+
+    const voices = synthRef.current.getVoices();
+    // Priorizar vozes premium e naturais
+    const preferredVoice = voices.find(v => 
+      (v.name.includes('Natural') || v.name.includes('Google') || v.name.includes('Microsoft')) && 
+      v.lang.startsWith('pt')
+    ) || voices.find(v => v.lang.startsWith('pt'));
+
+    if (preferredVoice) utterance.voice = preferredVoice;
+
+    utterance.onstart = () => setIsSpeaking(true);
+    utterance.onend = () => {
+      isProcessingQueue.current = false;
+      processQueue();
+    };
+    utterance.onerror = () => {
+      isProcessingQueue.current = false;
+      processQueue();
+    };
+
+    synthRef.current.speak(utterance);
+  }, []);
 
   // Iniciar Escuta
   const startListening = useCallback(() => {
@@ -67,31 +118,21 @@ export function useJarvisVoice(onTranscription: (text: string) => void) {
     }
   }, [isListening]);
 
-  // Falar Texto (TTS)
-  const speak = useCallback((text: string) => {
+  // Falar Texto (TTS) com suporte a fila
+  const speak = useCallback((text: string, isPartial = false) => {
     if (!synthRef.current) return;
 
-    // Cancelar qualquer fala anterior
-    synthRef.current.cancel();
-
-    const utterance = new SpeechSynthesisUtterance(text);
-    utterance.lang = 'pt-BR';
-    utterance.rate = 1.1; // Um pouco mais rápido para parecer inteligente
-    utterance.pitch = 0.9; // Um pouco mais grave para parecer o Jarvis
-
-    // Tentar encontrar uma voz masculina/profissional se disponível
-    const voices = synthRef.current.getVoices();
-    const preferredVoice = voices.find(v => 
-      v.name.includes('Google') || v.name.includes('Microsoft') || v.name.includes('Daniel')
-    );
-    if (preferredVoice) utterance.voice = preferredVoice;
-
-    utterance.onstart = () => setIsSpeaking(true);
-    utterance.onend = () => setIsSpeaking(false);
-    utterance.onerror = () => setIsSpeaking(false);
-
-    synthRef.current.speak(utterance);
-  }, []);
+    if (!isPartial) {
+      synthRef.current.cancel();
+      queueRef.current = [text];
+    } else {
+      // Se for parcial, quebra por sentenças para falar mais rápido
+      const sentences = text.split(/[.!?\n]/).filter(s => s.trim().length > 10);
+      queueRef.current.push(...sentences);
+    }
+    
+    processQueue();
+  }, [processQueue]);
 
   return {
     isListening,

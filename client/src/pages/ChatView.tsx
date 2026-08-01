@@ -282,26 +282,19 @@ export default function ChatView() {
     textareaRef.current?.focus();
   };
 
-  const handleSendMessage = (content: string) => {
+  const handleSendMessage = async (content: string) => {
     if (!content.trim() || isLoading) return;
 
     let convId = activeConversationId;
 
     if (!convId) {
-      const title = content.slice(0, 50) + (content.length > 50 ? "..." : "");
       createConversationMutation.mutate(
-        { title },
+        { title: content.slice(0, 50) },
         {
           onSuccess: (data) => {
             setActiveConversationId(data.id);
-            setIsLoading(true);
-            setInput("");
-            chatMutation.mutate({ conversationId: data.id, content, useAdvancedReasoning });
-          },
-          onError: (error) => {
-            handleApiError(error, "chat");
-            setIsLoading(false);
-          },
+            handleSendMessage(content);
+          }
         }
       );
       return;
@@ -309,7 +302,85 @@ export default function ChatView() {
 
     setIsLoading(true);
     setInput("");
-    chatMutation.mutate({ conversationId: convId, content: content.trim(), useAdvancedReasoning });
+
+    if (isJarvisMode) {
+      // MODO STREAMING PARA J.A.R.V.I.S. (Instantâneo)
+      try {
+        const response = await fetch(`/api/chat/stream?conversationId=${convId}&content=${encodeURIComponent(content)}`);
+        if (!response.ok) throw new Error("Falha no streaming");
+
+        const reader = response.body?.getReader();
+        const decoder = new TextDecoder();
+        let fullText = "";
+        let sentenceBuffer = "";
+
+        // Adicionar mensagem do usuário localmente
+        setMessages(prev => [...prev, { 
+          id: Date.now(), 
+          conversationId: convId!, 
+          role: "user", 
+          content, 
+          createdAt: new Date() 
+        }]);
+
+        // Placeholder para a resposta do assistente
+        const assistantMsgId = Date.now() + 1;
+        setMessages(prev => [...prev, { 
+          id: assistantMsgId, 
+          conversationId: convId!, 
+          role: "assistant", 
+          content: "", 
+          createdAt: new Date() 
+        }]);
+
+        while (reader) {
+          const { done, value } = await reader.read();
+          if (done) break;
+
+          const chunk = decoder.decode(value);
+          const lines = chunk.split("\n");
+
+          for (const line of lines) {
+            if (line.startsWith("data: ")) {
+              const data = line.slice(6).trim();
+              if (data === "[DONE]") continue;
+              
+              try {
+                const { token } = JSON.parse(data);
+                if (token) {
+                  fullText += token;
+                  sentenceBuffer += token;
+
+                  // Atualizar UI em tempo real
+                  setMessages(prev => prev.map(m => 
+                    m.id === assistantMsgId ? { ...m, content: fullText } : m
+                  ));
+
+                  // Se detectou fim de frase, fala agora!
+                  if (/[.!?\n]/.test(token) && sentenceBuffer.length > 20) {
+                    speak(sentenceBuffer, true);
+                    sentenceBuffer = "";
+                  }
+                }
+              } catch (e) {}
+            }
+          }
+        }
+        
+        // Fala o que sobrou
+        if (sentenceBuffer.trim()) speak(sentenceBuffer, true);
+        
+        setIsLoading(false);
+        queryClient.invalidateQueries({ queryKey: ["conversations", "list"] });
+      } catch (err) {
+        console.error("Streaming error:", err);
+        setIsLoading(false);
+        chatMutation.mutate({ conversationId: convId, content: content.trim(), useAdvancedReasoning });
+      }
+    } else {
+      // MODO NORMAL (tRPC)
+      chatMutation.mutate({ conversationId: convId, content: content.trim(), useAdvancedReasoning });
+    }
   };
 
   const handleFileChange = (event: React.ChangeEvent<HTMLInputElement>) => {
