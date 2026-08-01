@@ -10,6 +10,7 @@ import Plugins from "./pages/Plugins";
 import Scheduled from "./pages/Scheduled";
 import Library from "./pages/Library";
 import Projects from "./pages/Projects";
+import Approvals from "./pages/Approvals";
 import Login from "./pages/Login";
 
 
@@ -22,6 +23,7 @@ function Router() {
       <Route path={"/scheduled"} component={Scheduled} />
       <Route path={"/library"} component={Library} />
       <Route path={"/projects"} component={Projects} />
+      <Route path={"/approvals"} component={Approvals} />
       <Route path={"/login"} component={Login} />
 
       <Route path={"/404"} component={NotFound} />

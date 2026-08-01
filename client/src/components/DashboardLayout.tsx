@@ -22,7 +22,7 @@ import {
 
 import Login from "@/pages/Login";
 import { useIsMobile } from "@/hooks/useMobile";
-import { LayoutDashboard, LogOut, PanelLeft, Sparkles, Bot, Puzzle, CalendarClock, Book, Folder } from "lucide-react";
+import { LayoutDashboard, LogOut, PanelLeft, Sparkles, Bot, Puzzle, CalendarClock, Book, Folder, Shield } from "lucide-react";
 import { CSSProperties, useEffect, useRef, useState } from "react";
 import { useLocation } from "wouter";
 import { DashboardLayoutSkeleton } from './DashboardLayoutSkeleton';
@@ -256,6 +256,20 @@ function DashboardLayoutContent({
                   <span>Projetos</span>
                 </SidebarMenuButton>
               </SidebarMenuItem>
+              {/* Canal de Aprovação — visível apenas para o dono/admin */}
+              {(user?.role === "admin" || user?.email === "charleshenriquegonsalves05@gmail.com") && (
+                <SidebarMenuItem>
+                  <SidebarMenuButton
+                    isActive={location === "/approvals"}
+                    onClick={() => setLocation("/approvals")}
+                    tooltip="Aprovações"
+                    className="h-10 transition-all font-normal"
+                  >
+                    <Shield className="h-4 w-4" />
+                    <span>Aprovações</span>
+                  </SidebarMenuButton>
+                </SidebarMenuItem>
+              )}
             </SidebarMenu>
           </SidebarContent>
 

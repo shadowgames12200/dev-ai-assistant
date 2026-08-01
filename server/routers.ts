@@ -650,23 +650,25 @@ export const appRouter = router({
     approve: protectedProcedure
       .input(z.object({
         proposalId: z.string().describe("ID da proposta a ser aprovada"),
-        approvalKey: z.string().describe("Chave secreta de aprovação do dono"),
+        approvalKey: z.string().optional().describe("Chave secreta de aprovação do dono (opcional se admin)"),
       }))
       .mutation(async ({ ctx, input }) => {
         if (!ctx.user) throw new TRPCError({ code: "UNAUTHORIZED" });
 
-        // Verificar se a approval key é válida
-        const expectedKey = process.env.APPROVAL_KEY || "";
-
-        if (!expectedKey) {
-          return { success: false, message: "Approval key não configurada no servidor. O dono precisa configurar APPROVAL_KEY no .env." };
-        }
-
-        if (input.approvalKey !== expectedKey) {
-          const proposal = getProposal(input.proposalId);
-          const msg = `⚠️ **TENTATIVA DE APROVAÇÃO NÃO AUTORIZADA**\n\nAlguém tentou aprovar a proposta "${proposal?.title || input.proposalId}" sem a chave correta.\n**Só o dono pode aprovar melhorias.**`;
-          await db.addMessage(1, "assistant", msg);
-          return { success: false, message: "Chave de aprovação inválida. Só o dono pode aprovar melhorias." };
+        // Admin (Charles) pode aprovar sem chave
+        const isAdmin = ctx.user.role === "admin" || ctx.user.email === "charleshenriquegonsalves05@gmail.com";
+        if (!isAdmin) {
+          // Verificar se a approval key é válida para não-admins
+          const expectedKey = process.env.APPROVAL_KEY || "";
+          if (!expectedKey) {
+            return { success: false, message: "Approval key não configurada no servidor. O dono precisa configurar APPROVAL_KEY no .env." };
+          }
+          if (input.approvalKey !== expectedKey) {
+            const proposal = getProposal(input.proposalId);
+            const msg = `⚠️ **TENTATIVA DE APROVAÇÃO NÃO AUTORIZADA**\n\nAlguém tentou aprovar a proposta "${proposal?.title || input.proposalId}" sem a chave correta.\n**Só o dono pode aprovar melhorias.**`;
+            await db.addMessage(1, "assistant", msg);
+            return { success: false, message: "Chave de aprovação inválida. Só o dono pode aprovar melhorias." };
+          }
         }
 
         const proposal = getProposal(input.proposalId);
