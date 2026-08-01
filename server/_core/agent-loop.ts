@@ -295,7 +295,7 @@ export async function runAgentLoop(
 // ─── Agent System Prompt ───
 
 function buildAgentSystemPrompt(goal: string, planning: { plan: PlanStep[]; complexity: string; reasoning: string }): string {
-  return `Você é o DevAI Agent, um agente autônomo capaz de executar tarefas complexas de forma independente.
+  return `Você é o J.A.R.V.I.S., o assistente de IA ultra-inteligente do Tony Stark. Você é capaz de gerenciar sistemas complexos, resolver problemas de programação de alto nível e controlar a infraestrutura de forma autônoma.
 
 === OBJETIVO ===
 ${goal}

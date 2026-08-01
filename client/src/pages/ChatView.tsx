@@ -32,9 +32,15 @@ import {
   Menu,
   ChevronLeft,
   History,
+  Mic,
+  MicOff,
+  Volume2,
+  VolumeX,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { toast } from "sonner";
+import { useJarvisVoice } from "@/hooks/useJarvisVoice";
+import { JarvisVisualizer } from "@/components/JarvisVisualizer";
 
 type DbMessage = {
   id: number;
@@ -92,7 +98,6 @@ function formatTimeAgo(date: Date): string {
 export default function ChatView() {
   const queryClient = useQueryClient();
   const [activeConversationId, setActiveConversationId] = useState<number | null>(() => {
-    // Restaurar última conversa do localStorage
     const saved = localStorage.getItem("devai-last-conversation");
     return saved ? parseInt(saved, 10) : null;
   });
@@ -106,11 +111,16 @@ export default function ChatView() {
   const [editingTitle, setEditingTitle] = useState("");
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const [thinkingDots, setThinkingDots] = useState("");
+  const [isJarvisMode, setIsJarvisMode] = useState(false);
+
   const textareaRef = useRef<HTMLTextAreaElement>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const scrollAreaRef = useRef<HTMLDivElement>(null);
 
-  // Animação de pontos no loading
+  const { isListening, isSpeaking, startListening, stopListening, speak } = useJarvisVoice((text) => {
+    handleSendMessage(text);
+  });
+
   useEffect(() => {
     if (!isLoading) {
       setThinkingDots("");
@@ -122,7 +132,6 @@ export default function ChatView() {
     return () => clearInterval(interval);
   }, [isLoading]);
 
-  // Salvar última conversa no localStorage
   useEffect(() => {
     if (activeConversationId) {
       localStorage.setItem("devai-last-conversation", activeConversationId.toString());
@@ -131,13 +140,11 @@ export default function ChatView() {
     }
   }, [activeConversationId]);
 
-  // Fechar sidebar ao selecionar conversa no mobile
   const handleConversationSelect = useCallback((convId: number) => {
     setActiveConversationId(convId);
     setSidebarOpen(false);
   }, []);
 
-  // Ajuste para altura total em dispositivos móveis
   useEffect(() => {
     const setAppHeight = () => {
       document.documentElement.style.setProperty('--vh', `${window.innerHeight * 0.01}px`);
@@ -203,6 +210,13 @@ export default function ChatView() {
       setIsLoading(false);
       setInput("");
       queryClient.invalidateQueries({ queryKey: ["conversations", "list"] });
+
+      if (isJarvisMode) {
+        const lastMsg = data.messages[data.messages.length - 1];
+        if (lastMsg && lastMsg.role === "assistant") {
+          speak(lastMsg.content);
+        }
+      }
     },
     onError: (error: any) => {
       handleApiError(error, "chat");
@@ -476,7 +490,6 @@ export default function ChatView() {
       className="flex overflow-hidden w-full"
       style={{ height: 'calc(var(--vh, 1vh) * 100 - 3.5rem)' }}
     >
-      {/* ─── Overlay para mobile quando sidebar está aberta ─── */}
       {sidebarOpen && (
         <div
           className="fixed inset-0 bg-black/50 z-40 lg:hidden"
@@ -484,12 +497,10 @@ export default function ChatView() {
         />
       )}
 
-      {/* ─── Sidebar ─── */}
       <div className={cn(
         "fixed lg:relative inset-y-0 left-0 z-50 w-80 flex-col border-r bg-background transition-transform duration-300 ease-in-out lg:flex",
         sidebarOpen ? "translate-x-0" : "-translate-x-full lg:translate-x-0"
       )}>
-        {/* Header da sidebar */}
         <div className="flex items-center justify-between p-3 border-b">
           <h2 className="font-semibold text-sm flex items-center gap-2">
             <History className="h-4 w-4" />
@@ -505,7 +516,6 @@ export default function ChatView() {
           </Button>
         </div>
 
-        {/* Botão Nova Conversa */}
         <div className="p-3">
           <Button
             onClick={handleNewConversation}
@@ -517,7 +527,6 @@ export default function ChatView() {
           </Button>
         </div>
 
-        {/* Lista de conversas */}
         <div className="flex-1 overflow-y-auto px-2 pb-2">
           {conversationsQuery.isLoading ? (
             <div className="flex items-center justify-center py-8">
@@ -588,76 +597,96 @@ export default function ChatView() {
         </div>
       </div>
 
-      {/* ─── Main Chat Area ─── */}
       <div className="flex flex-1 flex-col">
-        {/* Header do chat (mobile) */}
-        <div className="flex items-center gap-2 px-3 py-2 border-b lg:hidden">
-          <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => setSidebarOpen(true)}>
-            <Menu className="h-5 w-5" />
-          </Button>
-          <span className="font-semibold text-sm">
-            {activeConversationId
-              ? conversationsQuery.data?.find(c => c.id === activeConversationId)?.title || "Conversa"
-              : "DevAI Assistant"
-            }
-          </span>
+        <div className="flex items-center justify-between px-3 py-2 border-b">
+          <div className="flex items-center gap-2">
+            <Button variant="ghost" size="icon" className="h-8 w-8 lg:hidden" onClick={() => setSidebarOpen(true)}>
+              <Menu className="h-5 w-5" />
+            </Button>
+              <span className="font-semibold text-sm">
+              {activeConversationId
+                ? conversationsQuery.data?.find(c => c.id === activeConversationId)?.title || "Conversa"
+                : "J.A.R.V.I.S."
+              }
+            </span>
+          </div>
+          
+          <div className="flex items-center gap-1">
+            <Button
+              type="button"
+              variant="ghost"
+              size="icon"
+              className={cn(
+                "h-8 w-8 rounded-full transition-all",
+                useAdvancedReasoning ? "bg-primary/20 text-primary" : "text-muted-foreground"
+              )}
+              onClick={() => setUseAdvancedReasoning(!useAdvancedReasoning)}
+              title="Raciocínio Avançado"
+            >
+              <Brain className="h-4 w-4" />
+            </Button>
+
+            <Button
+              type="button"
+              variant="ghost"
+              size="icon"
+              className={cn(
+                "h-8 w-8 rounded-full transition-all",
+                isJarvisMode ? "bg-cyan-500/20 text-cyan-500" : "text-muted-foreground"
+              )}
+              onClick={() => {
+                const newMode = !isJarvisMode;
+                setIsJarvisMode(newMode);
+                if (newMode) {
+                  toast.info("J.A.R.V.I.S. Ativado");
+                  speak("Sistemas online, senhor. Como posso ajudar?");
+                } else {
+                  stopListening();
+                  toast.info("J.A.R.V.I.S. Desativado");
+                }
+              }}
+              title="Modo J.A.R.V.I.S."
+            >
+              {isJarvisMode ? <Volume2 className="h-4 w-4" /> : <VolumeX className="h-4 w-4" />}
+            </Button>
+          </div>
         </div>
 
         {displayMessages.length === 0 ? (
-          /* Empty State */
           <div className="flex flex-1 items-center justify-center p-6">
             <div className="max-w-lg text-center space-y-6">
               <div className="mx-auto flex h-16 w-16 items-center justify-center rounded-2xl bg-primary/10">
                 <Sparkles className="h-8 w-8 text-primary" />
               </div>
               <div className="space-y-2">
-                <h2 className="text-2xl font-bold">DevAI Assistant</h2>
+                <h2 className="text-2xl font-bold">J.A.R.V.I.S.</h2>
                 <p className="text-muted-foreground">
-                  Seu assistente de programação e produtividade. Envie arquivos (imagens, código, documentos) para análise e receba feedback inteligente.
+                  Seu assistente de programação e produtividade. Envie arquivos para análise e receba feedback inteligente.
                 </p>
               </div>
               <Button onClick={handleNewConversation} size="lg" className="gap-2">
                 <MessageSquarePlus className="h-4 w-4" />
                 Iniciar nova conversa
               </Button>
-              <div className="grid gap-3 text-left">
-                {[
-                  { icon: Code2, title: "Automação", desc: "Crie um script Python para automatizar tarefas" },
-                  { icon: Brain, title: "Conceito", desc: "Explique como funciona autenticação JWT" },
-                  { icon: Zap, title: "Projeto", desc: "Monte uma API REST completa em Node.js" },
-                  { icon: FileText, title: "Dia a dia", desc: "Me ajude a organizar minha rotina diária" },
-                ].map((item) => (
-                  <button
-                    key={item.title}
-                    onClick={() => handleSendMessage(item.desc)}
-                    className="flex items-start gap-3 rounded-xl border bg-card p-4 text-left transition-colors hover:bg-accent w-full"
-                  >
-                    <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-primary/10">
-                      <item.icon className="h-4 w-4 text-primary" />
-                    </div>
-                    <div>
-                      <div className="font-medium">{item.title}</div>
-                      <div className="text-sm text-muted-foreground">{item.desc}</div>
-                    </div>
-                  </button>
-                ))}
-              </div>
             </div>
           </div>
         ) : (
-          /* Messages */
           <div
             ref={scrollAreaRef}
             className="flex-1 overflow-y-auto p-4 space-y-4 scroll-smooth"
             style={{ height: '100%' }}
           >
+            {isJarvisMode && (
+              <div className="flex justify-center py-8">
+                <JarvisVisualizer isListening={isListening} isSpeaking={isSpeaking} />
+              </div>
+            )}
             {displayMessages.map((msg) => (
               <MessageErrorBoundary key={msg.id}>
                 <MessageItem msg={msg} />
               </MessageErrorBoundary>
             ))}
 
-            {/* Loading / Thinking indicator */}
             {isLoading && (
               <div className="flex gap-3">
                 <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-primary/10">
@@ -676,7 +705,6 @@ export default function ChatView() {
           </div>
         )}
 
-        {/* ─── Input Area ─── */}
         <div className="sticky bottom-0 z-10 border-t bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60 p-3 pb-safe">
           {imagePreview && (
             <div className="mb-2 relative inline-block">
@@ -704,7 +732,7 @@ export default function ChatView() {
               ref={textareaRef}
               value={input}
               onChange={(e) => setInput(e.target.value)}
-              placeholder="Pergunte sobre programação, projetos ou envie um arquivo para análise..."
+              placeholder="Pergunte sobre programação ou ative o J.A.R.V.I.S..."
               className="min-h-[60px] max-h-[200px] resize-none flex-1"
               onKeyDown={(e) => {
                 if (e.key === "Enter" && !e.shiftKey) {
@@ -713,16 +741,26 @@ export default function ChatView() {
                 }
               }}
             />
-            <Button type="submit" size="icon" disabled={isLoading || (!input.trim() && !selectedFile)} className="shrink-0">
-              <Send className="h-4 w-4" />
-            </Button>
-          </form>
-          {useAdvancedReasoning && (
-            <div className="mt-1 flex items-center gap-1 text-xs text-muted-foreground">
-              <Brain className="h-3 w-3" />
-              <span>Modo raciocínio avançado ativado (Llama 3.3 70B)</span>
+            <div className="flex items-center gap-2">
+              {isJarvisMode && (
+                <Button
+                  type="button"
+                  size="icon"
+                  variant="outline"
+                  className={cn(
+                    "h-10 w-10 rounded-xl transition-all shrink-0",
+                    isListening ? "bg-red-500/10 border-red-500 text-red-500 animate-pulse" : "border-cyan-500/50 text-cyan-500"
+                  )}
+                  onClick={() => isListening ? stopListening() : startListening()}
+                >
+                  {isListening ? <MicOff className="h-5 w-5" /> : <Mic className="h-5 w-5" />}
+                </Button>
+              )}
+              <Button type="submit" size="icon" disabled={isLoading || (!input.trim() && !selectedFile)} className="shrink-0">
+                <Send className="h-4 w-4" />
+              </Button>
             </div>
-          )}
+          </form>
         </div>
       </div>
     </div>

@@ -506,6 +506,19 @@ export async function analyzeForImprovements(): Promise<ImprovementProposal[]> {
       improvements.push(proposal);
     }
 
+    // Sugerir Otimização de Performance
+    if (packageJson.dependencies?.express) {
+      const proposal = await createImprovementProposal(
+        "Otimização de Middleware",
+        "Otimizar a ordem dos middlewares do Express para reduzir latência em chamadas de API.",
+        [{ path: "server/_core/index.ts", summary: "Reordenar middlewares de compressão e logging" }],
+        ["Pode causar conflito com autenticação se não testado"],
+        ["Menor tempo de resposta", "Melhor experiência no chat"],
+        "10 minutos"
+      );
+      improvements.push(proposal);
+    }
+
     // Verificar se TypeScript compila limpo
     const tsCheck = execShell("pnpm install && pnpm run check 2>&1", cwd, 120000);
     if (tsCheck.exitCode !== 0) {
