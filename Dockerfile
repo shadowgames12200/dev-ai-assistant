@@ -22,6 +22,7 @@ COPY . .
 RUN pnpm run build
 
 # Northflank e outras plataformas de deploy usam porta 8080 por padrão
+ENV NODE_ENV=production
 ENV PORT=8080
 EXPOSE 8080
 
