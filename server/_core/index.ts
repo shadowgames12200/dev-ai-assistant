@@ -2,12 +2,13 @@ import express from "express";
 import { createExpressMiddleware } from "@trpc/server/adapters/express";
 import { appRouter } from "../routers.js";
 import { createContext } from "./context.js";
-import { registerStorageProxy } from "./storage.js";
+import { registerStorageProxy } from "./storageProxy.js";
 import { registerOAuthRoutes } from "./oauth.js";
-import { registerLocalAuthRoutes } from "./auth.js";
+import { registerLocalAuthRoutes } from "../routes/localAuth.js";
 import { serveStatic, setupVite } from "./vite.js";
 import { ENV } from "./env.js";
 import * as db from "../db.js";
+import type { Server } from "http";
 
 async function startServer() {
   const app = express();
@@ -36,7 +37,8 @@ async function startServer() {
 
     try {
       const { invokeGroq } = await import("./groq.js");
-      const { buildSmartContext, buildMemoryContext } = await import("../routers.js");
+      const { buildSmartContext } = await import("./memory.js");
+      const { buildMemoryContext } = await import("./semantic-memory.js");
       
       // Buscar histórico para contexto
       const history = await db.getConversationMessages(conversationId);
@@ -52,7 +54,7 @@ async function startServer() {
       }
 
       const stream = await invokeGroq({
-        messages,
+        messages: messages.map(m => ({ role: m.role, content: typeof m.content === "string" ? m.content : "" })),
         stream: true,
         temperature: 0.5,
         model: "llama-3.3-70b-versatile"
@@ -109,10 +111,12 @@ async function startServer() {
   if (process.env.NODE_ENV === "production") {
     serveStatic(app);
   } else {
-    await setupVite(app);
+    const server: Server = app.listen(0, "0.0.0.0", () => {});
+    server.close();
+    await setupVite(app, server);
   }
 
-  const port = ENV.port || 3000;
+  const port = parseInt(process.env.PORT || "3000", 10);
   app.listen(port, "0.0.0.0", () => {
     console.log(`Server running on port ${port}`);
   });

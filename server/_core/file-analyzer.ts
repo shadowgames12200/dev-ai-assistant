@@ -431,5 +431,5 @@ function extractStrings(buffer: Buffer, minLength: number = 6, maxLength: number
     }
   }
 
-  return [...new Set(strings)].slice(0, 50);
+  return Array.from(new Set(strings)).slice(0, 50);
 }

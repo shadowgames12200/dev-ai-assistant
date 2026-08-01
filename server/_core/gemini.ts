@@ -132,7 +132,7 @@ export async function invokeGemini(params: GeminiGenerateParamsWithStream): Prom
 
   if (stream) {
     payload.generationConfig = {
-      ...payload.generationConfig,
+      ...(payload.generationConfig as Record<string, unknown>),
       temperature,
     };
     payload.model = model;

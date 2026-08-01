@@ -166,7 +166,7 @@ export async function createConversation(userId: number, title: string) {
 export async function getUserConversations(userId: number) {
   const db = await getDb();
   if (!db) {
-    const memConvs = [...memoryConversations.values()]
+    const memConvs = Array.from(memoryConversations.values())
       .filter(c => c.userId === userId)
       .sort((a, b) => new Date(b.updatedAt).getTime() - new Date(a.updatedAt).getTime());
     return memConvs;

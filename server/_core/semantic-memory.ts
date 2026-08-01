@@ -197,7 +197,7 @@ Responda apenas com uma lista de fatos curtos e diretos, um por linha. Se não h
     const result = response.choices[0]?.message?.content || "";
     if (result.includes("NADA")) return;
 
-    const facts = result.split("\n").filter(f => f.trim().length > 10);
+    const facts = result.split("\n").filter((f: string) => f.trim().length > 10);
 
     for (const fact of facts) {
       await saveMemory({

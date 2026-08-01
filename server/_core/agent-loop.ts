@@ -12,7 +12,7 @@
  * Inspirado no loop de agente do Manus AI.
  */
 
-import { invokeGroq, type GroqMessage, type GroqInvokeParams, type GroqResponse } from "./groq.js";
+import { invokeGroq, invokeGroqNonStream, type GroqMessage, type GroqInvokeParams, type GroqResponse } from "./groq.js";
 import { invokeLLMWithFallback, type GeminiContent, invokeGemini, extractTextFromGeminiResponse, convertToGeminiContents } from "./gemini.js";
 import { tools, toolHandlers } from "./tools.js";
 import {
@@ -132,7 +132,7 @@ export async function runAgentLoop(
       // Build request payload using Groq types
       const requestPayload: GroqInvokeParams & { tools?: any[]; tool_choice?: any; temperature?: number; max_tokens?: number } = {
         model: cfg.model,
-        messages: conversationHistory,
+        messages: conversationHistory as any,
         temperature: cfg.temperature,
         maxTokens: cfg.maxTokens,
       };
@@ -147,11 +147,11 @@ export async function runAgentLoop(
       let response: GroqResponse | null = null;
       let geminiFallbackUsed = false;
       try {
-        response = await invokeGroq(requestPayload);
+        response = await invokeGroqNonStream(requestPayload);
       } catch (groqErr) {
         console.warn("[Agent] Groq failed, trying Gemini fallback...", (groqErr as Error).message);
         try {
-          const geminiContents = convertToGeminiContents(requestPayload.messages);
+          const geminiContents = convertToGeminiContents(requestPayload.messages as any);
           const geminiResponse = await invokeGemini({
             contents: geminiContents,
             model: "gemini-2.0-flash",
@@ -177,7 +177,7 @@ export async function runAgentLoop(
       }
       const responseTime = Date.now() - planningCallStart;
 
-      const message = response.choices[0]?.message as ExtendedGroqMessage;
+      const message = response?.choices[0]?.message as ExtendedGroqMessage;
       if (!message) {
         iterations.push({
           iteration,
@@ -285,15 +285,15 @@ export async function runAgentLoop(
     // If we exhausted iterations, generate a final summary
     let finalResponse: GroqResponse | null = null;
     try {
-      finalResponse = await invokeGroq({
+      finalResponse = await invokeGroqNonStream({
         model: cfg.model,
-        messages: conversationHistory,
+        messages: conversationHistory as any,
         maxTokens: cfg.maxTokens,
       });
     } catch (groqErr) {
       console.warn("[Agent] Final summary Groq failed, trying Gemini fallback...");
       try {
-        const geminiContents = convertToGeminiContents(conversationHistory);
+        const geminiContents = convertToGeminiContents(conversationHistory as any);
         const geminiResponse = await invokeGemini({
           contents: geminiContents,
           model: "gemini-2.0-flash",
@@ -315,7 +315,7 @@ export async function runAgentLoop(
       }
     }
 
-    const finalContent = finalResponse.choices[0]?.message?.content || "Não foi possível completar a tarefa no tempo limite.";
+    const finalContent = finalResponse?.choices[0]?.message?.content || "Não foi possível completar a tarefa no tempo limite.";
 
     iterations.push({
       iteration: iterations.length + 1,
@@ -399,7 +399,7 @@ export async function enhancedChat(
   for (let i = 0; i < cfg.maxIterations; i++) {
     const requestPayload: GroqInvokeParams & { tools?: any[]; tool_choice?: any; temperature?: number; max_tokens?: number } = {
       model: cfg.model,
-      messages: conversationHistory,
+      messages: conversationHistory as any,
       temperature: cfg.temperature,
       maxTokens: cfg.maxTokens,
     };
@@ -411,11 +411,11 @@ export async function enhancedChat(
 
     let response: GroqResponse | null = null;
     try {
-      response = await invokeGroq(requestPayload);
+      response = await invokeGroqNonStream(requestPayload);
     } catch (groqErr) {
       console.warn("[Chat] Groq failed, trying Gemini fallback...");
       try {
-        const geminiContents = convertToGeminiContents(requestPayload.messages);
+        const geminiContents = convertToGeminiContents(requestPayload.messages as any);
         const geminiResponse = await invokeGemini({
           contents: geminiContents,
           model: "gemini-2.0-flash",
@@ -437,7 +437,7 @@ export async function enhancedChat(
         throw new Error(`Groq: ${(groqErr as Error).message} | Gemini: ${(geminiErr as Error).message}`);
       }
     }
-    const message = response.choices[0]?.message as ExtendedGroqMessage;
+    const message = response?.choices[0]?.message as ExtendedGroqMessage;
 
     if (!message) break;
 
@@ -494,16 +494,16 @@ export async function enhancedChat(
   // Fallback: generate final response without tools
   let finalResponse: GroqResponse | null = null;
   try {
-    finalResponse = await invokeGroq({
+    finalResponse = await invokeGroqNonStream({
       model: cfg.model,
-      messages: conversationHistory,
+      messages: conversationHistory as any,
       maxTokens: cfg.maxTokens,
       temperature: 0.3,
     });
   } catch (groqErr) {
     console.warn("[Chat] Final response Groq failed, trying Gemini fallback...");
     try {
-      const geminiContents = convertToGeminiContents(conversationHistory);
+      const geminiContents = convertToGeminiContents(conversationHistory as any);
       const geminiResponse = await invokeGemini({
         contents: geminiContents,
         model: "gemini-2.0-flash",
@@ -526,7 +526,7 @@ export async function enhancedChat(
     }
   }
 
-  const finalContent = finalResponse.choices[0]?.message?.content || "";
+  const finalContent = finalResponse?.choices[0]?.message?.content || "";
 
   return {
     content: finalContent || "Não consegui completar a tarefa.",

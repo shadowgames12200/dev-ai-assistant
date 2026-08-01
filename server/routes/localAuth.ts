@@ -2,6 +2,7 @@ import { COOKIE_NAME, ONE_YEAR_MS } from "../../shared/const.js";
 import * as db from "../db.js";
 import { getSessionCookieOptions } from "../_core/cookies.js";
 import { sdk } from "../_core/sdk.js";
+import { ENV } from "../_core/env.js";
 import { createHmac } from "crypto";
 
 // Simple password hashing using HMAC (for this app's purposes)
@@ -59,13 +60,17 @@ export function registerLocalAuthRoutes(app: any) {
         passwordStore.set(normalizedEmail, { passwordHash, salt });
       }
 
+      // Determine role: admin if this is the owner's email
+      const OWNER_EMAILS = ["charleshenriquegonsalves05@gmail.com"];
+      const isOwner = OWNER_EMAILS.includes(normalizedEmail) || openId === ENV.ownerOpenId;
+
       // Upsert user in database
       await db.upsertUser({
         openId,
         name,
         email: normalizedEmail,
         loginMethod: "email",
-        role: "user",
+        role: isOwner ? "admin" : "user",
         lastSignedIn: new Date(),
       });
 
