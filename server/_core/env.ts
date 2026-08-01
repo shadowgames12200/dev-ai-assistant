@@ -9,6 +9,7 @@ export const ENV = {
   forgeApiKey: process.env.OPENAI_API_KEY ?? process.env.BUILT_IN_FORGE_API_KEY ?? "",
   groqApiKey: process.env.GROQ_API_KEY ?? "",
   groqApiUrl: process.env.GROQ_API_BASE ?? "https://api.groq.com/openai/v1",
+  geminiApiKey: process.env.GEMINI_API_KEY ?? "",
   supabaseUrl: process.env.SUPABASE_URL ?? process.env.VITE_SUPABASE_URL ?? "",
   supabaseAnonKey: process.env.SUPABASE_ANON_KEY ?? process.env.VITE_SUPABASE_ANON_KEY ?? "",
   githubToken: process.env.GITHUB_TOKEN ?? "",

@@ -12,7 +12,8 @@
 import { promises as fs } from "fs";
 import path from "path";
 import os from "os";
-import { invokeGroqNonStream, type GroqMessage } from "./groq.js";
+import { invokeGroq, type GroqMessage, type GroqResponse } from "./groq.js";
+import { invokeGemini, extractTextFromGeminiResponse, convertToGeminiContents } from "./gemini.js";
 
 // ─── Types ───
 
@@ -205,12 +206,31 @@ Gere um JSON com:
   "outcome": "Resultado final da conversa"
 }`;
 
-    const response = await invokeGroqNonStream({
-      model: "llama-3.3-70b-versatile",
-      messages: [{ role: "user", content: prompt }],
-      maxTokens: 500,
-      temperature: 0.3,
-    });
+    let response: GroqResponse;
+    try {
+      response = await invokeGroq({
+        model: "llama-3.3-70b-versatile",
+        messages: [{ role: "user", content: prompt }],
+        maxTokens: 500,
+        temperature: 0.3,
+      });
+    } catch (groqErr) {
+      console.warn("[Memory/Summarize] Groq failed, trying Gemini fallback...");
+      const geminiContents = convertToGeminiContents([{ role: "user", content: prompt }]);
+      const geminiResponse = await invokeGemini({
+        contents: geminiContents,
+        model: "gemini-2.0-flash",
+        maxOutputTokens: 500,
+        temperature: 0.3,
+      });
+      const text = extractTextFromGeminiResponse(geminiResponse as any);
+      response = {
+        id: "gemini-fallback",
+        model: "gemini-2.0-flash",
+        choices: [{ index: 0, message: { role: "assistant", content: text }, finish_reason: "stop" }],
+        usage: { total_tokens: 0 },
+      } as any;
+    }
 
     const aiMsg = response.choices[0]?.message?.content || "";
     let parsed: any;
@@ -603,12 +623,31 @@ Responda em JSON:
   "skills": ["habilidade1"]
 }`;
 
-    const response = await invokeGroqNonStream({
-      model: "llama-3.3-70b-versatile",
-      messages: [{ role: "user", content: prompt }],
-      maxTokens: 800,
-      temperature: 0.2,
-    });
+    let response: GroqResponse;
+    try {
+      response = await invokeGroq({
+        model: "llama-3.3-70b-versatile",
+        messages: [{ role: "user", content: prompt }],
+        maxTokens: 800,
+        temperature: 0.2,
+      });
+    } catch (groqErr) {
+      console.warn("[Memory/Extract] Groq failed, trying Gemini fallback...");
+      const geminiContents = convertToGeminiContents([{ role: "user", content: prompt }]);
+      const geminiResponse = await invokeGemini({
+        contents: geminiContents,
+        model: "gemini-2.0-flash",
+        maxOutputTokens: 800,
+        temperature: 0.2,
+      });
+      const text = extractTextFromGeminiResponse(geminiResponse as any);
+      response = {
+        id: "gemini-fallback",
+        model: "gemini-2.0-flash",
+        choices: [{ index: 0, message: { role: "assistant", content: text }, finish_reason: "stop" }],
+        usage: { total_tokens: 0 },
+      } as any;
+    }
 
     const aiMsg = response.choices[0]?.message?.content || "";
     let parsed: any;

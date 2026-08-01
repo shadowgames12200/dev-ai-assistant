@@ -12,7 +12,8 @@
  * Inspirado no loop de agente do Manus AI.
  */
 
-import { invokeGroq, invokeGroqNonStream, type GroqMessage, type GroqInvokeParams, type GroqResponse } from "./groq.js";
+import { invokeGroq, type GroqMessage, type GroqInvokeParams, type GroqResponse } from "./groq.js";
+import { invokeLLMWithFallback, type GeminiContent, invokeGemini, extractTextFromGeminiResponse, convertToGeminiContents } from "./gemini.js";
 import { tools, toolHandlers } from "./tools.js";
 import {
   createTask,
@@ -143,7 +144,37 @@ export async function runAgentLoop(
       }
 
       const planningCallStart = Date.now();
-      const response = await invokeGroqNonStream(requestPayload);
+      let response: GroqResponse | null = null;
+      let geminiFallbackUsed = false;
+      try {
+        response = await invokeGroq(requestPayload);
+      } catch (groqErr) {
+        console.warn("[Agent] Groq failed, trying Gemini fallback...", (groqErr as Error).message);
+        try {
+          const geminiContents = convertToGeminiContents(requestPayload.messages);
+          const geminiResponse = await invokeGemini({
+            contents: geminiContents,
+            model: "gemini-2.0-flash",
+            temperature: requestPayload.temperature,
+            maxOutputTokens: requestPayload.maxTokens,
+          });
+          const text = extractTextFromGeminiResponse(geminiResponse as any);
+          // Wrap Gemini response in Groq-like format for compatibility
+          response = {
+            id: "gemini-fallback",
+            model: "gemini-2.0-flash",
+            choices: [{
+              index: 0,
+              message: { role: "assistant", content: text },
+              finish_reason: "stop",
+            }],
+            usage: { total_tokens: 0 },
+          } as any;
+          geminiFallbackUsed = true;
+        } catch (geminiErr) {
+          throw new Error(`Groq: ${(groqErr as Error).message} | Gemini: ${(geminiErr as Error).message}`);
+        }
+      }
       const responseTime = Date.now() - planningCallStart;
 
       const message = response.choices[0]?.message as ExtendedGroqMessage;
@@ -252,11 +283,37 @@ export async function runAgentLoop(
     }
 
     // If we exhausted iterations, generate a final summary
-    const finalResponse = await invokeGroqNonStream({
-      model: cfg.model,
-      messages: conversationHistory,
-      maxTokens: cfg.maxTokens,
-    });
+    let finalResponse: GroqResponse | null = null;
+    try {
+      finalResponse = await invokeGroq({
+        model: cfg.model,
+        messages: conversationHistory,
+        maxTokens: cfg.maxTokens,
+      });
+    } catch (groqErr) {
+      console.warn("[Agent] Final summary Groq failed, trying Gemini fallback...");
+      try {
+        const geminiContents = convertToGeminiContents(conversationHistory);
+        const geminiResponse = await invokeGemini({
+          contents: geminiContents,
+          model: "gemini-2.0-flash",
+          maxOutputTokens: cfg.maxTokens,
+        });
+        const text = extractTextFromGeminiResponse(geminiResponse as any);
+        finalResponse = {
+          id: "gemini-fallback",
+          model: "gemini-2.0-flash",
+          choices: [{
+            index: 0,
+            message: { role: "assistant", content: text },
+            finish_reason: "stop",
+          }],
+          usage: { total_tokens: 0 },
+        } as any;
+      } catch (geminiErr) {
+        throw new Error(`Groq: ${(groqErr as Error).message} | Gemini: ${(geminiErr as Error).message}`);
+      }
+    }
 
     const finalContent = finalResponse.choices[0]?.message?.content || "Não foi possível completar a tarefa no tempo limite.";
 
@@ -295,7 +352,7 @@ export async function runAgentLoop(
 // ─── Agent System Prompt ───
 
 function buildAgentSystemPrompt(goal: string, planning: { plan: PlanStep[]; complexity: string; reasoning: string }): string {
-  return `Você é o J.A.R.V.I.S., o assistente de IA ultra-inteligente do Tony Stark. Você é capaz de gerenciar sistemas complexos, resolver problemas de programação de alto nível e controlar a infraestrutura de forma autônoma.
+  return `Você é o DevAI Agent, um agente autônomo capaz de executar tarefas complexas de forma independente.
 
 === OBJETIVO ===
 ${goal}
@@ -352,7 +409,34 @@ export async function enhancedChat(
       requestPayload.tool_choice = "auto";
     }
 
-    const response = await invokeGroqNonStream(requestPayload);
+    let response: GroqResponse | null = null;
+    try {
+      response = await invokeGroq(requestPayload);
+    } catch (groqErr) {
+      console.warn("[Chat] Groq failed, trying Gemini fallback...");
+      try {
+        const geminiContents = convertToGeminiContents(requestPayload.messages);
+        const geminiResponse = await invokeGemini({
+          contents: geminiContents,
+          model: "gemini-2.0-flash",
+          temperature: requestPayload.temperature,
+          maxOutputTokens: requestPayload.maxTokens,
+        });
+        const text = extractTextFromGeminiResponse(geminiResponse as any);
+        response = {
+          id: "gemini-fallback",
+          model: "gemini-2.0-flash",
+          choices: [{
+            index: 0,
+            message: { role: "assistant", content: text },
+            finish_reason: "stop",
+          }],
+          usage: { total_tokens: 0 },
+        } as any;
+      } catch (geminiErr) {
+        throw new Error(`Groq: ${(groqErr as Error).message} | Gemini: ${(geminiErr as Error).message}`);
+      }
+    }
     const message = response.choices[0]?.message as ExtendedGroqMessage;
 
     if (!message) break;
@@ -408,12 +492,39 @@ export async function enhancedChat(
   }
 
   // Fallback: generate final response without tools
-  const finalResponse = await invokeGroqNonStream({
-    model: cfg.model,
-    messages: conversationHistory,
-    maxTokens: cfg.maxTokens,
-    temperature: 0.3,
-  });
+  let finalResponse: GroqResponse | null = null;
+  try {
+    finalResponse = await invokeGroq({
+      model: cfg.model,
+      messages: conversationHistory,
+      maxTokens: cfg.maxTokens,
+      temperature: 0.3,
+    });
+  } catch (groqErr) {
+    console.warn("[Chat] Final response Groq failed, trying Gemini fallback...");
+    try {
+      const geminiContents = convertToGeminiContents(conversationHistory);
+      const geminiResponse = await invokeGemini({
+        contents: geminiContents,
+        model: "gemini-2.0-flash",
+        maxOutputTokens: cfg.maxTokens,
+        temperature: 0.3,
+      });
+      const text = extractTextFromGeminiResponse(geminiResponse as any);
+      finalResponse = {
+        id: "gemini-fallback",
+        model: "gemini-2.0-flash",
+        choices: [{
+          index: 0,
+          message: { role: "assistant", content: text },
+          finish_reason: "stop",
+        }],
+        usage: { total_tokens: 0 },
+      } as any;
+    } catch (geminiErr) {
+      throw new Error(`Groq: ${(groqErr as Error).message} | Gemini: ${(geminiErr as Error).message}`);
+    }
+  }
 
   const finalContent = finalResponse.choices[0]?.message?.content || "";
 

@@ -170,18 +170,34 @@ ${text}
 
 Responda apenas com uma lista de fatos curtos e diretos, um por linha. Se não houver nada importante, responda "NADA".`;
 
-    // Usar Groq para extrair os fatos
-    const { invokeGroqNonStream } = await import("./groq.js");
-    const response = await invokeGroqNonStream({
-      messages: [{ role: "user", content: prompt }],
-      model: "llama-3.3-70b-versatile",
-      maxTokens: 500,
-    });
+    // Usar Groq para extrair os fatos (com fallback Gemini)
+    let response: any;
+    try {
+      const { invokeGroq } = await import("./groq.js");
+      response = await invokeGroq({
+        messages: [{ role: "user", content: prompt }],
+        model: "llama-3.3-70b-versatile",
+        maxTokens: 500,
+      });
+    } catch (groqErr) {
+      console.warn("[SemanticMemory] Groq failed, trying Gemini fallback...");
+      const { invokeGemini, extractTextFromGeminiResponse, convertToGeminiContents } = await import("./gemini.js");
+      const geminiContents = convertToGeminiContents([{ role: "user", content: prompt }]);
+      const geminiResponse = await invokeGemini({
+        contents: geminiContents,
+        model: "gemini-2.0-flash",
+        maxOutputTokens: 500,
+      });
+      const text = extractTextFromGeminiResponse(geminiResponse as any);
+      response = {
+        choices: [{ message: { content: text } }],
+      };
+    }
 
     const result = response.choices[0]?.message?.content || "";
     if (result.includes("NADA")) return;
 
-    const facts = result.split("\n").filter((f: string) => f.trim().length > 10);
+    const facts = result.split("\n").filter(f => f.trim().length > 10);
 
     for (const fact of facts) {
       await saveMemory({
