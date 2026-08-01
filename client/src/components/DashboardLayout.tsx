@@ -48,13 +48,17 @@ export default function DashboardLayout({
     localStorage.setItem(SIDEBAR_WIDTH_KEY, sidebarWidth.toString());
   }, [sidebarWidth]);
 
+  // Usa key baseada no estado de auth para forçar re-mount limpo
+  // e evitar o erro removeChild do React durante transições de loading
+  const authKey = loading ? "loading" : user ? `auth-${user.id}` : "guest";
+
   if (loading) {
-    return <DashboardLayoutSkeleton />
+    return <DashboardLayoutSkeleton key={authKey} />;
   }
 
   if (!user) {
     return (
-      <div className="flex items-center justify-center min-h-screen bg-background">
+      <div key={authKey} className="flex items-center justify-center min-h-screen bg-background">
         <div className="flex flex-col items-center gap-8 p-8 max-w-md w-full">
           <div className="flex flex-col items-center gap-6">
             <div className="flex h-16 w-16 items-center justify-center rounded-2xl bg-gradient-to-br from-violet-500 to-indigo-600 shadow-lg shadow-violet-500/25">
@@ -83,6 +87,7 @@ export default function DashboardLayout({
 
   return (
     <SidebarProvider
+      key={authKey}
       style={
         {
           "--sidebar-width": `${sidebarWidth}px`,
