@@ -15,4 +15,6 @@ export const ENV = {
   githubToken: process.env.GITHUB_TOKEN ?? "",
   approvalKey: process.env.APPROVAL_KEY ?? "",
   tavilyApiKey: process.env.TAVILY_API_KEY ?? "",
+  googleCloudApiKey: process.env.GOOGLE_CLOUD_API_KEY ?? "",
+  edgeTtsEnabled: process.env.EDGE_TTS_ENABLED !== "false",
 };

@@ -57,6 +57,7 @@ import {
   generateProposalDiff,
   type FileDiff as DiffFile,
 } from "./_core/diff-generator.js";
+import { voiceRouter } from "./_core/voice-routes.js";
 import {
   getQueueStats,
   getJob,
@@ -207,6 +208,7 @@ function isSelfImprovement(content: string): boolean {
 
 export const appRouter = router({
   system: systemRouter,
+  voice: voiceRouter,
   auth: router({
     login: publicProcedure
       .input(z.object({ username: z.string(), password: z.string() }))
