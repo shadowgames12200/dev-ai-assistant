@@ -1,9 +1,9 @@
 import { Router } from 'express';
-import { streamChat } from '../_core/groq.js';
+import { invokeGroq } from '../_core/groq.js';
 
 export const chatStreamRouter = Router();
 
-chatStreamRouter.post('/api/chat/stream', async (req, res) => {
+chatStreamRouter.post('/api/chat/stream', async (req: any, res: any) => {
   const { messages } = req.body;
   
   if (!messages || !Array.isArray(messages)) {
@@ -15,16 +15,42 @@ chatStreamRouter.post('/api/chat/stream', async (req, res) => {
   res.setHeader('Connection', 'keep-alive');
 
   try {
-    const stream = await streamChat(messages);
+    const stream = await invokeGroq({ messages, stream: true }) as any;
     
-    for await (const chunk of stream) {
-      const content = chunk.choices[0]?.delta?.content || '';
-      if (content) {
-        res.write(`data: ${JSON.stringify({ content })}\n\n`);
+    // O stream do fetch (ReadableStream) precisa ser lido via reader
+    const reader = stream.getReader();
+    const decoder = new TextDecoder();
+    let buffer = '';
+
+    while (true) {
+      const { done, value } = await reader.read();
+      if (done) break;
+
+      buffer += decoder.decode(value, { stream: true });
+      const lines = buffer.split('\n');
+      buffer = lines.pop() || '';
+
+      for (const line of lines) {
+        if (line.trim() === '') continue;
+        if (line.startsWith('data: ')) {
+          const data = line.slice(6);
+          if (data === '[DONE]') {
+            res.write('data: [DONE]\n\n');
+            continue;
+          }
+          try {
+            const parsed = JSON.parse(data);
+            const content = parsed.choices[0]?.delta?.content || '';
+            if (content) {
+              res.write(`data: ${JSON.stringify({ content })}\n\n`);
+            }
+          } catch (e) {
+            // Ignorar erros de parse parciais
+          }
+        }
       }
     }
     
-    res.write('data: [DONE]\n\n');
     res.end();
   } catch (error) {
     console.error('Erro no streaming do JARVIS:', error);
