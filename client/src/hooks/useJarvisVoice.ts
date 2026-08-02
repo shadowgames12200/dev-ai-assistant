@@ -2,7 +2,7 @@ import { useState, useEffect, useCallback, useRef } from 'react';
 
 /**
  * Hook para gerenciar a voz do J.A.R.V.I.S. (STT e TTS)
- * Otimizado para latência zero e fala natural.
+ * Otimizado para latência zero, fala natural e modo "Sempre Ouvindo" (Wake Word).
  */
 export function useJarvisVoice(onTranscription: (text: string) => void) {
   const [isListening, setIsListening] = useState(false);
@@ -13,6 +13,10 @@ export function useJarvisVoice(onTranscription: (text: string) => void) {
   const synthRef = useRef<SpeechSynthesis | null>(null);
   const queueRef = useRef<string[]>([]);
   const isProcessingQueue = useRef(false);
+  const isIntentionalStop = useRef(false); // Para saber se paramos de propósito ou se o navegador derrubou
+
+  // Palavra de ativação (Wake Word)
+  const WAKE_WORD = "jarvis";
 
   // Inicializar Reconhecimento de Fala
   useEffect(() => {
@@ -24,22 +28,32 @@ export function useJarvisVoice(onTranscription: (text: string) => void) {
       recognition.interimResults = true;
       recognition.lang = 'pt-BR';
 
-      recognition.onstart = () => setIsListening(true);
+      recognition.onstart = () => {
+        setIsListening(true);
+        isIntentionalStop.current = false;
+      };
+      
       recognition.onend = () => {
         setIsListening(false);
-        // Reiniciar automaticamente se o modo contínuo estiver ativado (estratégia Stark)
-        if (recognitionRef.current && window.localStorage.getItem('jarvis_mic_continuous') === 'true') {
+        // Reiniciar automaticamente se o modo contínuo estiver ativado E não paramos de propósito (estratégia Stark)
+        if (recognitionRef.current && !isIntentionalStop.current) {
           try {
+            console.log("Microfone desligado pelo navegador. Reiniciando para manter Jarvis sempre ouvindo...");
             recognitionRef.current.start();
           } catch (err) {
             console.warn('Erro ao reiniciar reconhecimento:', err);
           }
         }
       };
+      
       recognition.onerror = (event: any) => {
         console.error('Erro no reconhecimento:', event.error);
         setError(event.error);
-        setIsListening(false);
+        
+        // Se o erro for 'no-speech' (ninguém falou nada), ignoramos e deixamos o onend reiniciar
+        if (event.error !== 'no-speech') {
+           setIsListening(false);
+        }
       };
 
       let finalTranscript = '';
@@ -56,7 +70,17 @@ export function useJarvisVoice(onTranscription: (text: string) => void) {
         const currentText = finalTranscript || interimTranscript;
         
         if (event.results[0].isFinal && currentText.trim().length > 0) {
-          onTranscription(currentText);
+          const textLower = currentText.toLowerCase();
+          
+          // Lógica de Wake Word (Palavra de Ativação)
+          // Se a palavra Jarvis estiver na frase, mandamos para a IA processar
+          if (textLower.includes(WAKE_WORD)) {
+             console.log("Jarvis ativado! Comando recebido:", currentText);
+             onTranscription(currentText);
+          } else {
+             console.log("Ignorado (sem wake word):", currentText);
+          }
+          
           finalTranscript = ''; 
         }
       };
@@ -71,6 +95,14 @@ export function useJarvisVoice(onTranscription: (text: string) => void) {
         console.log("Vozes carregadas:", window.speechSynthesis.getVoices().length);
       };
     }
+    
+    // Limpeza ao desmontar
+    return () => {
+        isIntentionalStop.current = true;
+        if (recognitionRef.current) {
+            recognitionRef.current.stop();
+        }
+    };
   }, [onTranscription]);
 
   const processQueue = useCallback(() => {
@@ -90,8 +122,8 @@ export function useJarvisVoice(onTranscription: (text: string) => void) {
 
     const utterance = new SpeechSynthesisUtterance(cleanText);
     utterance.lang = 'pt-BR';
-    utterance.rate = 1.05; 
-    utterance.pitch = 0.95; 
+    utterance.rate = 1.1; // Um pouco mais rápido para parecer mais natural/robótico
+    utterance.pitch = 0.9; // Um pouco mais grave para parecer o Jarvis
 
     const voices = synthRef.current.getVoices();
     const preferredVoice = voices.find(v => 
@@ -117,6 +149,7 @@ export function useJarvisVoice(onTranscription: (text: string) => void) {
   const startListening = useCallback(() => {
     if (recognitionRef.current && !isListening) {
       try {
+        isIntentionalStop.current = false;
         recognitionRef.current.start();
       } catch (e) {
         console.error('Falha ao iniciar reconhecimento:', e);
@@ -126,6 +159,7 @@ export function useJarvisVoice(onTranscription: (text: string) => void) {
 
   const stopListening = useCallback(() => {
     if (recognitionRef.current && isListening) {
+      isIntentionalStop.current = true; // Avisa que paramos de propósito
       recognitionRef.current.stop();
     }
   }, [isListening]);
