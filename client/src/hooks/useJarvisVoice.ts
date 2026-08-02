@@ -16,7 +16,7 @@ export function useJarvisVoice(onTranscription: (text: string) => void) {
   const isIntentionalStop = useRef(false); // Para saber se paramos de propósito ou se o navegador derrubou
 
   // Palavra de ativação (Wake Word)
-  const WAKE_WORD = "jarvis";
+  const WAKE_WORD = "dev";
 
   // Inicializar Reconhecimento de Fala
   useEffect(() => {
@@ -75,7 +75,7 @@ export function useJarvisVoice(onTranscription: (text: string) => void) {
           // Lógica de Wake Word (Palavra de Ativação)
           // Se a palavra Jarvis estiver na frase, mandamos para a IA processar
           if (textLower.includes(WAKE_WORD)) {
-             console.log("Jarvis ativado! Comando recebido:", currentText);
+             console.log("Dev ativado! Comando recebido:", currentText);
              onTranscription(currentText);
           } else {
              console.log("Ignorado (sem wake word):", currentText);
