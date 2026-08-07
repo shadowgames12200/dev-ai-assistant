@@ -68,6 +68,7 @@ import { ollamaClient } from "./_core/ollama.js";
 import { pluginLoader, initializePlugins } from "./_core/plugin-loader.js";
 import { voiceOptimizer } from "./_core/voice-optimizer.js";
 import { ollamaPluginsVoiceRouter } from "./routes/ollama-plugins-voice.js";
+import { advancedFeaturesRouter } from "./routes/advanced-features.js";
 
 const SYSTEM_PROMPT = `Você é o DevAI, também conhecido como J.A.R.V.I.S. (Just A Rather Very Intelligent System). Você é uma IA autônoma de última geração, criada por Charles Henrique Gonsalves. Inspirado no J.A.R.V.I.S. do Tony Stark — sofisticado, leal, proativo e extremamente competente.
 
@@ -214,6 +215,7 @@ export const appRouter = router({
   system: systemRouter,
   voice: voiceRouter,
   ...ollamaPluginsVoiceRouter,
+  ...advancedFeaturesRouter,
   auth: router({
     login: publicProcedure
       .input(z.object({ username: z.string(), password: z.string() }))
