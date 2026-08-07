@@ -3,16 +3,53 @@ import { drizzle } from "drizzle-orm/postgres-js";
 import postgres from "postgres";
 import { InsertUser, users, conversations, messages, InsertConversation, InsertMessage } from "../drizzle/schema.js";
 import { ENV } from './_core/env.js';
+import fs from 'node:fs';
+import path from 'node:path';
 
 let _db: ReturnType<typeof drizzle> | null = null;
 let _dbConnectAttempted = false;
 
-// In-memory fallback for when database is not available
-const memoryUsers: Map<string, any> = new Map();
-const memoryConversations: Map<number, any> = new Map();
-const memoryMessages: Map<number, any[]> = new Map();
+// In-memory fallback with file persistence for local/hybrid mode
+const LOCAL_DB_PATH = path.resolve(process.cwd(), 'local_db.json');
+let memoryUsers: Map<string, any> = new Map();
+let memoryConversations: Map<number, any> = new Map();
+let memoryMessages: Map<number, any[]> = new Map();
 let memoryConvIdCounter = 1;
 let memoryMsgIdCounter = 1;
+
+// Carregar dados do arquivo se existir (Modo Híbrido/Local)
+function loadLocalDb() {
+  try {
+    if (fs.existsSync(LOCAL_DB_PATH)) {
+      const data = JSON.parse(fs.readFileSync(LOCAL_DB_PATH, 'utf-8'));
+      memoryUsers = new Map(Object.entries(data.users || {}));
+      memoryConversations = new Map(Object.entries(data.conversations || {}).map(([k, v]) => [parseInt(k), v]));
+      memoryMessages = new Map(Object.entries(data.messages || {}).map(([k, v]) => [parseInt(k), v]));
+      memoryConvIdCounter = data.convIdCounter || 1;
+      memoryMsgIdCounter = data.msgIdCounter || 1;
+      console.log(`[Database] Dados locais carregados de ${LOCAL_DB_PATH}`);
+    }
+  } catch (err) {
+    console.error("[Database] Erro ao carregar banco local:", err);
+  }
+}
+
+function saveLocalDb() {
+  try {
+    const data = {
+      users: Object.fromEntries(memoryUsers),
+      conversations: Object.fromEntries(memoryConversations),
+      messages: Object.fromEntries(memoryMessages),
+      convIdCounter: memoryConvIdCounter,
+      msgIdCounter: memoryMsgIdCounter,
+    };
+    fs.writeFileSync(LOCAL_DB_PATH, JSON.stringify(data, null, 2));
+  } catch (err) {
+    console.error("[Database] Erro ao salvar banco local:", err);
+  }
+}
+
+loadLocalDb();
 
 // Lazily create the drizzle instance so local tooling can run without a DB.
 export async function getDb() {
@@ -64,6 +101,7 @@ export async function upsertUser(user: InsertUser): Promise<void> {
       lastSignedIn: user.lastSignedIn || new Date(),
     };
     memoryUsers.set(user.openId, newEntry);
+    saveLocalDb();
     console.log("[Database] User stored in memory:", newEntry.openId);
     return;
   }
@@ -147,6 +185,7 @@ export async function createConversation(userId: number, title: string) {
     const conv = { id, userId, title, createdAt: new Date(), updatedAt: new Date() };
     memoryConversations.set(id, conv);
     memoryMessages.set(id, []);
+    saveLocalDb();
     return id;
   }
 
@@ -159,6 +198,7 @@ export async function createConversation(userId: number, title: string) {
     const conv = { id, userId, title, createdAt: new Date(), updatedAt: new Date() };
     memoryConversations.set(id, conv);
     memoryMessages.set(id, []);
+    saveLocalDb();
     return id;
   }
 }
@@ -231,22 +271,24 @@ export async function updateConversationTitle(id: number, title: string) {
 }
 
 export async function deleteConversation(id: number, userId: number) {
+  console.log(`[Database] Tentando deletar conversa ${id} para o usuário ${userId}`);
+  
+  // Sempre tenta remover da memória primeiro para garantir feedback visual
+  memoryConversations.delete(id);
+  memoryMessages.delete(id);
+  saveLocalDb();
+
   const db = await getDb();
-  if (!db) {
-    memoryConversations.delete(id);
-    memoryMessages.delete(id);
-    return;
-  }
+  if (!db) return;
 
   try {
-    const conv = await getConversation(id, userId);
-    if (!conv) return;
+    // Primeiro deletamos as mensagens (chave estrangeira)
     await db.delete(messages).where(eq(messages.conversationId, id));
-    await db.delete(conversations).where(eq(conversations.id, id));
+    // Depois a conversa, filtrando pelo userId para segurança
+    await db.delete(conversations).where(eq(conversations.id, id)).where(eq(conversations.userId, userId));
+    console.log(`[Database] Conversa ${id} deletada com sucesso do DB.`);
   } catch (error) {
-    console.warn("[Database] Failed to delete conversation");
-    memoryConversations.delete(id);
-    memoryMessages.delete(id);
+    console.error("[Database] Erro ao deletar conversa do DB:", error);
   }
 }
 
@@ -280,6 +322,7 @@ export async function addMessage(conversationId: number, role: string, content: 
     // Update conversation timestamp
     const conv = memoryConversations.get(conversationId);
     if (conv) conv.updatedAt = new Date();
+    saveLocalDb();
     return id;
   }
 

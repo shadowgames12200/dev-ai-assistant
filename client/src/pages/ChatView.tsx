@@ -112,6 +112,7 @@ export default function ChatView() {
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const [thinkingDots, setThinkingDots] = useState("");
   const [isJarvisMode, setIsJarvisMode] = useState(false);
+  const [isCreatingConversation, setIsCreatingConversation] = useState(false);
 
   const textareaRef = useRef<HTMLTextAreaElement>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
@@ -169,6 +170,9 @@ export default function ChatView() {
     return () => window.removeEventListener('resize', setAppHeight);
   }, []);
 
+  const userQuery = trpc.auth.me.useQuery();
+  const userId = userQuery.data?.id;
+
   const conversationsQuery = trpc.conversations.list.useQuery(undefined, {
     enabled: true,
     staleTime: 30_000,
@@ -179,14 +183,21 @@ export default function ChatView() {
       setActiveConversationId(data.id);
       queryClient.invalidateQueries({ queryKey: ["conversations", "list"] });
       setSidebarOpen(false);
+      setIsCreatingConversation(false);
     },
+    onError: () => {
+      setIsCreatingConversation(false);
+      toast.error("Erro ao criar conversa.");
+    }
   });
 
   const deleteConversationMutation = trpc.conversations.delete.useMutation({
-    onSuccess: () => {
-      if (activeConversationId === undefined) return;
-      setActiveConversationId(null);
-      setMessages([]);
+    onSuccess: (_data, variables) => {
+      // Só reseta se a conversa deletada for a ativa
+      if (activeConversationId === variables.id) {
+        setActiveConversationId(null);
+        setMessages([]);
+      }
       queryClient.invalidateQueries({ queryKey: ["conversations", "list"] });
       toast.success("Conversa deletada.");
     },
@@ -298,17 +309,21 @@ export default function ChatView() {
   };
 
   const handleSendMessage = async (content: string) => {
-    if (!content.trim() || isLoading) return;
+    if (!content.trim() || isLoading || isCreatingConversation) return;
 
     let convId = activeConversationId;
 
     if (!convId) {
+      setIsCreatingConversation(true);
       createConversationMutation.mutate(
         { title: content.slice(0, 50) },
         {
           onSuccess: (data) => {
-            setActiveConversationId(data.id);
-            handleSendMessage(content);
+            // A mutação principal já seta o ID e o estado de criação
+            // Chamamos novamente para enviar a mensagem de fato
+            // Mas usamos o ID retornado diretamente para evitar delay de estado
+            setIsLoading(true);
+            chatMutation.mutate({ conversationId: data.id, content: content.trim(), useAdvancedReasoning });
           }
         }
       );
@@ -318,82 +333,81 @@ export default function ChatView() {
     setIsLoading(true);
     setInput("");
 
-    if (isJarvisMode) {
-      // MODO STREAMING PARA J.A.R.V.I.S. (Instantâneo)
-      try {
-        const response = await fetch(`/api/chat/stream?conversationId=${convId}&content=${encodeURIComponent(content)}`);
-        if (!response.ok) throw new Error("Falha no streaming");
+    // USAR STREAMING PARA TODOS OS MODOS (Resolve o problema de delay e timeout no Vercel)
+    try {
+      const streamUrl = isJarvisMode 
+        ? `/api/chat/stream?conversationId=${convId}&content=${encodeURIComponent(content)}`
+        : `/api/chat/stream-full?conversationId=${convId}&content=${encodeURIComponent(content)}&userId=${userId}`;
+      
+      const response = await fetch(streamUrl);
+      if (!response.ok) throw new Error("Falha no streaming");
 
-        const reader = response.body?.getReader();
-        const decoder = new TextDecoder();
-        let fullText = "";
-        let sentenceBuffer = "";
+      const reader = response.body?.getReader();
+      const decoder = new TextDecoder();
+      let fullText = "";
+      let sentenceBuffer = "";
 
-        // Adicionar mensagem do usuário localmente
-        setMessages(prev => [...prev, { 
-          id: Date.now(), 
-          conversationId: convId!, 
-          role: "user", 
-          content, 
-          createdAt: new Date() 
-        }]);
+      // Adicionar mensagem do usuário localmente
+      setMessages(prev => [...prev, { 
+        id: Date.now(), 
+        conversationId: convId!, 
+        role: "user", 
+        content, 
+        createdAt: new Date() 
+      }]);
 
-        // Placeholder para a resposta do assistente
-        const assistantMsgId = Date.now() + 1;
-        setMessages(prev => [...prev, { 
-          id: assistantMsgId, 
-          conversationId: convId!, 
-          role: "assistant", 
-          content: "", 
-          createdAt: new Date() 
-        }]);
+      // Placeholder para a resposta do assistente
+      const assistantMsgId = Date.now() + 1;
+      setMessages(prev => [...prev, { 
+        id: assistantMsgId, 
+        conversationId: convId!, 
+        role: "assistant", 
+        content: "", 
+        createdAt: new Date() 
+      }]);
 
-        while (reader) {
-          const { done, value } = await reader.read();
-          if (done) break;
+      while (reader) {
+        const { done, value } = await reader.read();
+        if (done) break;
 
-          const chunk = decoder.decode(value);
-          const lines = chunk.split("\n");
+        const chunk = decoder.decode(value);
+        const lines = chunk.split("\n");
 
-          for (const line of lines) {
-            if (line.startsWith("data: ")) {
-              const data = line.slice(6).trim();
-              if (data === "[DONE]") continue;
-              
-              try {
-                const { token } = JSON.parse(data);
-                if (token) {
-                  fullText += token;
-                  sentenceBuffer += token;
+        for (const line of lines) {
+          if (line.startsWith("data: ")) {
+            const data = line.slice(6).trim();
+            if (data === "[DONE]") continue;
+            
+            try {
+              const parsed = JSON.parse(data);
+              const token = parsed.token;
+              if (token) {
+                fullText += token;
+                sentenceBuffer += token;
 
-                  // Atualizar UI em tempo real
-                  setMessages(prev => prev.map(m => 
-                    m.id === assistantMsgId ? { ...m, content: fullText } : m
-                  ));
+                // Atualizar UI em tempo real
+                setMessages(prev => prev.map(m => 
+                  m.id === assistantMsgId ? { ...m, content: fullText } : m
+                ));
 
-                  // Se detectou fim de frase, fala agora!
-                  if (/[.!?\n]/.test(token) && sentenceBuffer.length > 20) {
-                    speak(sentenceBuffer, true);
-                    sentenceBuffer = "";
-                  }
+                // Se for modo Jarvis, fala o texto
+                if (isJarvisMode && /[.!?\n]/.test(token) && sentenceBuffer.length > 20) {
+                  speak(sentenceBuffer, true);
+                  sentenceBuffer = "";
                 }
-              } catch (e) {}
-            }
+              }
+            } catch (e) {}
           }
         }
-        
-        // Fala o que sobrou
-        if (sentenceBuffer.trim()) speak(sentenceBuffer, true);
-        
-        setIsLoading(false);
-        queryClient.invalidateQueries({ queryKey: ["conversations", "list"] });
-      } catch (err) {
-        console.error("Streaming error:", err);
-        setIsLoading(false);
-        chatMutation.mutate({ conversationId: convId, content: content.trim(), useAdvancedReasoning });
       }
-    } else {
-      // MODO NORMAL (tRPC)
+      
+      if (isJarvisMode && sentenceBuffer.trim()) speak(sentenceBuffer, true);
+      
+      setIsLoading(false);
+      queryClient.invalidateQueries({ queryKey: ["conversations", "list"] });
+    } catch (err) {
+      console.error("Streaming error:", err);
+      // Fallback para tRPC se o streaming falhar
       chatMutation.mutate({ conversationId: convId, content: content.trim(), useAdvancedReasoning });
     }
   };
@@ -695,6 +709,15 @@ export default function ChatView() {
                 : "J.A.R.V.I.S."
               }
             </span>
+            {isLocalMode ? (
+              <Badge variant="secondary" className="text-[10px] bg-amber-100 text-amber-700 border-amber-200 h-5 px-1.5">
+                Local
+              </Badge>
+            ) : (
+              <Badge variant="secondary" className="text-[10px] bg-green-100 text-green-700 border-green-200 h-5 px-1.5">
+                Nuvem
+              </Badge>
+            )}
           </div>
           
           <div className="flex items-center gap-1">

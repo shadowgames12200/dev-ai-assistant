@@ -19,6 +19,7 @@ import { registerOAuthRoutes } from '../server/_core/oauth.js';
 import { registerLocalAuthRoutes } from '../server/routes/localAuth.js';
 
 import { chatStreamRouter } from '../server/routes/chatStream.js';
+import { chatStreamFullRouter } from '../server/routes/chatStreamFull.js';
 
 import path from 'path';
 
@@ -69,6 +70,7 @@ registerOAuthRoutes(app);
 registerLocalAuthRoutes(app);
 
 app.use(chatStreamRouter);
+app.use(chatStreamFullRouter);
 
 
 

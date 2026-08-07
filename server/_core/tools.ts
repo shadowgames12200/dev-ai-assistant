@@ -159,6 +159,23 @@ export const tools: Tool[] = [
   {
     type: "function",
     function: {
+      name: "computer_control",
+      description: "Acessa e manipula arquivos e comandos diretamente no computador local do usuário (apenas em modo híbrido/local).",
+      parameters: {
+        type: "object",
+        properties: {
+          action: { type: "string", enum: ["read_file", "write_file", "list_dir", "execute_command"], description: "Ação a ser executada." },
+          path: { type: "string", description: "Caminho do arquivo ou diretório." },
+          content: { type: "string", description: "Conteúdo para escrita (opcional)." },
+          command: { type: "string", description: "Comando para execução (opcional)." },
+        },
+        required: ["action"],
+      },
+    },
+  },
+  {
+    type: "function",
+    function: {
       name: "self_improvement",
       description: "Permite ao J.A.R.V.I.S. propor e executar melhorias no seu próprio código-fonte. Use para auto-evolução.",
       parameters: {
@@ -325,6 +342,45 @@ export const toolHandlers: Record<string, (args: any) => Promise<string>> = {
       return "Ação de auto-melhoria inválida.";
     } catch (err) {
       return `Erro no sistema de auto-melhoria: ${(err as Error).message}`;
+    }
+  },
+
+  computer_control: async ({ action, path: filePath, content, command }: any) => {
+    // Verifica se está rodando localmente
+    const isLocal = process.env.NODE_ENV === 'development' || !process.env.VERCEL || process.env.LOCAL_MODE === 'true';
+    if (!isLocal) {
+      return "⚠️ Esta ferramenta ('computer_control') só está disponível quando o DevAI está rodando localmente no seu computador. No Vercel, use 'execute_shell' para o sandbox isolado.";
+    }
+
+    try {
+      const fs = await import('node:fs');
+      const { exec } = await import('node:child_process');
+      const { promisify } = await import('node:util');
+      const execAsync = promisify(exec);
+
+      if (action === "read_file" && filePath) {
+        const fullPath = (await import('node:path')).resolve(filePath);
+        return fs.readFileSync(fullPath, 'utf-8');
+      }
+      if (action === "write_file" && filePath && content) {
+        const fullPath = (await import('node:path')).resolve(filePath);
+        const dir = (await import('node:path')).dirname(fullPath);
+        if (!fs.existsSync(dir)) fs.mkdirSync(dir, { recursive: true });
+        fs.writeFileSync(fullPath, content);
+        return `✅ Arquivo ${filePath} escrito com sucesso no seu computador.`;
+      }
+      if (action === "list_dir" && filePath) {
+        const fullPath = (await import('node:path')).resolve(filePath);
+        const files = fs.readdirSync(fullPath);
+        return `Arquivos em ${filePath}:\n${files.join("\n")}`;
+      }
+      if (action === "execute_command" && command) {
+        const { stdout, stderr } = await execAsync(command);
+        return `💻 Comando executado no seu computador:\nSaída:\n${stdout}\n${stderr ? `Erro:\n${stderr}` : ""}`;
+      }
+      return "Ação inválida ou parâmetros faltando para computer_control.";
+    } catch (err) {
+      return `❌ Erro no controle do computador: ${(err as Error).message}`;
     }
   },
 };
