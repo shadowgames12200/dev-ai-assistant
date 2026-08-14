@@ -7,6 +7,7 @@ import { registerOAuthRoutes } from "./oauth";
 import { registerStorageProxy } from "./storageProxy";
 import { appRouter } from "../routers";
 import { createContext } from "./context";
+import { handleLocalLogin, handleLocalLogout } from "../localAuth";
 import { serveStatic, setupVite } from "./vite";
 
 function isPortAvailable(port: number): Promise<boolean> {
@@ -36,6 +37,9 @@ async function startServer() {
   app.use(express.urlencoded({ limit: "50mb", extended: true }));
   registerStorageProxy(app);
   registerOAuthRoutes(app);
+  // Local email/password auth (auto-register)
+  app.post("/api/auth/login", handleLocalLogin);
+  app.post("/api/auth/logout", handleLocalLogout);
   // tRPC API
   app.use(
     "/api/trpc",

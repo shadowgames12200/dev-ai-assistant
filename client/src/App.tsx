@@ -4,13 +4,55 @@ import NotFound from "@/pages/NotFound";
 import { Route, Switch } from "wouter";
 import ErrorBoundary from "./components/ErrorBoundary";
 import { ThemeProvider } from "./contexts/ThemeContext";
-import Home from "./pages/Home";
+import { useAuth } from "./_core/hooks/useAuth";
+import Login from "./pages/Login";
+import Chat from "./pages/Chat";
+import Admin from "./pages/Admin";
 
 function Router() {
-  // make sure to consider if you need authentication for certain routes
+  const { user, loading } = useAuth();
+
+  // Public route: login page
+  const LoginPage = () => {
+    if (user) {
+      window.location.href = "/chat";
+      return null;
+    }
+    return <Login />;
+  };
+
+  // Protected route wrapper: redirects to login when not authenticated
+  const Protected = ({ children }: { children: React.ReactNode }) => {
+    if (loading) {
+      return (
+        <div className="flex items-center justify-center min-h-screen bg-[#0a0a0f]">
+          <div className="flex flex-col items-center gap-3">
+            <div className="h-8 w-8 animate-spin rounded-full border-2 border-violet-500/30 border-t-violet-400" />
+            <p className="text-sm text-zinc-500">Carregando...</p>
+          </div>
+        </div>
+      );
+    }
+    if (!user) {
+      window.location.href = "/";
+      return null;
+    }
+    return <>{children}</>;
+  };
+
   return (
     <Switch>
-      <Route path={"/"} component={Home} />
+      <Route path={"/"} component={LoginPage} />
+      <Route path={"/chat"}>
+        <Protected>
+          <Chat />
+        </Protected>
+      </Route>
+      <Route path={"/admin"}>
+        <Protected>
+          <Admin />
+        </Protected>
+      </Route>
       <Route path={"/404"} component={NotFound} />
       {/* Final fallback route */}
       <Route component={NotFound} />
@@ -18,20 +60,12 @@ function Router() {
   );
 }
 
-// NOTE: About Theme
-// - First choose a default theme according to your design style (dark or light bg), than change color palette in index.css
-//   to keep consistent foreground/background color across components
-// - If you want to make theme switchable, pass `switchable` ThemeProvider and use `useTheme` hook
-
 function App() {
   return (
     <ErrorBoundary>
-      <ThemeProvider
-        defaultTheme="light"
-        // switchable
-      >
+      <ThemeProvider defaultTheme="dark">
         <TooltipProvider>
-          <Toaster />
+          <Toaster position="top-right" />
           <Router />
         </TooltipProvider>
       </ThemeProvider>

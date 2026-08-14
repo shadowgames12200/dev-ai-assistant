@@ -420,6 +420,73 @@ export async function invokeLLM(params: InvokeParams): Promise<InvokeResult> {
   return (await response.json()) as InvokeResult;
 }
 
+/**
+ * Streaming variant of invokeLLM. Returns a ReadableStream of SSE chunks
+ * (`data: {...}\n\n`, terminated by `data: [DONE]\n\n`).
+ */
+export async function invokeLLMStream(
+  params: InvokeParams & { stream?: boolean }
+): Promise<Response> {
+  assertApiKey();
+
+  const {
+    messages,
+    tools,
+    toolChoice,
+    tool_choice,
+    outputSchema,
+    output_schema,
+    responseFormat,
+    response_format,
+    model,
+    thinking,
+    reasoning,
+    maxTokens,
+    max_tokens,
+  } = params;
+
+  const payload: Record<string, unknown> = {
+    messages: messages.map(normalizeMessage),
+    stream: true,
+  };
+
+  if (model) payload.model = model;
+  if (tools && tools.length > 0) payload.tools = tools;
+  const normalizedToolChoice = normalizeToolChoice(toolChoice || tool_choice, tools);
+  if (normalizedToolChoice) payload.tool_choice = normalizedToolChoice;
+  const resolvedMaxTokens = max_tokens ?? maxTokens;
+  if (typeof resolvedMaxTokens === "number") payload.max_tokens = resolvedMaxTokens;
+  if (thinking) payload.thinking = thinking;
+  if (reasoning) payload.reasoning = reasoning;
+
+  const normalizedResponseFormat = normalizeResponseFormat({
+    responseFormat,
+    response_format,
+    outputSchema,
+    output_schema,
+  });
+  if (normalizedResponseFormat) payload.response_format = normalizedResponseFormat;
+
+  const response = await fetchWithBackoff(resolveApiUrl(), {
+    method: "POST",
+    headers: {
+      "content-type": "application/json",
+      authorization: `Bearer ${ENV.forgeApiKey}`,
+      accept: "text/event-stream",
+    },
+    body: JSON.stringify(payload),
+  });
+
+  if (!response.ok) {
+    const errorText = await response.text();
+    throw new Error(
+      `LLM stream invoke failed: ${response.status} ${response.statusText} – ${errorText}`
+    );
+  }
+
+  return response;
+}
+
 export type ModelInfo = {
   id: string;
   object: string;
