@@ -35,9 +35,22 @@
 - [x] Painel de admin básico (gestão de usuários) visível apenas para admin
 
 ## Entrega
-- [ ] Adaptar código para deploy autônomo no Vercel (vercel.json, env)
-- [ ] Enviar código ao GitHub do usuário (shadowgames12200/dev-ai-assistant)
+- [x] Deploy autônomo decidido por mudança de arquitetura: app agora roda fullstack na Azure VM (20.89.48.89) — não mais na Vercel
+- [x] Código versionado no GitHub (shadowgames12200/dev-ai-assistant) — repo usado para migrar o backend para a VM
+
+## Migração para Azure VM (20.89.48.89)
+- [x] Fullstack React/Express/tRPC migrado para a VM (PM2, Nginx, MySQL/TiDB)
+- [x] Login e-mail/senha corrigido e funcionando (charleshenriquegonsalves05@gmail.com)
+- [x] Executor sandbox em Docker isolado (porta 8443) para capacidades autônomas (Python/Node/Bash)
+- [x] Correção de bug crítico: 'iteration is not defined' no loop do agente
+- [x] Upload e análise universal de arquivos Office (xlsx, docx, pptx) com extração real de conteúdo
+- [x] Fallback de LLM: Forge/Groq → Gemini (gemini-3.1-flash-lite) → Ollama local (desativado por padrão, RAM da VM insuficiente)
+- [x] Timeouts e AbortController em todos os fetches de LLM para evitar travamentos
+- [x] Correção de recursão infinita no fallback (flag __noFallback)
+- [x] Módulo de memória semântica degrada graciosamente (Forge não suporta embeddings)
+- [x] Verificação completa sem bugs: sintaxe, tRPC, executor, frontend, banco
 
 ## Qualidade
 - [x] Testes vitest para auth e conversas
 - [x] Verificação visual das telas (desktop e mobile)
+- [x] Teste end-to-end do fallback Gemini forçado (Groq simulado falho)
