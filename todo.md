@@ -202,9 +202,11 @@
 - [ ] Monitorar oportunidades compatíveis com currículo, revisão, transcrição, redação e planilhas, preservando conexões para vagas com escopo claro
 - [ ] Validar a produção da IA em dados do projeto, corrigir falhas e documentar limitações antes de considerar uma entrega pronta
 - [ ] Apresentar ao usuário a proposta e a entrega final completas para confirmação específica antes de qualquer publicação, envio ou aceite ao cliente
-- [ ] Retomar a busca recente por oportunidades de texto, transcrição e planilhas sem enviar propostas nem consumir conexões
+- [x] Retomar a busca recente por oportunidades de texto, transcrição e planilhas sem enviar propostas nem consumir conexões
 - [ ] Exibir a proposta, o custo em conexão e o projeto exato ao usuário para confirmação específica antes de qualquer envio
 - [ ] Continuar a buscar novas vagas compatíveis assim que a plataforma estiver disponível, sem enviar propostas automaticamente
+- [x] Realizar e registrar nesta rodada buscas específicas por transcrição e por planilhas com os mesmos critérios de risco e concorrência
+- [x] Confirmar no registro desta rodada que nenhuma proposta foi enviada e nenhuma conexão foi consumida nas buscas de transcrição e planilhas
 
 ## Melhoria do perfil na 99Freelas (pedido do usuário 19/08)
 - [x] Verificar o resumo atual, o título e a seção adequada para uma apresentação profissional no perfil
@@ -232,6 +234,17 @@
 - [ ] Confirmar com o usuário os dados necessários antes de preencher ou criar qualquer conta
 - [ ] Solicitar confirmação específica antes de submeter o cadastro ou a candidatura
 - [ ] Apoiar o teste somente de forma permitida pelas regras da plataforma
+
+## Candidatura individual à Audiotext (decisão do usuário 19/08)
+- [x] Registrar os requisitos da candidatura e reiterar que o usuário deve concluir as avaliações sozinho
+- [ ] Preparar somente orientação geral permitida, sem responder etapas avaliativas ou manipular a candidatura
+- [ ] Apoiar os próximos passos após o resultado informado pelo usuário
+
+## Captação direta como canal prioritário (pedido do usuário 19/08)
+- [x] Definir uma oferta inicial de serviços simples, com público, preço, prazo e limites claros
+- [x] Atualizar o kit de WhatsApp, Facebook e OLX para comunicar a oferta sem prometer resultados ou qualificação inexistente
+- [x] Pesquisar plataformas de transcrição compatíveis com português e registrar regras de entrada e pagamento
+- [ ] Apresentar os textos e o plano de divulgação para confirmação específica antes de qualquer publicação ou contato
 
 ## Reforço de qualidade para projetos reais (pedido do usuário 19/08)
 - [x] Completar a triagem determinística de trabalho freelancer com validação explícita de riscos antes da produção
