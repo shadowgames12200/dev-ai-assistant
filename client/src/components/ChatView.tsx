@@ -13,6 +13,7 @@ import {
   Image as ImageIcon,
   Archive,
   MoreVertical,
+  Cpu,
 } from "lucide-react";
 import { trpc } from "@/lib/trpc";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
@@ -48,6 +49,7 @@ export default function ChatView({ conversationId }: { conversationId: number })
   const [messages, setMessages] = useState<DBMessage[]>([]);
   const [pendingContent, setPendingContent] = useState("");
   const [isStreaming, setIsStreaming] = useState(false);
+  const [isAgentMode, setIsAgentMode] = useState(false);
   const [attachments, setAttachments] = useState<
     Array<{ id: number; fileName: string; fileType: string; storageUrl: string }>
   >([]);
@@ -136,6 +138,9 @@ export default function ChatView({ conversationId }: { conversationId: number })
             }
             try {
               const json = JSON.parse(payload);
+              if (json.agentMode === true) {
+                setIsAgentMode(true);
+              }
               if (json.content) {
                 setPendingContent((prev) => prev + json.content);
               } else if (json.error) {
@@ -285,7 +290,15 @@ export default function ChatView({ conversationId }: { conversationId: number })
                       <p className="text-xs opacity-70 mb-1">{formatRole(msg.role)}</p>
                     )}
                     {isAssistant ? (
-                      <Streamdown>{msg.content}</Streamdown>
+                      <div>
+                        {isAgentMode && (msg as any).isPending && (
+                          <div className="flex items-center gap-1.5 mb-2 text-xs font-medium text-amber-400">
+                            <Cpu className="h-3.5 w-3.5" />
+                            <span>Modo Agente (5 créditos)</span>
+                          </div>
+                        )}
+                        <Streamdown>{msg.content}</Streamdown>
+                      </div>
                     ) : (
                       <p className="whitespace-pre-wrap">{msg.content}</p>
                     )}
