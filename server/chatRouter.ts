@@ -283,6 +283,94 @@ export function buildProfessionalServiceDataRequest(gate: ProfessionalServiceGat
   return `**Dados necessários antes da entrega de ${gate.service}**\n\nPara não inventar informações ou prometer algo incompleto, confirme:\n\n${questions}\n\n**Status: ESCOPO EM CONFIRMAÇÃO — NÃO ENVIE AO CLIENTE AINDA.**\n\nQuando você responder, preparo a execução ou a versão final com uma checagem de entrega.`;
 }
 
+export type FreelancerProjectTriage = {
+  service: "currículo" | "transcrição" | "redação" | "revisão" | "planilha" | "automação";
+  missing: string[];
+  risks: string[];
+};
+
+/**
+ * Segunda camada para trabalhos pagos. Os guardas específicos acima protegem
+ * dados técnicos de cada serviço; esta triagem confirma as condições mínimas
+ * para iniciar produção: escopo, prazo, formato e critério de aceite.
+ */
+export function getFreelancerProjectTriage(
+  message: string,
+  attachmentCount = 0
+): FreelancerProjectTriage | null {
+  const text = message.toLowerCase();
+  const requestsProfessionalExecution =
+    /fa[çc]a|crie|monte|prepare|transcrev|revis|automatiz|entregar|enviar|pronto|cliente|projeto|99freelas|workana/.test(
+      text
+    );
+  if (!requestsProfessionalExecution) return null;
+
+  const service = /curr[ií]culo/.test(text)
+    ? "currículo"
+    : /transcri[çc][ãa]o|transcrev/.test(text)
+      ? "transcrição"
+      : /revis(?:[ãa]o|e|ar)|corrigir|corre[çc][ãa]o/.test(text)
+        ? "revisão"
+        : /automa[çc][ãa]o|script|rob[oô]|integrar/.test(text)
+            ? "automação"
+            : /planilha|excel|csv/.test(text)
+              ? "planilha"
+              : /artigo|reda[çc][ãa]o|post|copy|texto para|tradu[çc][ãa]o/.test(text)
+                ? "redação"
+                : null;
+  if (!service) return null;
+
+  const missing: string[] = [];
+  const risks: string[] = [];
+  const hasDeliverable = /entreg[aá]vel|entreg[ae]|arquivo|documento|planilha|relat[oó]rio|curr[ií]culo|artigo|transcri[çc][ãa]o|script|c[oó]digo/.test(text);
+  const hasDeadline = /prazo|at[eé]|hoje|amanh[ãa]|urgente|em\s+\d+\s*(?:horas?|dias?|semanas?)/.test(text);
+  const hasFormat = /\.docx|\.txt|\.srt|\.xlsx|\.csv|\.pdf|word|excel|google\s+planilhas|formato|arquivo de sa[ií]da/.test(message);
+  const hasAcceptance = /crit[eé]rio(?:s)? de aceite|aceite|aprova|confer(?:ir|[êe]ncia)|valid(?:ar|a[çc][ãa]o)|revis[ãa]o final/.test(text);
+
+  if (!hasDeliverable) missing.push("entregável esperado");
+  if (!hasDeadline) missing.push("prazo ou data de entrega");
+  if (!hasFormat) missing.push("formato de entrega");
+  if (!hasAcceptance) missing.push("critério de aceite ou forma de conferência do cliente");
+
+  if (service === "planilha") {
+    const hasInput = attachmentCount > 0 || /dados de entrada|origem|colunas|aba|exemplo|csv|arquivo|lan[çc]amentos/.test(text);
+    const hasRules = /f[oó]rmula|regra|c[aá]lculo|total|valida[çc][ãa]o|classifica[çc][ãa]o/.test(text);
+    if (!hasInput) missing.push("dados de entrada, colunas ou exemplo real");
+    if (!hasRules) missing.push("regras de cálculo e conferência");
+  }
+
+  const hasSensitiveData = /\bcpf\b|\brg\b|\bcnpj\b|senha|token|api[ _-]?key|chave\s*(?:pix|privada|ssh)|cart[aã]o|conta banc[aá]ria|dados banc[aá]rios|dados pessoais|informa[çc][õo]es confidenciais|confidencial/.test(text);
+  const isLegalScope = /advog|jur[ií]dic|contrato|processo|oab|contest[açc][ãa]o|peti[çc][ãa]o|laudo/.test(text);
+  const isFinancialScope = /cont[aá]bil|contabilidade|\bdre\b|concilia[çc][ãa]o|declara[çc][ãa]o|imposto|tribut[aá]r|extrato|investimento|conta banc[aá]ria/.test(text);
+  const hasIrreversibleAction = /delet|exclu|apag|publicar|postar|enviar\s+e-?mail|pagamento|\bpagar\b|transferir|submeter|deploy|produ[çc][ãa]o|alterar\s+banco|migrar/.test(text);
+
+  if (hasSensitiveData) {
+    risks.push("há dados sensíveis; confirme autorização, minimização dos dados e canal seguro antes de processar");
+  }
+  if (isLegalScope && (service === "redação" || service === "revisão" || service === "automação")) {
+    risks.push("o pedido tem impacto jurídico; limite a organização textual e exija validação de profissional habilitado antes de qualquer uso oficial");
+  }
+  if (isFinancialScope && (service === "planilha" || service === "automação")) {
+    risks.push("o pedido envolve dados ou decisão financeira; exija conferência humana qualificada e não faça movimentações, declarações ou recomendações personalizadas");
+  }
+  if (hasIrreversibleAction && service === "automação") {
+    risks.push("a automação prevê ação externa ou difícil de reverter; exija confirmação explícita por escrito e valide primeiro em ambiente de teste");
+  }
+
+  return missing.length || risks.length ? { service, missing, risks } : null;
+}
+
+export function buildFreelancerProjectTriageRequest(triage: FreelancerProjectTriage): string {
+  const questions = triage.missing.map((item, index) => `${index + 1}. ${item}`).join("\n");
+  const riskSection = triage.risks.length
+    ? `\n\n**Riscos que exigem confirmação ou validação:**\n${triage.risks.map((risk) => `- ${risk}`).join("\n")}`
+    : "";
+  const briefingSection = questions
+    ? `Antes de iniciar um trabalho de ${triage.service}, confirme:\n\n${questions}`
+    : `Antes de iniciar um trabalho de ${triage.service}, resolva os riscos abaixo.`;
+  return `**BRIEFING PROFISSIONAL INCOMPLETO — EXECUÇÃO BLOQUEADA**\n\n${briefingSection}${riskSection}\n\n**Status: PLANEJAMENTO E ESCOPO — NÃO INICIE NEM ENVIE AO CLIENTE AINDA.**\n\nCom essas informações, preparo um plano de execução, produzo o material e faço a checagem final antes da entrega.`;
+}
+
 export type StreamContentState = {
   accumulatedContent: string;
   mode: "unknown" | "delta" | "cumulative";
@@ -533,6 +621,37 @@ export const chatRouter = router({
           finished = true;
         });
 
+        // Guardas de qualidade não devem consumir créditos: são perguntas de
+        // levantamento de briefing, feitas antes de classificar modo agente ou
+        // acionar o modelo.
+        const missingResumeData = getMissingResumeData(input.content || "");
+        const professionalServiceGate = getProfessionalServiceGate(
+          input.content || "",
+          attIds.length
+        );
+        const freelancerProjectTriage =
+          !missingResumeData?.length && !professionalServiceGate
+            ? getFreelancerProjectTriage(input.content || "", attIds.length)
+            : null;
+        const protectedReply = missingResumeData?.length
+          ? buildResumeDataRequest(missingResumeData)
+          : professionalServiceGate
+            ? buildProfessionalServiceDataRequest(professionalServiceGate)
+            : freelancerProjectTriage
+              ? buildFreelancerProjectTriageRequest(freelancerProjectTriage)
+              : null;
+        if (protectedReply) {
+          safeWrite(encoder.encode(`data: ${JSON.stringify({ content: protectedReply })}\n\n`));
+          safeWrite(encoder.encode("data: [DONE]\n\n"));
+          safeEnd();
+          try {
+            await db.addMessage(input.conversationId, "assistant", protectedReply);
+          } catch (e) {
+            console.error("[Chat] Failed to persist protected professional reply:", e);
+          }
+          return { conversationId: input.conversationId, streaming: true };
+        }
+
         try {
           // ─── Agent-mode classifier (light LLM pass) ─────────────────────
           // Decide if the message is an autonomous task BEFORE charging credits.
@@ -705,37 +824,6 @@ export const chatRouter = router({
             }
           }
           // ─────────────────────────────────────────────────────────────
-          const missingResumeData = getMissingResumeData(input.content || "");
-          if (missingResumeData?.length) {
-            const protectedReply = buildResumeDataRequest(missingResumeData);
-            safeWrite(encoder.encode(`data: ${JSON.stringify({ content: protectedReply })}\n\n`));
-            safeWrite(encoder.encode("data: [DONE]\n\n"));
-            safeEnd();
-            try {
-              await db.addMessage(input.conversationId, "assistant", protectedReply);
-            } catch (e) {
-              console.error("[Chat] Failed to persist protected resume reply:", e);
-            }
-            return { conversationId: input.conversationId, streaming: true };
-          }
-
-          const professionalServiceGate = getProfessionalServiceGate(
-            input.content || "",
-            attIds.length
-          );
-          if (professionalServiceGate) {
-            const protectedReply = buildProfessionalServiceDataRequest(professionalServiceGate);
-            safeWrite(encoder.encode(`data: ${JSON.stringify({ content: protectedReply })}\n\n`));
-            safeWrite(encoder.encode("data: [DONE]\n\n"));
-            safeEnd();
-            try {
-              await db.addMessage(input.conversationId, "assistant", protectedReply);
-            } catch (e) {
-              console.error("[Chat] Failed to persist protected professional reply:", e);
-            }
-            return { conversationId: input.conversationId, streaming: true };
-          }
-
           const { invokeLLMStream } = await import("./_core/llm");
           const llmResponse = await invokeLLMStream({
             model: "gemini-3.6-flash",

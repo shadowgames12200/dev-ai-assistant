@@ -202,3 +202,14 @@
 - [ ] Monitorar oportunidades compatíveis com currículo, revisão, transcrição, redação e planilhas, preservando conexões para vagas com escopo claro
 - [ ] Validar a produção da IA em dados do projeto, corrigir falhas e documentar limitações antes de considerar uma entrega pronta
 - [ ] Apresentar ao usuário a proposta e a entrega final completas para confirmação específica antes de qualquer publicação, envio ou aceite ao cliente
+
+## Reforço de qualidade para projetos reais (pedido do usuário 19/08)
+- [x] Completar a triagem determinística de trabalho freelancer com validação explícita de riscos antes da produção
+- [x] Criar teste de regressão da triagem para impedir que a IA declare um serviço profissional pronto sem requisitos essenciais
+- [x] Completar os testes de risco para bloquear escopos jurídicos, financeiros, dados sensíveis, ações irreversíveis e publicação externa sem confirmação
+- [x] Completar o teste de bloqueio de dados sensíveis, incluindo CPF, senha, token e chaves de acesso
+- [x] Testar o bloqueio de escopos financeiros e contábeis que exigem conferência humana qualificada
+- [x] Executar na VM os testes automatizados dos guardas de transcrição, redação, automação e triagem de riscos, removendo os arquivos temporários de teste
+- [x] Executar na VM cenários E2E de chat incompletos para transcrição, redação e automação via API e conferir o bloqueio antes do modelo
+- [x] Limpar na VM todos os dados temporários criados pelos cenários E2E de qualidade e registrar a limpeza
+- [x] Publicar na VM somente os reforços de qualidade que passarem nos testes automatizados e na validação de saúde
