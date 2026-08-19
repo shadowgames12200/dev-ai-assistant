@@ -1,208 +1,280 @@
-import { and, asc, desc, eq, inArray } from "drizzle-orm";
-import { drizzle } from "drizzle-orm/mysql2";
-import {
-  InsertAttachment,
-  InsertConversation,
-  InsertMessage,
-  InsertUser,
-  attachments,
-  conversations,
-  messages,
-  users,
-} from "../drizzle/schema";
-import { ENV } from "./_core/env";
+// db.ts — Backend de persistência JSON local (substitui drizzle/MySQL indisponível na VM)
+// Compatível com TODAS as assinaturas do db.ts do template Manus.
+import fs from "fs";
+import path from "path";
+import os from "os";
 
-let _db: ReturnType<typeof drizzle> | null = null;
+const DATA_DIR = process.env.DATA_DIR || process.cwd() || os.homedir();
+const CONVOS_FILE = path.join(DATA_DIR, "convos_data.json");
+const USERS_FILE = path.join(DATA_DIR, "users_data.json");
 
-export async function getDb() {
-  if (!_db && process.env.DATABASE_URL) {
-    try {
-      _db = drizzle(process.env.DATABASE_URL);
-    } catch (error) {
-      console.warn("[Database] Failed to connect:", error);
-      _db = null;
-    }
+let seq = { msgs: 0, attachments: 0, users: 0 };
+let dirty = false;
+
+interface ConvosData {
+  convos: any[];
+  msgs: any[];
+  attachments: any[];
+}
+
+interface UsersData {
+  profiles: Record<string, any>;
+  passwords: Record<string, string>;
+}
+
+function loadConvos(): ConvosData {
+  try {
+    const raw = fs.readFileSync(CONVOS_FILE, "utf-8");
+    const d = JSON.parse(raw) as ConvosData;
+    d.convos = d.convos || [];
+    d.msgs = d.msgs || [];
+    d.attachments = d.attachments || [];
+    return d;
+  } catch {
+    return { convos: [], msgs: [], attachments: [] };
   }
-  return _db;
+}
+
+function saveConvos(d: ConvosData) {
+  fs.writeFileSync(CONVOS_FILE, JSON.stringify(d, null, 2), "utf-8");
+}
+
+function loadUsers(): UsersData {
+  try {
+    const raw = fs.readFileSync(USERS_FILE, "utf-8");
+    const d = JSON.parse(raw) as UsersData;
+    d.profiles = d.profiles || {};
+    d.passwords = d.passwords || {};
+    return d;
+  } catch {
+    return { profiles: {}, passwords: {} };
+  }
+}
+
+function saveUsers(d: UsersData) {
+  fs.writeFileSync(USERS_FILE, JSON.stringify(d, null, 2), "utf-8");
+}
+
+function nextSeq(kind: "msgs" | "attachments" | "users"): number {
+  seq[kind] = (seq[kind] || 0) + 1;
+  return seq[kind];
+}
+
+// Reaproveita sequências existentes para não colidir com ids já persistidos.
+function syncSeq() {
+  const c = loadConvos();
+  seq.msgs = c.msgs.reduce((m, x) => Math.max(m, x.id || 0), 0);
+  seq.attachments = c.attachments.reduce((m, x) => Math.max(m, x.id || 0), 0);
+  const u = loadUsers();
+  seq.users = Object.values(u.profiles).reduce(
+    (m, x) => Math.max(m, Number(x.id) || 0),
+    0
+  );
+}
+syncSeq();
+
+// ─── drizzle compat: getDb retorna null (sem MySQL) ───
+// Password credentials são armazenadas dentro de users_data.json (campo
+// `passwords`) para o login por e-mail/senha funcionar sem banco MySQL.
+export async function getDb(): Promise<any> {
+  const u = loadUsers();
+  const conn = {
+    query: async (sql: string, params?: any[]) => {
+      const email = params?.[0] as string;
+      if (/INSERT INTO password_credentials/.test(sql)) {
+        // INSERT ... ON DUPLICATE KEY UPDATE (email, passwordHash, salt)
+        if (!u.passwords) u.passwords = {};
+        if (params) {
+          (u.passwords as any)[email] = {
+            email,
+            passwordHash: String(params[1]),
+            salt: String(params[2]),
+          };
+          saveUsers(u);
+          return [{ affectedRows: 1 }];
+        }
+        saveUsers(u);
+        return [{ affectedRows: 1 }];
+      }
+      if (/SELECT passwordHash, salt FROM password_credentials/.test(sql)) {
+        const rec = u.passwords?.[email] ?? null;
+        const rows = rec ? [rec] : [];
+        return [rows];
+      }
+      return [null];
+    },
+  };
+  return conn;
 }
 
 // ─── Users ───
-
-export async function upsertUser(user: InsertUser): Promise<void> {
-  if (!user.openId) {
-    throw new Error("User openId is required for upsert");
+export async function upsertUser(user: any): Promise<void> {
+  if (!user.openId) throw new Error("User openId is required for upsert");
+  const u = loadUsers();
+  const existing = u.profiles[user.openId];
+  if (!existing) {
+    seq.users = (seq.users || 0) + 1;
+    u.profiles[user.openId] = {
+      openId: user.openId,
+      id: seq.users,
+      createdAt: Date.now(),
+      name: user.name || "",
+      email: user.email || "",
+      loginMethod: user.loginMethod || "email",
+      role: user.role || "user",
+      lastSignedIn: new Date().toISOString(),
+    };
+  } else {
+    existing.name = user.name !== undefined ? user.name : existing.name;
+    existing.email = user.email !== undefined ? user.email : existing.email;
+    existing.lastSignedIn = new Date().toISOString();
+    if (user.role) existing.role = user.role;
   }
-
-  const db = await getDb();
-  if (!db) {
-    console.warn("[Database] Cannot upsert user: database not available");
-    return;
-  }
-
-  try {
-    const values: InsertUser = { openId: user.openId };
-    const updateSet: Record<string, unknown> = {};
-
-    for (const field of ["name", "email", "loginMethod"] as const) {
-      const value = user[field];
-      if (value !== undefined) {
-        values[field] = value ?? null;
-        updateSet[field] = value ?? null;
-      }
-    }
-
-    if (user.lastSignedIn !== undefined) {
-      values.lastSignedIn = user.lastSignedIn;
-      updateSet.lastSignedIn = user.lastSignedIn;
-    }
-    const isOwnerByOpenId = user.openId === ENV.ownerOpenId;
-    const ownerEmail = process.env.OWNER_EMAIL ?? "";
-    const isOwnerByEmail =
-      ownerEmail !== "" &&
-      (user.email?.toLowerCase() ?? "") === ownerEmail.toLowerCase();
-    if (user.role !== undefined) {
-      values.role = user.role;
-      updateSet.role = user.role;
-    } else if (isOwnerByOpenId || isOwnerByEmail) {
-      // First owner / predefined owner should always be admin, even on
-      // re-sync updates that do not carry a role explicitly.
-      values.role = "admin";
-      updateSet.role = "admin";
-    } else {
-      // Only set role on INSERT (upsert without role must never downgrade an
-      // existing user — e.g. a promoted admin — back to "user").
-      values.role = "user";
-    }
-
-    if (!values.lastSignedIn) {
-      values.lastSignedIn = new Date();
-    }
-
-    if (Object.keys(updateSet).length === 0) {
-      updateSet.lastSignedIn = new Date();
-    }
-
-    await db.insert(users).values(values).onDuplicateKeyUpdate({ set: updateSet });
-  } catch (error) {
-    console.error("[Database] Failed to upsert user:", error);
-    throw error;
-  }
+  saveUsers(u);
 }
 
 export async function getUserByOpenId(openId: string) {
-  const db = await getDb();
-  if (!db) return undefined;
-  const result = await db.select().from(users).where(eq(users.openId, openId)).limit(1);
-  return result.length > 0 ? result[0] : undefined;
+  const u = loadUsers();
+  return u.profiles[openId] || null;
 }
 
 export async function updateUserRole(id: number, role: "admin" | "user") {
-  const db = await getDb();
-  if (!db) throw new Error("Database not available");
-  await db.update(users).set({ role }).where(eq(users.id, id));
+  const u = loadUsers();
+  for (const v of Object.values(u.profiles)) {
+    if (Number(v.id) === id) {
+      (v as any).role = role;
+      saveUsers(u);
+      return { id, role };
+    }
+  }
+  return null;
 }
 
 // ─── Conversations ───
-
 export async function createConversation(userId: number, title: string) {
-  const db = await getDb();
-  if (!db) throw new Error("Database not available");
-  const result = await db
-    .insert(conversations)
-    .values({ userId, title })
-    .$returningId();
-  return result[0].id;
+  const d = loadConvos();
+  const id = (d.convos.reduce((m, c) => Math.max(m, c.id), 0) || 0) + 1;
+  d.convos.push({
+    id,
+    userId,
+    title,
+    createdAt: new Date().toISOString(),
+    updatedAt: new Date().toISOString(),
+  });
+  saveConvos(d);
+  return id;
 }
 
 export async function getUserConversations(userId: number) {
-  const db = await getDb();
-  if (!db) return [];
-  return await db
-    .select()
-    .from(conversations)
-    .where(eq(conversations.userId, userId))
-    .orderBy(desc(conversations.updatedAt));
+  const d = loadConvos();
+  return d.convos
+    .filter((c) => c.userId === userId)
+    .sort((a, b) => (b.updatedAt || "").localeCompare(a.updatedAt || ""));
 }
 
 export async function getConversation(id: number, userId: number) {
-  const db = await getDb();
-  if (!db) return undefined;
-  const result = await db
-    .select()
-    .from(conversations)
-    .where(eq(conversations.id, id))
-    .limit(1);
-  const conv = result[0];
-  if (conv && conv.userId !== userId) return undefined;
-  return conv;
+  const d = loadConvos();
+  return d.convos.find((c) => c.id === id && c.userId === userId) || null;
 }
 
 export async function updateConversationTitle(id: number, title: string) {
-  const db = await getDb();
-  if (!db) throw new Error("Database not available");
-  await db.update(conversations).set({ title }).where(eq(conversations.id, id));
+  const d = loadConvos();
+  const c = d.convos.find((c) => c.id === id);
+  if (c) {
+    c.title = title;
+    c.updatedAt = new Date().toISOString();
+    saveConvos(d);
+  }
+  return { id, title };
 }
 
 export async function deleteConversation(id: number, userId: number) {
-  const db = await getDb();
-  if (!db) throw new Error("Database not available");
-  await db.delete(messages).where(eq(messages.conversationId, id));
-  await db.delete(attachments).where(eq(attachments.conversationId, id));
-  await db
-    .delete(conversations)
-    .where(and(eq(conversations.id, id), eq(conversations.userId, userId)));
+  const d = loadConvos();
+  const c = d.convos.find((c) => c.id === id && c.userId === userId);
+  if (!c) return false;
+  d.convos = d.convos.filter((c) => c.id !== id);
+  d.msgs = d.msgs.filter((m) => m.conversationId !== id);
+  d.attachments = d.attachments.filter((a) => a.conversationId !== id);
+  saveConvos(d);
+  return true;
 }
 
 // ─── Messages ───
-
 export async function getConversationMessages(conversationId: number) {
-  const db = await getDb();
-  if (!db) return [];
-  return await db
-    .select()
-    .from(messages)
-    .where(eq(messages.conversationId, conversationId))
-    .orderBy(asc(messages.id));
+  const d = loadConvos();
+  return d.msgs
+    .filter((m) => m.conversationId === conversationId)
+    .sort((a, b) => a.id - b.id);
 }
 
 export async function addMessage(
   conversationId: number,
-  role: string,
+  role: "user" | "assistant" | "system",
   content: string,
-  fileUrl?: string,
-  fileName?: string
+  fileUrl?: string | null,
+  fileName?: string | null
 ) {
-  const db = await getDb();
-  if (!db) throw new Error("Database not available");
-  const result = await db
-    .insert(messages)
-    .values({ conversationId, role, content, fileUrl, fileName })
-    .$returningId();
-  return result[0].id;
+  const d = loadConvos();
+  const id = (d.msgs.reduce((m, x) => Math.max(m, x.id || 0), 0) || 0) + 1;
+  d.msgs.push({
+    id,
+    conversationId,
+    role,
+    content,
+    fileUrl: fileUrl ?? null,
+    fileName: fileName ?? null,
+    createdAt: new Date().toISOString(),
+  });
+  const c = d.convos.find((c) => c.id === conversationId);
+  if (c) c.updatedAt = new Date().toISOString();
+  saveConvos(d);
+  return id;
 }
 
 // ─── Attachments ───
-
-export async function addAttachment(attachment: InsertAttachment) {
-  const db = await getDb();
-  if (!db) throw new Error("Database not available");
-  const result = await db.insert(attachments).values(attachment).$returningId();
-  return result[0].id;
+export async function addAttachment(attachment: any) {
+  const d = loadConvos();
+  const id = (d.attachments.reduce((m, x) => Math.max(m, x.id || 0), 0) || 0) + 1;
+  d.attachments.push({
+    id,
+    conversationId: attachment.conversationId,
+    userId: attachment.userId,
+    fileName: attachment.fileName,
+    fileType: attachment.fileType,
+    fileSize: attachment.fileSize,
+    storageUrl: attachment.storageUrl,
+    createdAt: new Date().toISOString(),
+  });
+  saveConvos(d);
+  return id;
 }
 
 export async function getConversationAttachments(conversationId: number) {
-  const db = await getDb();
-  if (!db) return [];
-  return await db
-    .select()
-    .from(attachments)
-    .where(eq(attachments.conversationId, conversationId))
-    .orderBy(asc(attachments.id));
+  const d = loadConvos();
+  return d.attachments
+    .filter((a) => a.conversationId === conversationId)
+    .sort((a, b) => a.id - b.id);
 }
 
 export async function deleteAttachments(ids: number[]) {
-  const db = await getDb();
-  if (!db || ids.length === 0) return;
-  await db.delete(attachments).where(inArray(attachments.id, ids));
+  const d = loadConvos();
+  d.attachments = d.attachments.filter((a) => !ids.includes(a.id));
+  saveConvos(d);
+  return { success: true };
 }
 
+// ─── Admin helpers ───
+export async function getUserById(id: number) {
+  const u = loadUsers();
+  for (const v of Object.values(u.profiles)) {
+    if (Number((v as any).id) === id) return v;
+  }
+  return null;
+}
+
+export async function getAllUsers() {
+  const u = loadUsers();
+  return Object.values(u.profiles).sort(
+    (a, b) => (a.createdAt || 0) - (b.createdAt || 0)
+  );
+}

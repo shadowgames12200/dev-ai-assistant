@@ -237,13 +237,15 @@ export default function Chat() {
               </button>
             </DropdownMenuTrigger>
             <DropdownMenuContent align="end" className="w-44">
-              <DropdownMenuItem
-                onClick={() => setLocation("/admin")}
-                className="cursor-pointer"
-              >
-                <Settings className="mr-2 h-4 w-4" />
-                Painel admin
-              </DropdownMenuItem>
+              {user?.role === "admin" && (
+                <DropdownMenuItem
+                  onClick={() => setLocation("/admin")}
+                  className="cursor-pointer"
+                >
+                  <Settings className="mr-2 h-4 w-4" />
+                  Painel admin
+                </DropdownMenuItem>
+              )}
               <DropdownMenuItem
                 onClick={() => logout()}
                 className="cursor-pointer text-red-400 focus:text-red-400"

@@ -423,6 +423,7 @@ export async function invokeLLM(params: InvokeParams): Promise<InvokeResult> {
 /**
  * Streaming variant of invokeLLM. Returns a ReadableStream of SSE chunks
  * (`data: {...}\n\n`, terminated by `data: [DONE]\n\n`).
+ * Includes provider fallback: Gemini → Groq → OpenAI
  */
 export async function invokeLLMStream(
   params: InvokeParams & { stream?: boolean }
@@ -467,24 +468,77 @@ export async function invokeLLMStream(
   });
   if (normalizedResponseFormat) payload.response_format = normalizedResponseFormat;
 
-  const response = await fetchWithBackoff(resolveApiUrl(), {
-    method: "POST",
-    headers: {
-      "content-type": "application/json",
-      authorization: `Bearer ${ENV.forgeApiKey}`,
-      accept: "text/event-stream",
-    },
-    body: JSON.stringify(payload),
-  });
+  // ── Provider fallback chain: Gemini → Groq → OpenAI ──
+  const providers = [
+    { url: ENV.forgeApiUrl, key: ENV.forgeApiKey, label: "primary" },
+    { url: "https://api.groq.com/openai/v1", key: ENV.groqApiKey, label: "groq" },
+    { url: "https://api.openai.com/v1", key: ENV.openaiApiKey, label: "openai" },
+  ].filter(p => p.url && p.key);
 
-  if (!response.ok) {
-    const errorText = await response.text();
-    throw new Error(
-      `LLM stream invoke failed: ${response.status} ${response.statusText} – ${errorText}`
-    );
+  if (providers.length === 0) {
+    throw new Error("No LLM providers available");
   }
 
-  return response;
+  // Map model name for different providers — ensure compatibility
+  // Gemini models only work on Gemini endpoint; use provider-appropriate models for fallbacks
+  const isGeminiModel = (m: string | undefined) =>
+    !!m && (m.toLowerCase().includes("gemini") || m.toLowerCase().startsWith("gemini"));
+  const getModelForProvider = (p: { label: string }): string => {
+    if (p.label === "groq") {
+      // Groq free tier available models (checked Aug 2026): openai/gpt-oss-20b (no thinking), groq/compound-mini
+      return isGeminiModel(model) ? "openai/gpt-oss-20b" : (model || "openai/gpt-oss-20b");
+    }
+    if (p.label === "openai") {
+      // OpenAI supports GPT models
+      return isGeminiModel(model) ? "gpt-4o-mini" : (model || "gpt-4o-mini");
+    }
+    return model || "gemini-3.6-flash";
+  };
+
+  let lastError: Error | null = null;
+  for (const provider of providers) {
+    try {
+      // Disable thinking on non-Gemini providers to avoid leaking reasoning in response
+      const finalPayload = provider.label !== "primary"
+        ? { ...payload, thinking: undefined, reasoning: undefined, model: getModelForProvider(provider) }
+        : { ...payload, model: getModelForProvider(provider) };
+
+      const response = await fetchWithBackoff(provider.url + "/chat/completions", {
+        method: "POST",
+        headers: {
+          "content-type": "application/json",
+          authorization: `Bearer ${provider.key}`,
+          accept: "text/event-stream",
+        },
+        body: JSON.stringify(finalPayload),
+      });
+
+      if (response.ok) {
+        if (provider.label !== "primary") {
+          console.log(`[LLM] Using fallback provider: ${provider.label}`);
+        }
+        return response;
+      }
+
+      const status = response.status;
+      const errorText = await response.text().catch(() => "");
+      lastError = new Error(
+        `LLM stream invoke failed (${provider.label}): ${status} ${response.statusText} – ${errorText.slice(0, 200)}`
+      );
+
+      // Don't try next provider for client errors (400, 401, 403) — those are config issues
+      if (status >= 400 && status < 500 && status !== 429) {
+        throw lastError;
+      }
+
+      console.warn(`[LLM] Provider ${provider.label} failed (${status}), trying next...`);
+    } catch (e) {
+      lastError = e instanceof Error ? e : new Error(String(e));
+      console.warn(`[LLM] Provider ${provider.label} error:`, lastError.message.slice(0, 100));
+    }
+  }
+
+  throw lastError || new Error("All LLM providers failed");
 }
 
 export type ModelInfo = {

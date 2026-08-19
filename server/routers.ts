@@ -29,12 +29,28 @@ export const appRouter = router({
       if (!ctx.user || ctx.user.role !== "admin") {
         throw new TRPCError({ code: "FORBIDDEN" });
       }
-      const sdb = await db.getDb();
-      if (!sdb) return [];
-      const [rows] = await (sdb as any).session.client.query(
-        "SELECT id, openId, name, email, loginMethod, role, createdAt, lastSignedIn FROM users ORDER BY createdAt DESC"
-      );
-      return rows;
+      let rows: any[] = [];
+      try {
+        const sdb = await db.getDb();
+        if (!sdb) throw new Error("no db");
+        const [r] = await (sdb as any).session.client.query(
+          "SELECT id, openId, name, email, loginMethod, role, createdAt, lastSignedIn FROM users ORDER BY createdAt DESC"
+        );
+        rows = r || [];
+      } catch {
+        rows = await db.getAllUsers();
+      }
+      // Normalize JSON profiles to the shape expected by the admin table
+      return rows.map((u: any) => ({
+        id: Number(u.id || 0),
+        openId: u.openId ?? "",
+        name: u.name ?? "",
+        email: u.email ?? "",
+        loginMethod: u.loginMethod ?? "email",
+        role: u.role ?? "user",
+        createdAt: u.createdAt ?? Date.now(),
+        lastSignedIn: u.lastSignedIn ?? 0,
+      }));
     }),
     setUserRole: protectedProcedure
       .input(z.object({ id: z.number(), role: z.enum(["admin", "user"]) }))
@@ -44,6 +60,77 @@ export const appRouter = router({
         }
         await db.updateUserRole(input.id, input.role);
         return { success: true };
+      }),
+  }),
+  // Credits
+  credits: router({
+    me: protectedProcedure.query(async ({ ctx }) => {
+      const { getBalance } = await import("./_core/credits");
+      if (ctx.user.role === "admin") return { balance: -1, unlimited: true };
+      const balance = await getBalance(ctx.user.id);
+      return { balance, unlimited: false };
+    }),
+    add: protectedProcedure
+      .input(z.object({ email: z.string().email(), amount: z.number().int() }))
+      .mutation(async ({ ctx, input }) => {
+        if (ctx.user.role !== "admin") throw new TRPCError({ code: "FORBIDDEN", message: "Somente admin." });
+        const { addCredits } = await import("./_core/credits");
+        const ok = await addCredits(input.email, input.amount);
+        return { success: ok };
+      }),
+    remove: protectedProcedure
+      .input(z.object({ email: z.string().email(), amount: z.number().int().positive() }))
+      .mutation(async ({ ctx, input }) => {
+        if (ctx.user.role !== "admin") throw new TRPCError({ code: "FORBIDDEN", message: "Somente admin." });
+        const { addCredits } = await import("./_core/credits");
+        const ok = await addCredits(input.email, -input.amount);
+        return { success: ok };
+      }),
+    setCost: protectedProcedure
+      .input(z.object({ costPerMessage: z.number().int().min(0).max(100) }))
+      .mutation(async ({ ctx, input }) => {
+        if (ctx.user.role !== "admin") throw new TRPCError({ code: "FORBIDDEN", message: "Somente admin." });
+        const { setCostPerMessage } = await import("./_core/credits");
+        await setCostPerMessage(input.costPerMessage);
+        return { success: true };
+      }),
+    getCost: protectedProcedure.query(async ({ ctx }) => {
+      if (ctx.user.role !== "admin") throw new TRPCError({ code: "FORBIDDEN", message: "Somente admin." });
+      const { getCostPerMessage } = await import("./_core/credits");
+      return { costPerMessage: await getCostPerMessage() };
+    }),
+    list: protectedProcedure.query(async ({ ctx }) => {
+      if (ctx.user.role !== "admin") throw new TRPCError({ code: "FORBIDDEN", message: "Somente admin." });
+      const { listUsers } = await import("./_core/credits");
+      return listUsers();
+    }),
+  }),
+  // Self-improvement (aprovações)
+  selfImprove: router({
+    list: protectedProcedure.query(async ({ ctx }) => {
+      if (ctx.user.role !== "admin") throw new TRPCError({ code: "FORBIDDEN" });
+      const mod = await import("./_core/self-improvement");
+      return { proposals: mod.listProposals() };
+    }),
+    approve: protectedProcedure
+      .input(z.object({ proposalId: z.string(), approvalKey: z.string().min(1) }))
+      .mutation(async ({ ctx, input }) => {
+        if (ctx.user.role !== "admin") throw new TRPCError({ code: "FORBIDDEN" });
+        const mod = await import("./_core/self-improvement");
+        const approvalKey = (process.env as any).APPROVAL_KEY || "";
+        if (input.approvalKey.trim() !== approvalKey) {
+          return { success: false, message: "Chave de aprovação inválida. Só o dono pode aprovar melhorias." };
+        }
+        const proposal = mod.approveProposal(input.proposalId);
+        return { success: true, message: "Proposta aprovada pelo dono. Execute os arquivos via o comando de melhoria.", proposal };
+      }),
+    reject: protectedProcedure
+      .input(z.object({ proposalId: z.string() }))
+      .mutation(async ({ ctx, input }) => {
+        if (ctx.user.role !== "admin") throw new TRPCError({ code: "FORBIDDEN" });
+        const mod = await import("./_core/self-improvement");
+        const result = mod.rejectProposal(input.proposalId);
+        return { success: true, proposal: result };
       }),
   }),
 });
