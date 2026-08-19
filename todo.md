@@ -197,3 +197,8 @@
 - [ ] Criar checklist de produção e revisão final por tipo de serviço, com correções antes da entrega
 - [ ] Registrar melhorias aprovadas após cada projeto para que a IA repita o processo em pedidos futuros
 - [ ] Exigir confirmação específica do usuário antes de enviar proposta, arquivo, mensagem final ou entregar resultado ao cliente
+
+## Atendimento de projetos na 99Freelas (pedido do usuário 19/08)
+- [ ] Monitorar oportunidades compatíveis com currículo, revisão, transcrição, redação e planilhas, preservando conexões para vagas com escopo claro
+- [ ] Validar a produção da IA em dados do projeto, corrigir falhas e documentar limitações antes de considerar uma entrega pronta
+- [ ] Apresentar ao usuário a proposta e a entrega final completas para confirmação específica antes de qualquer publicação, envio ou aceite ao cliente
