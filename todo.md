@@ -208,6 +208,11 @@
 - [x] Comparar as alternativas por velocidade de primeira venda, custo inicial, dificuldade, risco e compatibilidade com a IA
 - [x] Preparar o material de divulgação e o roteiro de atendimento da alternativa inicial recomendada: serviços digitais diretos por mensagem
 
+## Estratégia de transcrição para renda extra (pedido do usuário 19/08)
+- [x] Comparar trabalho de transcrição por plataforma e captação direta para a meta desejada de R$ 20–100 por dia
+- [x] Preparar uma estratégia inicial de transcrição em português que não prometa recebimento diário garantido
+- [x] Criar material de divulgação e critérios de preço, escopo e revisão para transcrições curtas
+
 ## Reforço de qualidade para projetos reais (pedido do usuário 19/08)
 - [x] Completar a triagem determinística de trabalho freelancer com validação explícita de riscos antes da produção
 - [x] Criar teste de regressão da triagem para impedir que a IA declare um serviço profissional pronto sem requisitos essenciais
