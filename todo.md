@@ -203,6 +203,11 @@
 - [ ] Validar a produção da IA em dados do projeto, corrigir falhas e documentar limitações antes de considerar uma entrega pronta
 - [ ] Apresentar ao usuário a proposta e a entrega final completas para confirmação específica antes de qualquer publicação, envio ou aceite ao cliente
 
+## Alternativas de renda remota sem câmera (pedido do usuário 19/08)
+- [x] Mapear alternativas de serviço e produto digital que possam ser executadas de casa com entrega por texto, arquivo ou automação
+- [x] Comparar as alternativas por velocidade de primeira venda, custo inicial, dificuldade, risco e compatibilidade com a IA
+- [ ] Preparar o material de divulgação e o roteiro de atendimento da alternativa inicial escolhida pelo usuário
+
 ## Reforço de qualidade para projetos reais (pedido do usuário 19/08)
 - [x] Completar a triagem determinística de trabalho freelancer com validação explícita de riscos antes da produção
 - [x] Criar teste de regressão da triagem para impedir que a IA declare um serviço profissional pronto sem requisitos essenciais
