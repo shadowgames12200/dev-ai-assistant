@@ -138,8 +138,62 @@
 - [x] Custo diferenciado: 5 créditos quando agentMode ativo, com aviso via SSE
 - [x] Badge/indicador de modo agente no frontend quando ativado
 - [x] Completar SYSTEM_PROMPT: garantir 4 modelos de monetização explícitos (freelancer texto, marketing/conteúdo, plataforma créditos, automações sob demanda)
-- [ ] Validar E2E setCost: alterar custo e confirmar débito diferente na próxima mensagem
+- [x] Validar E2E setCost: custo alterado para 3 e confirmado via getCost; mensagem enviada com sucesso; custo restaurado para 1
 - [x] Limpar usuário de teste e conversas de teste dos JSONs da VM
 - [x] Push final para GitHub shadowgames12200/dev-ai-assistant (commit f579b2e)
-- [ ] Resumo final com manual de monetização
+- [x] Resumo final com manual de monetização
 - [ ] (Melhoria futura, fora do escopo atual) Pagamento automático: webhook Mercado Pago/Asaas — Pix pago libera créditos automaticamente sem admin manual
+
+## Simulação de serviço freelancer (pedido do usuário 19/08)
+- [x] Criar conta de cliente teste na VM (simula cliente real com 50 créditos trial)
+- [x] Simular pedido de currículo profissional via chat (pedido típico do Workana)
+- [x] Verificar resposta da IA: qualidade, formatação, tempo, débito de créditos
+- [x] Entregar resultado da simulação ao usuário
+- [x] Limpar conta de teste após simulação
+
+## Qualidade profissional de freelancer (pedido do usuário 19/08)
+- [x] Impedir que a IA invente dados pessoais, datas, instituições, experiências, certificados, métricas ou resultados não enviados pelo cliente em currículos (protocolo profissional + bloqueio programático)
+- [x] Fazer a IA identificar lacunas e fazer perguntas objetivas antes de fechar currículos
+- [x] Adicionar checklist obrigatório de revisão: fatos, ortografia, instruções do cliente, formato e itens pendentes
+- [x] Orientar a IA a entregar rascunho seguro com campos [PENDENTE] quando dados essenciais estiverem ausentes
+- [x] Testar na VM com pedido de currículo incompleto e publicar a melhoria (bloqueio confirmado E2E)
+- [x] Corrigir duplicação de trechos nas respostas em streaming antes de qualquer entrega ao cliente
+- [x] Limpar a conversa temporária criada no teste de qualidade da VM
+- [x] Usar resposta completa no backend para impedir que eventos SSE incompletos cortem uma entrega profissional
+- [x] Bloquear rótulos de entrega final e exigir perguntas quando houver dados essenciais ausentes
+- [x] Implementar bloqueio programático para currículo incompleto, impedindo que o modelo gere datas, escola, empresa ou curso não fornecidos
+- [x] Implementar guardas programáticas ou pós-validação para transcrição, redação e automação antes de declará-las prontas
+- [x] Adicionar testes automatizados de lacunas para transcrição, redação e automação
+- [ ] Executar E2E na VM de um caso incompleto de transcrição e de redação ou automação
+- [ ] Corrigir o encerramento duplicado de respostas SSE para eliminar erros `write after end` e estabilizar testes de chat
+
+## Perfil freelancer 99Freelas (pedido do usuário 19/08)
+- [x] Preencher título, apresentação e experiência com informações profissionais verificáveis
+- [x] Selecionar áreas de interesse e habilidades coerentes com os serviços iniciais
+- [x] Solicitar confirmação do usuário antes de salvar ou submeter qualquer alteração do perfil
+
+## Pacote completo de treinamento profissional (pedido do usuário 19/08)
+- [x] Treinar entendimento de escopo, coleta de requisitos e confirmação de prazo/formato antes de aceitar um trabalho
+- [x] Treinar checklists específicos para currículo, transcrição, redação, revisão, tradução, planilha e automação
+- [x] Treinar propostas profissionais e atendimento ao cliente para Workana e 99Freelas, sem promessas não confirmadas
+- [x] Treinar pesquisa verificável, distinção entre fatos e opinião, e indicação honesta de fontes e incertezas
+- [x] Treinar programação segura: diagnóstico, plano, backup, testes, explicação de riscos e nenhum comando destrutivo sem confirmação
+- [x] Treinar privacidade, sigilo entre clientes, proteção de credenciais e respeito a direitos autorais
+- [x] Treinar eficiência de infraestrutura: estimar complexidade, escolher modo adequado e proteger a VM de tarefas excessivas
+- [x] Adicionar protocolo avançado de evidências, critérios de aceitação, confiança e revisão adversarial antes da entrega
+- [x] Adicionar ciclo avançado de trabalho: entender, planejar, executar, verificar, revisar riscos e apresentar resultado
+- [x] Adicionar classificação explícita de afirmações: dado fornecido, fato verificado, estimativa ou informação pendente
+- [x] Adicionar nível de confiança e alternativa segura quando uma resposta depender de informação incompleta ou incerta
+- [x] Adicionar revisão adversarial para procurar dados inventados, requisitos esquecidos, contradições, riscos e exposição de dados antes da entrega
+- [ ] Testar cenários completos de serviço freelancer na VM, revisar resultados e limpar dados temporários
+
+## Primeiras propostas no 99Freelas (pedido do usuário 19/08)
+- [ ] Buscar projetos pequenos de redação, revisão, currículo, transcrição ou planilhas compatíveis com o perfil
+- [ ] Avaliar escopo, prazo, orçamento, riscos e consumo de conexões antes de recomendar uma candidatura
+- [ ] Preparar proposta personalizada e solicitar confirmação antes de qualquer envio ao cliente
+
+## Execução assistida e aprendizagem por projeto (pedido do usuário 19/08)
+- [ ] Criar fluxo de triagem: escopo, requisitos, prazo, formato, riscos e critérios de aceite antes de começar um projeto
+- [ ] Criar checklist de produção e revisão final por tipo de serviço, com correções antes da entrega
+- [ ] Registrar melhorias aprovadas após cada projeto para que a IA repita o processo em pedidos futuros
+- [ ] Exigir confirmação específica do usuário antes de enviar proposta, arquivo, mensagem final ou entregar resultado ao cliente

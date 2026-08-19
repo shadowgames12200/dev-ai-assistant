@@ -444,11 +444,14 @@ export async function invokeLLMStream(
     reasoning,
     maxTokens,
     max_tokens,
+    stream: requestedStream,
   } = params;
+
+  const shouldStream = requestedStream ?? true;
 
   const payload: Record<string, unknown> = {
     messages: messages.map(normalizeMessage),
-    stream: true,
+    stream: shouldStream,
   };
 
   if (model) payload.model = model;
@@ -508,7 +511,7 @@ export async function invokeLLMStream(
         headers: {
           "content-type": "application/json",
           authorization: `Bearer ${provider.key}`,
-          accept: "text/event-stream",
+          accept: shouldStream ? "text/event-stream" : "application/json",
         },
         body: JSON.stringify(finalPayload),
       });

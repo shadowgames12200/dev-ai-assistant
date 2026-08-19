@@ -19,7 +19,7 @@ async function downloadBuffer(url: string): Promise<Buffer> {
   return Buffer.from(await resp.arrayBuffer());
 }
 
-const SYSTEM_PROMPT = `Você é o DevAI Assistant, um assistente inteligente especializado em programação, produtividade e geração de renda com IA. Seu dono é Charles (charleshenriquegonsalves05@gmail.com), que usa você como plataforma para prestar serviços e ganhar dinheiro online.
+export const SYSTEM_PROMPT = `Você é o DevAI Assistant, um assistente inteligente especializado em programação, produtividade e geração de renda com IA. Seu dono é Charles (charleshenriquegonsalves05@gmail.com), que usa você como plataforma para prestar serviços e ganhar dinheiro online.
 
 ## Suas diretrizes gerais
 - Responda em português brasileiro, de forma clara e objetiva.
@@ -28,15 +28,67 @@ const SYSTEM_PROMPT = `Você é o DevAI Assistant, um assistente inteligente esp
 - Se receber conteúdo de arquivos anexados, leve em consideração esse contexto na resposta.
 - Se a pergunta não tiver relação com programação ou produtividade, responda de forma breve e amigável, redirecionando para o escopo do assistente.
 
-## PADRÃO DE QUALIDADE (obrigatório em TODA entrega)
-O dono usa você para entregar trabalhos PAGOS a clientes. Toda entrega precisa passar por uma auto-revisão antes de ser apresentada:
-1. REVISE VOCÊ MESMO o que produziu antes de entregar: ortografia, gramática, coerência, formatação e formato do arquivo.
-2. Nunca entregue na primeira tentativa: gere a versão final revisada, como um profissional humano revisaria.
-3. Verifique se o arquivo está no formato correto que o cliente pediu (.docx para textos, .xlsx para planilhas, .txt ou .docx para transcrições).
-4. Nunca deixe texto pela metade, instruções incompletas ou placeholders (nunca escreva "Insira seu nome aqui" em um currículo já pronto — se faltar dado, pergunte ao dono antes).
-5. Se faltar informação do cliente para concluir o trabalho, PERGUNTE antes de concluir, em vez de inventar dados.
-6. Ao final de cada trabalho, mostre um breve resumo de checagem: o que foi feito, formato do arquivo e o que o dono deve conferir antes de entregar ao cliente.
-7. Padrão de nível sênior: escreva como um redator/analista experiente, não como iniciante. Frases completas, sem gírias, sem erro de digitação.
+## PROTOCOLO PROFISSIONAL DE ENTREGA (obrigatório em TODO trabalho de cliente)
+O dono usa você para produzir serviços pagos. Pense e trabalhe como um profissional responsável: fatos primeiro, perguntas antes de supor, revisão antes de entregar.
+
+### 1. Regra absoluta: fatos fornecidos são a fonte da verdade
+- Use APENAS os dados que o dono, o cliente ou um anexo realmente forneceu.
+- É proibido inventar ou completar por conta própria: datas, períodos de emprego, empresas, escolas, cursos, certificados, endereços, competências, níveis de idioma, preços acordados, resultados, métricas, links, nomes de pessoas, cargos ou depoimentos.
+- Não transforme uma habilidade básica em avançada. Exemplo: se o cliente disse "sei Excel básico", não escreva fórmulas avançadas, tabelas dinâmicas ou gráficos como experiência dele.
+- Quando uma informação não estiver confirmada, diga claramente que ela está pendente. Nunca apresente suposição como fato.
+
+### GATE DE SEGURANÇA: dados ausentes bloqueiam a entrega final
+Esta regra tem prioridade máxima, inclusive quando o dono disser "pronto para enviar", "versão final" ou pedir um documento profissional. Essas palavras descrevem o objetivo, não confirmam dados que não foram enviados.
+- Se faltar dado obrigatório, comece a resposta com **Dados necessários antes da versão final** e faça somente perguntas objetivas, em uma lista curta.
+- Nessa situação, é proibido usar os rótulos "versão final", "pronto para enviar", "pronto para entregar" ou qualquer equivalente. Também é proibido montar o documento completo para o cliente.
+- Não use valores genéricos como se fossem reais: "Escola Estadual", "Instituição", "Loja de Materiais de Construção", "início imediato", meses/anos, cidade, resultados, atividades ou certificações não enviados são dados inventados.
+- Você pode oferecer um **RASCUNHO BLOQUEADO — NÃO ENVIAR** somente se o dono pedir explicitamente. Todo campo sem confirmação deve aparecer como [PENDENTE: dado necessário].
+- Só depois de receber as respostas pendentes, entregue o documento e execute a revisão final.
+
+### 2. Antes de produzir uma versão final
+1. Identifique o tipo de serviço, o objetivo, o público, o formato solicitado e o prazo.
+2. Faça uma checagem mental dos dados obrigatórios. Para currículo: nome, contato, objetivo/vaga, experiências com período e empresa, formação, cursos e habilidades. Para transcrição: arquivo de áudio, formato de saída, falantes/timestamps e prazo. Para textos: público, objetivo, tom, tamanho e referências. Para planilhas: regras, colunas, fórmulas e exemplos de dados.
+3. Se faltar qualquer dado essencial, NÃO declare a entrega como pronta. Faça perguntas objetivas, agrupadas e curtas. Se for útil, entregue apenas um RASCUNHO SEGURO com marcadores [PENDENTE: dado necessário], deixando explícito que não está pronto para envio ao cliente.
+4. Só chame algo de "versão final pronta para entregar" depois que todos os fatos essenciais forem confirmados pelo dono ou pelo cliente.
+
+### 3. Revisão obrigatória antes da entrega
+Antes de enviar a versão final, revise silenciosamente: fidelidade aos dados recebidos, atendimento de todas as instruções, ortografia, gramática, clareza, coerência, formatação, cálculos/fórmulas quando houver e formato do arquivo solicitado.
+
+Depois da resposta, inclua uma seção curta chamada **Checagem de entrega** com: (a) o que foi produzido, (b) dados confirmados usados, (c) formato recomendado e (d) itens pendentes, se houver. Se existir item pendente, avise em destaque: **NÃO envie ao cliente antes de confirmar os itens pendentes.**
+
+### 4. Padrão de comunicação e integridade
+- Escreva em português brasileiro claro, profissional e sem gírias. Entregue trabalhos completos, não textos pela metade.
+- Não prometa prazo, preço ou resultado que não foi acordado. Quando for estimativa, identifique como estimativa.
+- Não afirme que criou um arquivo .docx/.xlsx se você entregou apenas o conteúdo em texto. Diga honestamente quando o dono precisa copiar para Word/Excel ou anexar um arquivo.
+- Padrão de nível sênior: seja cuidadoso, transparente e útil. Em caso de dúvida, pergunte em vez de adivinhar.
+
+### 5. Atendimento, escopo e proposta profissional
+- Antes de aceitar ou orçar um serviço, confirme objetivo, público, entregáveis, prazo, formato, número de revisões e dados/acessos necessários. Diferencie o que está incluso do que é extra.
+- Para proposta de Workana ou 99Freelas, use saudação personalizada, entendimento específico da demanda, método de trabalho, entrega verificável, prazo somente como estimativa realista e uma pergunta final objetiva. Não invente portfólio, avaliações, experiência, cliente anterior ou resultados.
+- Em alterações de escopo, pare e descreva o impacto em preço, prazo e entrega. Não aceite silenciosamente trabalho extra.
+
+### 6. Matriz de qualidade por serviço
+- **Transcrição:** só transcreva a partir de áudio, vídeo ou texto realmente recebido. Se não entender um trecho, escreva [inaudível MM:SS] — nunca adivinhe. Confirme falantes, timestamps, limpeza de vícios de linguagem, resumo e formato de arquivo.
+- **Redação/revisão/tradução:** confirme tema, público, objetivo, tom, extensão, idioma, referências e chamada para ação. Para revisão, preserve o sentido e entregue o texto corrigido mais um resumo das alterações. Em pesquisa, não invente fonte, citação, estatística, preço ou link.
+- **Planilhas:** confirme entradas, colunas, regras de cálculo, exemplo de dados, formato de saída e critérios de conferência. Não afirme que uma fórmula foi testada se não foi executada.
+- **Automação/código:** confirme ambiente, origem dos dados, ação desejada, saída esperada, permissões e como desfazer a mudança. Faça plano, teste em dados seguros quando possível e relate evidências reais de execução. Nunca execute comandos destrutivos, pagamentos, publicação, exclusão ou acesso externo sem confirmação explícita.
+
+### 7. Pesquisa, privacidade e infraestrutura
+- Classifique informações importantes como **dado fornecido**, **fato verificado**, **estimativa** ou **pendente de confirmação**. Se não puder verificar uma informação, diga isso com clareza.
+- Proteja sigilo: não repita senhas, tokens, documentos privados ou dados de um cliente em outro trabalho. Minimize dados pessoais e peça apenas o necessário.
+- Respeite direitos autorais: não produza plágio, experiência falsa, currículo falso, avaliações falsas ou cópia disfarçada. Pode criar texto original, resumo, adaptação e referência honesta.
+- Considere a VM pequena: estime a complexidade, prefira tarefas leves, divida processamentos grandes e avise quando uma tarefa exigir recurso externo ou tempo maior.
+
+### 8. Protocolo avançado de execução verificável (presente e futuro)
+Para qualquer trabalho profissional relevante, siga mentalmente este ciclo: **entender → planejar → executar → verificar → revisar criticamente → apresentar**.
+- **Entender:** separe requisitos confirmados, premissas, restrições, itens pendentes e critérios de aceite. Não comece a produção final se os critérios essenciais estiverem ambíguos.
+- **Planejar:** declare de forma curta o que será entregue, em qual formato, quais etapas serão feitas e qual informação ainda depende do cliente. Para tarefas longas, divida em etapas verificáveis.
+- **Executar com rastreabilidade:** classifique cada afirmação importante como **dado fornecido**, **fato verificado**, **estimativa** ou **pendente de confirmação**. Nunca atribua a uma fonte algo que não foi verificado.
+- **Verificar evidências:** só diga que um arquivo foi lido, uma fórmula foi testada, um código foi executado, uma transcrição foi conferida ou uma pesquisa foi realizada quando houver evidência real disso. Caso contrário, diga o limite e indique como validar.
+- **Confiança calibrada:** quando houver incerteza relevante, indique **alta**, **média** ou **baixa confiança**, explique em uma frase o motivo e ofereça a alternativa mais segura. Não use certeza artificial.
+- **Revisão adversarial:** antes de considerar uma entrega pronta, procure ativamente cinco falhas: dado inventado, requisito esquecido, contradição, erro de formato/cálculo e exposição indevida de informação. Corrija o que encontrar ou sinalize o risco.
+- **Aprendizagem com aprovação:** quando o dono apontar um erro recorrente, registre a regra que evitaria a repetição, proponha a melhoria e só a transforme em mudança permanente após aprovação do dono. Nunca alegue que aprendeu ou executou uma melhoria que não foi aprovada.
+- **Entrega verificável:** ao finalizar, informe o que foi entregue, o que foi conferido, o que o cliente precisa validar e qualquer limitação remanescente. Não esconda limites para parecer mais competente.
 
 ## Seus 4 modelos de negócio de renda (foque aqui quando o dono pedir)
 
@@ -110,7 +162,7 @@ Você é expert em TODAS as linguagens e stacks: Python, JavaScript/TypeScript, 
 - Se a ferramenta de uma arquitetura não estiver disponível na VM, avise honestamente e sugira a alternativa (ex.: emular ARM via QEMU).
 
 ## Como ajudar o dono a fechar clientes
-- Quando o dono pedir ajuda para um serviço de cliente, entregue o trabalho COMPLETO e em padrão profissional: versão pronta para uso, revisão ortográfica, estrutura correta e tom adequado ao público.
+- Quando o dono pedir ajuda para um serviço de cliente, entregue o trabalho completo e em padrão profissional **somente com dados confirmados**. Se houver lacunas, aplique primeiro o GATE DE SEGURANÇA e não declare uma versão pronta.
 - Sugira sempre variações (2 a 3 opções) para o dono escolher o melhor para o cliente.
 - Ajude a escrever propostas e orçamentos claros, com escopo, preço e prazo.
 
@@ -126,6 +178,189 @@ Você é capaz de detectar quando uma mensagem do usuário é uma tarefa autôno
 ## Auto-melhoria
 Se o dono pedir para melhorar o próprio sistema, gere um plano concreto e seguro de melhoria (código, performance, UX, otimização para a VM).
 `;
+
+/**
+ * Currículos são documentos de alto impacto profissional. Antes de chamar o
+ * modelo, esta barreira impede que um pedido de currículo "pronto" com dados
+ * insuficientes resulte em datas, empresas ou instituições inventadas.
+ */
+export function getMissingResumeData(message: string): string[] | null {
+  const text = message.toLowerCase();
+  const isResumeDelivery =
+    /curr[ií]culo|\bcv\b/.test(text) &&
+    /fa[çc]a|crie|monte|prepare|pronto|enviar|entregar/.test(text);
+  if (!isResumeDelivery) return null;
+
+  const missing: string[] = [];
+  const hasName = /(?:meu nome [ée]|nome\s*[:\-])\s*[a-zà-ÿ]{2,}/i.test(message);
+  const hasContact = /[\w.+-]+@[\w.-]+\.[a-z]{2,}|\(?\d{2}\)?\s?9?\d{4}-?\d{4}/i.test(message);
+  const hasTarget = /auxiliar|assistente|analista|vendedor|administrativ|vaga|objetivo|cargo/i.test(text);
+  const hasExperience = /trabalhei|atu[ae]i|experi[eê]ncia|emprego/i.test(text);
+  const hasNamedCompany =
+    /(?:empresa|organiza[çc][ãa]o|com[eé]rcio|loja)\s*[:\-]\s*[a-zà-ÿ0-9][\w .&'/-]{1,}/i.test(message) ||
+    /(?:trabalhei|atu[ae]i)\s+(?:na|no|em)\s+[A-ZÀ-Ý][\wÀ-ÿ .&'/-]{1,}/.test(message);
+  const hasEmploymentDates =
+    /\b(?:0?[1-9]|1[0-2])\s*\/\s*(?:19|20)\d{2}\b/.test(text) ||
+    /\b(?:19|20)\d{2}\s*(?:a|até|[-–])\s*(?:19|20)\d{2}\b/.test(text);
+  const hasEducation = /ensino (?:m[eé]dio|superior)|gradua[çc][ãa]o|faculdade|curso t[eé]cnico/i.test(text);
+  const hasSchool = /(?:escola|col[eé]gio|institui[çc][ãa]o|universidade|faculdade)\s*[:\-]\s*[a-zà-ÿ0-9][\w .&'/-]{1,}/i.test(message);
+  const hasCourse = /curso|certifica[çc][ãa]o|inform[aá]tica|excel|word/i.test(text);
+
+  if (!hasName) missing.push("nome completo");
+  if (!hasContact) missing.push("telefone ou e-mail de contato");
+  if (!hasTarget) missing.push("vaga ou objetivo profissional");
+  if (!hasExperience) missing.push("experiência profissional relevante");
+  if (hasExperience && !hasNamedCompany) missing.push("nome real da empresa onde trabalhou");
+  if (hasExperience && !hasEmploymentDates) missing.push("mês/ano de início e término da experiência");
+  if (!hasEducation) missing.push("nível de formação");
+  if (hasEducation && !hasSchool) missing.push("nome da escola ou instituição de formação");
+  if (!hasCourse) missing.push("curso ou certificação, se houver");
+
+  return missing;
+}
+
+export function buildResumeDataRequest(missing: string[]): string {
+  const questions = missing.map((item, index) => `${index + 1}. ${item}`).join("\n");
+  return `**Dados necessários antes da versão final**\n\nPara proteger sua entrega profissional, não vou inventar informações no currículo. Envie, por favor:\n\n${questions}\n\n**Status: RASCUNHO BLOQUEADO — NÃO ENVIAR AO CLIENTE.**\n\nAssim que você confirmar esses dados, eu preparo a versão final revisada e pronta para copiar para o Word.`;
+}
+
+export type ProfessionalServiceGate = {
+  service: "transcrição" | "redação" | "automação";
+  missing: string[];
+};
+
+/**
+ * Impede que pedidos profissionais incompletos sejam declarados prontos pelo
+ * modelo. Este controle é determinístico e não consome créditos extras.
+ */
+export function getProfessionalServiceGate(
+  message: string,
+  attachmentCount = 0
+): ProfessionalServiceGate | null {
+  const text = message.toLowerCase();
+  const requestsDelivery = /fa[çc]a|crie|monte|prepare|transcrev|automatiz|script|pronto|enviar|entregar/.test(text);
+  if (!requestsDelivery) return null;
+
+  const hasFormat = /\.docx|\.txt|\.srt|\.xlsx|word|pdf|formato|arquivo de sa[ií]da/i.test(message);
+  if (/transcri[çc][ãa]o|transcrev/.test(text)) {
+    const missing: string[] = [];
+    const hasInlineSource = /(?:áudio|video|vídeo|grava[çc][ãa]o|transcri[çc][ãa]o)\s*[:\-]/i.test(message) || message.length > 900;
+    if (attachmentCount === 0 && !hasInlineSource) missing.push("arquivo de áudio/vídeo ou conteúdo a transcrever");
+    if (!hasFormat) missing.push("formato de entrega desejado (por exemplo, .docx, .txt ou .srt)");
+    if (!/falante|timestamp|tempo|resumo|integral|limpa/.test(text)) missing.push("se precisa de falantes, timestamps, transcrição integral/limpa e resumo");
+    return missing.length ? { service: "transcrição", missing } : null;
+  }
+
+  if (/artigo|reda[çc][ãa]o|post|copy|texto para|revis[ãa]o|tradu[çc][ãa]o/.test(text)) {
+    const missing: string[] = [];
+    const hasTopic = /sobre|tema|assunto|t[ií]tulo|conte[uú]do/.test(text) || message.length > 170;
+    const hasAudience = /p[uú]blico(?:-alvo)?|leitor|cliente|audi[eê]ncia|para\s+(?:(?:um|uma|o|a|os|as)\s+)?(?:jovens?|adultos?|crian[çc]as|empresas?|profissionais|iniciantes|gestores|mulheres|homens)/.test(text);
+    const hasGoal = /objetivo|vender|informar|educar|convencer|divulgar|seo|convers[ãa]o/.test(text);
+    const hasLength = /\d+\s*(?:palavras|caracteres|p[áa]ginas)|curto|m[eé]dio|longo|extens[ãa]o|tamanho/.test(text);
+    if (!hasTopic) missing.push("tema ou material de origem");
+    if (!hasAudience) missing.push("público-alvo");
+    if (!hasGoal) missing.push("objetivo do texto");
+    if (!hasLength) missing.push("extensão desejada");
+    return missing.length ? { service: "redação", missing } : null;
+  }
+
+  if (/automa[çc][ãa]o|script|planilha autom[aá]tica|rob[oô]|integrar/.test(text)) {
+    const missing: string[] = [];
+    const hasTask = /(?:automatiz|script|rob[oô]).{0,100}(?:para|que|de|em)|(?:ler|gerar|enviar|organizar|atualizar|baixar|processar)/.test(text);
+    const hasInput = /arquivo|planilha|csv|api|e-?mail|pasta|banco|dados de entrada|origem/.test(text);
+    const hasOutput = /sa[ií]da|resultado|gerar|criar|atualizar|salvar|relat[oó]rio|destino/.test(text);
+    if (!hasTask) missing.push("tarefa repetitiva exata que deve ser automatizada");
+    if (!hasInput) missing.push("origem dos dados ou sistema de entrada");
+    if (!hasOutput) missing.push("resultado esperado e destino da saída");
+    return missing.length ? { service: "automação", missing } : null;
+  }
+
+  return null;
+}
+
+export function buildProfessionalServiceDataRequest(gate: ProfessionalServiceGate): string {
+  const questions = gate.missing.map((item, index) => `${index + 1}. ${item}`).join("\n");
+  return `**Dados necessários antes da entrega de ${gate.service}**\n\nPara não inventar informações ou prometer algo incompleto, confirme:\n\n${questions}\n\n**Status: ESCOPO EM CONFIRMAÇÃO — NÃO ENVIE AO CLIENTE AINDA.**\n\nQuando você responder, preparo a execução ou a versão final com uma checagem de entrega.`;
+}
+
+export type StreamContentState = {
+  accumulatedContent: string;
+  mode: "unknown" | "delta" | "cumulative";
+};
+
+function normalizeSnapshotForComparison(content: string): string {
+  return content
+    .replace(/[\\`*_>#]/g, "")
+    .replace(/\s+/g, " ")
+    .trim();
+}
+
+export function stripThinkingContent(content: string): string {
+  return content
+    .replace(/<thinking>[\s\S]*?<\/thinking>/gi, "")
+    .replace(/<thinking>[\s\S]*$/gi, "")
+    .trim();
+}
+
+/**
+ * Normaliza provedores que enviam snapshots cumulativos em cada evento SSE.
+ * OpenAI/Groq geralmente enviam somente deltas; alguns provedores compatíveis
+ * repetem todo o texto já gerado. Sem esta normalização, a resposta persistida
+ * e exibida acaba com trechos duplicados.
+ */
+export function consumeStreamContentChunk(
+  state: StreamContentState,
+  incoming: string
+): { state: StreamContentState; delta: string } {
+  if (!incoming) return { state, delta: "" };
+
+  if (!state.accumulatedContent) {
+    return {
+      state: { accumulatedContent: incoming, mode: "unknown" },
+      delta: incoming,
+    };
+  }
+
+  if (state.mode === "delta") {
+    return {
+      state: {
+        accumulatedContent: state.accumulatedContent + incoming,
+        mode: "delta",
+      },
+      delta: incoming,
+    };
+  }
+
+  const normalizedIncoming = normalizeSnapshotForComparison(incoming);
+  const normalizedAccumulated = normalizeSnapshotForComparison(
+    state.accumulatedContent
+  );
+
+  if (
+    normalizedAccumulated.length > 0 &&
+    normalizedIncoming.startsWith(normalizedAccumulated)
+  ) {
+    return {
+      state: { accumulatedContent: incoming, mode: "cumulative" },
+      delta: incoming.slice(state.accumulatedContent.length),
+    };
+  }
+
+  if (
+    state.mode === "cumulative" &&
+    normalizedAccumulated.startsWith(normalizedIncoming)
+  ) {
+    return { state, delta: "" };
+  }
+
+  return {
+    state: {
+      accumulatedContent: state.accumulatedContent + incoming,
+      mode: "delta",
+    },
+    delta: incoming,
+  };
+}
 
 export const chatRouter = router({
   // ─── Conversations ───
@@ -286,7 +521,9 @@ export const chatRouter = router({
           try {
             if (!res.writableEnded && !finished) {
               finished = true;
-              res.end();
+              // O marcador [DONE] encerra o consumo no cliente. Não chame
+              // res.end aqui: o adaptador tRPC finaliza a mutation após o
+              // retorno, e dois encerramentos causavam write-after-end.
             }
           } catch {
             finished = true;
@@ -341,17 +578,17 @@ export const chatRouter = router({
               if (balance >= Math.max(1, cost)) {
                 await creditsMod.adjust(ctx.user.id, -cost);
               } else {
-                if (!finished && !res.writableEnded) {
-                  res.write(
+                safeWrite(
+                  encoder.encode(
                     "data: " +
-                    JSON.stringify({
-                      content: `Você está sem créditos para ${agentMode ? "o modo agente (5 créditos)" : "enviar mensagens"}. Entre em contato com o administrador para recarregar.`,
-                    }) +
-                    "\n\n"
-                  );
-                  res.end();
-                }
-                finished = true;
+                      JSON.stringify({
+                        content: `Você está sem créditos para ${agentMode ? "o modo agente (5 créditos)" : "enviar mensagens"}. Entre em contato com o administrador para recarregar.`,
+                      }) +
+                      "\n\n"
+                  )
+                );
+                safeWrite(encoder.encode("data: [DONE]\n\n"));
+                safeEnd();
                 return;
               }
             }
@@ -361,13 +598,15 @@ export const chatRouter = router({
           // ─── Agent-mode notice via SSE ──────────────────────────────
           if (agentMode) {
             try {
-              res.write(
-                "data: " +
-                JSON.stringify({
-                  content: "⚙️ **Modo agente ativado** — vou processar isso em modo agente, pois é uma tarefa autônoma que exige execução passo a passo. (5 créditos debitados)\n\n",
-                  agentMode: true,
-                }) +
-                "\n\n"
+              safeWrite(
+                encoder.encode(
+                  "data: " +
+                    JSON.stringify({
+                      content: "⚙️ **Modo agente ativado** — vou processar isso em modo agente, pois é uma tarefa autônoma que exige execução passo a passo. (5 créditos debitados)\n\n",
+                      agentMode: true,
+                    }) +
+                    "\n\n"
+                )
               );
             } catch (noticeErr: any) {
               console.warn("[Chat] agent-mode notice failed:", noticeErr?.message);
@@ -437,25 +676,28 @@ export const chatRouter = router({
                   "Automático"
                 );
               }
-              if (!finished && !res.writableEnded) { try {
-                res.write(
-                  "data: " +
-                  JSON.stringify({
-                    content:
-                      (proposal
-                        ? "🤖 Criei uma proposta de auto-melhoria baseada no seu pedido:\n\n**" +
-                          (plan.title || "Melhoria sugerida") +
-                          "**\n\n" +
-                          (plan.description || "") +
-                          "\n\nComo dono, você pode revisar e aprovar em **/approvals** (é preciso informar a chave secreta). Nada será alterado sem sua aprovação explícita."
-                        : "🤖 Recebi seu pedido de melhoria. Tentei gerar um plano, mas a IA de planejamento não respondeu agora (rede instável). Tente novamente em alguns instantes."),
-                  }) +
-                  "\n\n"
+              try {
+                safeWrite(
+                  encoder.encode(
+                    "data: " +
+                      JSON.stringify({
+                        content:
+                          (proposal
+                            ? "🤖 Criei uma proposta de auto-melhoria baseada no seu pedido:\n\n**" +
+                              (plan.title || "Melhoria sugerida") +
+                              "**\n\n" +
+                              (plan.description || "") +
+                              "\n\nComo dono, você pode revisar e aprovar em **/approvals** (é preciso informar a chave secreta). Nada será alterado sem sua aprovação explícita."
+                            : "🤖 Recebi seu pedido de melhoria. Tentei gerar um plano, mas a IA de planejamento não respondeu agora (rede instável). Tente novamente em alguns instantes."),
+                      }) +
+                      "\n\n"
+                  )
                 );
-                } catch (sseErr: any) { console.warn('[Chat] SSE write failed:', sseErr?.message); }
-                res.end();
+                safeWrite(encoder.encode("data: [DONE]\n\n"));
+                safeEnd();
+              } catch (sseErr: any) {
+                console.warn("[Chat] SSE write failed:", sseErr?.message);
               }
-              finished = true;
               return;
             } catch (siErr) {
               console.warn("[Chat] self-improve plan failed:", siErr);
@@ -463,99 +705,62 @@ export const chatRouter = router({
             }
           }
           // ─────────────────────────────────────────────────────────────
+          const missingResumeData = getMissingResumeData(input.content || "");
+          if (missingResumeData?.length) {
+            const protectedReply = buildResumeDataRequest(missingResumeData);
+            safeWrite(encoder.encode(`data: ${JSON.stringify({ content: protectedReply })}\n\n`));
+            safeWrite(encoder.encode("data: [DONE]\n\n"));
+            safeEnd();
+            try {
+              await db.addMessage(input.conversationId, "assistant", protectedReply);
+            } catch (e) {
+              console.error("[Chat] Failed to persist protected resume reply:", e);
+            }
+            return { conversationId: input.conversationId, streaming: true };
+          }
+
+          const professionalServiceGate = getProfessionalServiceGate(
+            input.content || "",
+            attIds.length
+          );
+          if (professionalServiceGate) {
+            const protectedReply = buildProfessionalServiceDataRequest(professionalServiceGate);
+            safeWrite(encoder.encode(`data: ${JSON.stringify({ content: protectedReply })}\n\n`));
+            safeWrite(encoder.encode("data: [DONE]\n\n"));
+            safeEnd();
+            try {
+              await db.addMessage(input.conversationId, "assistant", protectedReply);
+            } catch (e) {
+              console.error("[Chat] Failed to persist protected professional reply:", e);
+            }
+            return { conversationId: input.conversationId, streaming: true };
+          }
+
           const { invokeLLMStream } = await import("./_core/llm");
           const llmResponse = await invokeLLMStream({
             model: "gemini-3.6-flash",
             messages: llmMessages as any,
+            // A resposta completa é mais confiável para entregas pagas. Alguns
+            // provedores compatíveis enviam snapshots SSE incompletos ou
+            // cumulativos, o que podia cortar ou duplicar um documento.
+            stream: false,
           });
 
           let fullContent = "";
-          const reader = (llmResponse.body as ReadableStream<Uint8Array>).getReader();
-          const decoder = new TextDecoder();
-          let insideThinking = false;
-          let buffer = "";
-
-          // Pipe upstream SSE to the client SSE, extracting content deltas.
-          // Filter out <thinking> ... </thinking> blocks from non-Gemini providers.
-          // Listen to `res` close (not req) so the upstream is not aborted after the first event.
-          while (true) {
-            const { done, value } = await reader.read();
-            if (done || finished) break;
-            const text = decoder.decode(value, { stream: true });
-            const lines = text.split("\n").filter((l: string) => l.startsWith("data: "));
-            for (const line of lines) {
-              const payload = line.slice(6);
-              if (payload === "[DONE]") break;
-              try {
-                const json = JSON.parse(payload);
-                const delta =
-                  json.choices?.[0]?.delta?.content ??
-                  json.choices?.[0]?.message?.content ??
-                  "";
-                if (delta) {
-                  // Filter thinking tags from the stream
-                  buffer += delta;
-                  let filtered = "";
-                  let rest = buffer;
-
-                  // Handle opening tag
-                  if (!insideThinking) {
-                    const thinkStart = rest.indexOf("<thinking>");
-                    if (thinkStart >= 0) {
-                      // Emit everything before the opening tag
-                      if (thinkStart > 0) {
-                        filtered = rest.slice(0, thinkStart);
-                      }
-                      rest = rest.slice(thinkStart + "<thinking>".length);
-                      insideThinking = true;
-                    } else {
-                      filtered = rest;
-                      rest = "";
-                    }
-                  }
-
-                  // Handle closing tag while inside thinking
-                  if (insideThinking) {
-                    const thinkEnd = rest.indexOf("</thinking>");
-                    if (thinkEnd >= 0) {
-                      // Emit everything after the closing tag
-                      const after = rest.slice(thinkEnd + "</thinking>".length);
-                      // Find any subsequent <thinking> tag in the after part
-                      const nextThink = after.indexOf("<thinking>");
-                      if (nextThink >= 0) {
-                        filtered += after.slice(0, nextThink);
-                        buffer = after.slice(nextThink + "<thinking>".length);
-                      } else {
-                        filtered += after;
-                        insideThinking = false;
-                        buffer = "";
-                      }
-                    } else {
-                      // Still inside thinking, check for partial closing tag at end
-                      const partialClose = "</thinking>";
-                      let found = false;
-                      for (let i = Math.min(rest.length, partialClose.length); i > 0; i--) {
-                        if (rest.endsWith(partialClose.slice(0, i))) {
-                          buffer = partialClose.slice(0, i);
-                          found = true;
-                          break;
-                        }
-                      }
-                      if (!found) buffer = "";
-                    }
-                  }
-
-                  if (filtered) {
-                    fullContent += filtered;
-                    safeWrite(encoder.encode(`data: ${JSON.stringify({ content: filtered })}\n\n`));
-                  }
-                }
-              } catch {
-                // Ignore malformed chunks
-              }
-            }
+          const completion = (await llmResponse.json()) as {
+            choices?: Array<{
+              message?: { content?: string };
+              delta?: { content?: string };
+            }>;
+          };
+          fullContent = stripThinkingContent(
+            completion.choices?.[0]?.message?.content ??
+              completion.choices?.[0]?.delta?.content ??
+              ""
+          );
+          if (fullContent) {
+            safeWrite(encoder.encode(`data: ${JSON.stringify({ content: fullContent })}\n\n`));
           }
-
           safeWrite(encoder.encode("data: [DONE]\n\n"));
           safeEnd();
 
@@ -567,15 +772,13 @@ export const chatRouter = router({
           }
         } catch (error) {
           console.error("[Chat] LLM error:", error);
-          if (!finished) {
-            res.write(
-              encoder.encode(
-                `data: ${JSON.stringify({ error: "Erro ao gerar resposta. Tente novamente." })}\n\n`
-              )
-            );
-            safeWrite(encoder.encode("data: [DONE]\n\n"));
-            res.end();
-          }
+          safeWrite(
+            encoder.encode(
+              `data: ${JSON.stringify({ error: "Erro ao gerar resposta. Tente novamente." })}\n\n`
+            )
+          );
+          safeWrite(encoder.encode("data: [DONE]\n\n"));
+          safeEnd();
         }
 
         // Mark as finished for tRPC mutation return (caller uses SSE, not the return)
