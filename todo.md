@@ -140,6 +140,6 @@
 - [x] Completar SYSTEM_PROMPT: garantir 4 modelos de monetização explícitos (freelancer texto, marketing/conteúdo, plataforma créditos, automações sob demanda)
 - [ ] Validar E2E setCost: alterar custo e confirmar débito diferente na próxima mensagem
 - [x] Limpar usuário de teste e conversas de teste dos JSONs da VM
-- [ ] Push final para GitHub shadowgames12200/dev-ai-assistant
+- [x] Push final para GitHub shadowgames12200/dev-ai-assistant (commit f579b2e)
 - [ ] Resumo final com manual de monetização
 - [ ] (Melhoria futura, fora do escopo atual) Pagamento automático: webhook Mercado Pago/Asaas — Pix pago libera créditos automaticamente sem admin manual
