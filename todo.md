@@ -206,7 +206,7 @@
 ## Alternativas de renda remota sem câmera (pedido do usuário 19/08)
 - [x] Mapear alternativas de serviço e produto digital que possam ser executadas de casa com entrega por texto, arquivo ou automação
 - [x] Comparar as alternativas por velocidade de primeira venda, custo inicial, dificuldade, risco e compatibilidade com a IA
-- [ ] Preparar o material de divulgação e o roteiro de atendimento da alternativa inicial escolhida pelo usuário
+- [x] Preparar o material de divulgação e o roteiro de atendimento da alternativa inicial recomendada: serviços digitais diretos por mensagem
 
 ## Reforço de qualidade para projetos reais (pedido do usuário 19/08)
 - [x] Completar a triagem determinística de trabalho freelancer com validação explícita de riscos antes da produção
