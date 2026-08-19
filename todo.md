@@ -202,6 +202,15 @@
 - [ ] Monitorar oportunidades compatíveis com currículo, revisão, transcrição, redação e planilhas, preservando conexões para vagas com escopo claro
 - [ ] Validar a produção da IA em dados do projeto, corrigir falhas e documentar limitações antes de considerar uma entrega pronta
 - [ ] Apresentar ao usuário a proposta e a entrega final completas para confirmação específica antes de qualquer publicação, envio ou aceite ao cliente
+- [ ] Retomar a busca recente por oportunidades de texto, transcrição e planilhas sem enviar propostas nem consumir conexões
+- [ ] Exibir a proposta, o custo em conexão e o projeto exato ao usuário para confirmação específica antes de qualquer envio
+- [ ] Continuar a buscar novas vagas compatíveis assim que a plataforma estiver disponível, sem enviar propostas automaticamente
+
+## Melhoria do perfil na 99Freelas (pedido do usuário 19/08)
+- [x] Verificar o resumo atual, o título e a seção adequada para uma apresentação profissional no perfil
+- [x] Preparar texto honesto que destaque serviços, cuidado e compromisso sem alegar experiência não comprovada
+- [x] Solicitar confirmação específica antes de salvar qualquer alteração no perfil
+- [x] Salvar e conferir no perfil público o título, apresentação, experiência, habilidades e áreas de interesse aprovados
 
 ## Alternativas de renda remota sem câmera (pedido do usuário 19/08)
 - [x] Mapear alternativas de serviço e produto digital que possam ser executadas de casa com entrega por texto, arquivo ou automação
@@ -213,6 +222,17 @@
 - [x] Preparar uma estratégia inicial de transcrição em português que não prometa recebimento diário garantido
 - [x] Criar material de divulgação e critérios de preço, escopo e revisão para transcrições curtas
 
+## Candidatura à GoTranscript (pedido do usuário 19/08)
+- [ ] Confirmar os requisitos atuais, idiomas aceitos, teste de entrada e forma de pagamento da GoTranscript
+- [x] Preparar o usuário para o teste de transcrição em português, sem enviar candidatura ainda
+- [ ] Solicitar confirmação específica antes de criar a conta, fornecer dados pessoais ou enviar a candidatura
+
+## Candidatura assistida à GoTranscript (pedido do usuário 19/08)
+- [ ] Conferir na página de candidatura as regras do teste, os campos solicitados e a compatibilidade com o perfil do usuário
+- [ ] Confirmar com o usuário os dados necessários antes de preencher ou criar qualquer conta
+- [ ] Solicitar confirmação específica antes de submeter o cadastro ou a candidatura
+- [ ] Apoiar o teste somente de forma permitida pelas regras da plataforma
+
 ## Reforço de qualidade para projetos reais (pedido do usuário 19/08)
 - [x] Completar a triagem determinística de trabalho freelancer com validação explícita de riscos antes da produção
 - [x] Criar teste de regressão da triagem para impedir que a IA declare um serviço profissional pronto sem requisitos essenciais
@@ -223,3 +243,8 @@
 - [x] Executar na VM cenários E2E de chat incompletos para transcrição, redação e automação via API e conferir o bloqueio antes do modelo
 - [x] Limpar na VM todos os dados temporários criados pelos cenários E2E de qualidade e registrar a limpeza
 - [x] Publicar na VM somente os reforços de qualidade que passarem nos testes automatizados e na validação de saúde
+
+## Postura de especialista para serviços profissionais (pedido do usuário 19/08)
+- [x] Definir um protocolo verificável de análise, execução, revisão e entrega para os serviços compatíveis
+- [x] Incorporar a postura profissional ao roteador de chat sem alegar experiência, certificações ou resultados inexistentes
+- [x] Cobrir o novo protocolo com testes de regressão e publicar a versão validada na VM

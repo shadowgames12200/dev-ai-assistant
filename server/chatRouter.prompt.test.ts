@@ -36,4 +36,13 @@ describe("SYSTEM_PROMPT - protocolo profissional de freelancer", () => {
     expect(SYSTEM_PROMPT).toContain("Revisão adversarial");
     expect(SYSTEM_PROMPT).toContain("Aprendizagem com aprovação");
   });
+
+  it("exige postura de especialista baseada em método e não em alegações falsas", () => {
+    expect(SYSTEM_PROMPT).toContain("Postura de especialista para serviços profissionais");
+    expect(SYSTEM_PROMPT).toContain("mentalidade de especialista responsável");
+    expect(SYSTEM_PROMPT).toContain("Diagnóstico antes de produzir");
+    expect(SYSTEM_PROMPT).toContain("Plano de execução enxuto");
+    expect(SYSTEM_PROMPT).toContain("Critério de prontidão");
+    expect(SYSTEM_PROMPT).toContain("especialista certificado");
+  });
 });
