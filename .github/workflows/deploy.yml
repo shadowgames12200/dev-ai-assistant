@@ -17,33 +17,41 @@ jobs:
           node-version: '22'
 
       - name: Install pnpm
-        uses: pnpm/action-setup@v4
-        with:
-          version: 8
+        run: corepack enable && corepack prepare pnpm@8 --activate
+        shell: bash
 
       - name: Install dependencies
         run: pnpm install
 
       - name: Run tests
         run: pnpm test
+        env:
+          PIX_KEY: ${{ secrets.PIX_KEY }}
+          PIX_RECEIVER_NAME: Charles Henrique Gonçalves dos Santos
+          PIX_CITY: Pirapora
+          OWNER_NOTIFICATION_EMAIL: devaiassistent@gmail.com
+          SUPPORT_WHATSAPP_NUMBER: "5538984057434"
+          APPROVAL_KEY: ${{ secrets.APPROVAL_KEY }}
 
-      - name: Build backend
-        run: npx esbuild server/_core/index.ts --platform=node --packages=external --bundle --format=esm --outfile=dist-server/index.js
-
-      - name: Build frontend
+      - name: Build all
         run: NODE_OPTIONS=--max-old-space-size=1024 pnpm build
+
+      - name: Build weekly learning triage script
+        run: npx esbuild scripts/weekly-learning-triage.ts --platform=node --packages=external --bundle --format=esm --outfile=dist/weekly-learning-triage.js
 
       - name: Create deployment archive
         run: |
-          tar -czf /tmp/deploy.tar.gz \
-            -C dist-server index.js \
-            -C dist/public .
+          mkdir -p /tmp/deploy-staging/public
+          cp dist/index.js /tmp/deploy-staging/
+          cp dist/weekly-learning-triage.js /tmp/deploy-staging/ 2>/dev/null || true
+          cp -r ${{ github.workspace }}/dist/public/* /tmp/deploy-staging/public/
+          tar -czf /tmp/deploy.tar.gz -C /tmp/deploy-staging .
 
       - name: Upload to VM and restart
         uses: appleboy/scp-action@master
         with:
           host: ${{ secrets.VM_HOST }}
-          username: ${{ secrets.VM_USER }}
+          username: ${{ secrets.VM_USERNAME }}
           key: ${{ secrets.VM_SSH_KEY }}
           source: /tmp/deploy.tar.gz
           target: /tmp/
@@ -52,22 +60,28 @@ jobs:
         uses: appleboy/ssh-action@v1
         with:
           host: ${{ secrets.VM_HOST }}
-          username: ${{ secrets.VM_USER }}
+          username: ${{ secrets.VM_USERNAME }}
           key: ${{ secrets.VM_SSH_KEY }}
           script: |
             set -e
             cd /home/azureuser/dev-ai-assistant
 
-            # Extract backend
-            tar -xzf /tmp/deploy.tar.gz -C /tmp/extract-deploy --strip-components=1 2>/dev/null || \
-              (mkdir -p /tmp/extract-deploy && tar -xzf /tmp/deploy.tar.gz -C /tmp/extract-deploy)
+            # Find the uploaded archive (scp-action places it under target dir)
+            ARCHIVE="/tmp/deploy.tar.gz"
+            [ ! -f "$ARCHIVE" ] && ARCHIVE="/tmp/tmp/deploy.tar.gz"
+            [ ! -f "$ARCHIVE" ] && { echo "ERROR: deploy.tar.gz not found"; exit 1; }
+
+            # Extract
+            mkdir -p /tmp/extract-deploy
+            tar -xzf "$ARCHIVE" -C /tmp/extract-deploy
 
             # Deploy backend
             cp /tmp/extract-deploy/index.js dist-server/index.js
+            cp /tmp/extract-deploy/weekly-learning-triage.js dist-server/weekly-learning-triage.js 2>/dev/null || true
 
             # Deploy statics
-            rm -rf dist-server/public/public
-            cp -r /tmp/extract-deploy/public/* dist-server/public/
+            rm -rf dist-server/public/assets dist-server/public/index.html
+            cp -r /tmp/extract-deploy/public/* dist-server/public/ 2>/dev/null || true
 
             # Cleanup
             rm -rf /tmp/extract-deploy /tmp/deploy.tar.gz
