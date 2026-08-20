@@ -45,6 +45,12 @@ pids
 *.seed
 *.pid.lock
 *.bak
+credits_data.json
+users_data.json
+convos_data.json
+
+# Generated server bundle
+dist-server/
 
 # Coverage directory used by tools like istanbul
 coverage/

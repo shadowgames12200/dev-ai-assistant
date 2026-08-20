@@ -84,6 +84,13 @@
 - [x] Publicar os arquivos estáticos e o backend compilado na VM Azure
 - [x] Reiniciar o processo gerenciado e confirmar estado online, ativos publicados e resposta HTTP local
 
+## Sincronização do GitHub (20/08)
+- [x] Verificar divergências do repositório local e remoto e excluir dados de runtime do commit
+- [ ] Criar commit limpo da interface de créditos e testes validados
+- [ ] Enviar a versão ao GitHub e confirmar que a branch remota está atualizada
+- [x] Remover do versionamento os JSONs de runtime e o bundle compilado, preservando os arquivos locais e da VM
+- [x] Confirmar que o repositório pode ser reconstruído somente a partir do código-fonte antes do envio ao GitHub
+
 ## Finalização
 - [ ] Verificação final de logs e estabilidade
 - [ ] Checkpoint final
