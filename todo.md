@@ -264,7 +264,10 @@
 
 ## Perguntas do usuário (18/08)
 - [x] Verificar se a auto-melhoria da IA está funcionando na VM
-- [ ] Explicar funcionamento híbrido: VM online + LM Studio (Windows 11) local como fallback do LLM
+- [x] Explicar funcionamento híbrido: VM online + LM Studio (Windows 11) local como fallback do LLM
+
+## Guia de operação híbrida (20/08)
+- [x] Documentar como usar o computador do proprietário apenas como fallback local, sem expor a API do modelo na internet
 
 ## Correção da auto-melhoria (pedido do usuário 18/08)
 - [x] Persistir propostas de autoaprendizagem na fonte JSON ativa da VM, preservando o fallback leve em vez de criar tabela MySQL
@@ -380,10 +383,10 @@
 - [ ] Preparar proposta personalizada e solicitar confirmação antes de qualquer envio ao cliente
 
 ## Execução assistida e aprendizagem por projeto (pedido do usuário 19/08)
-- [ ] Criar fluxo de triagem: escopo, requisitos, prazo, formato, riscos e critérios de aceite antes de começar um projeto
-- [ ] Criar checklist de produção e revisão final por tipo de serviço, com correções antes da entrega
-- [ ] Registrar melhorias aprovadas após cada projeto para que a IA repita o processo em pedidos futuros
-- [ ] Exigir confirmação específica do usuário antes de enviar proposta, arquivo, mensagem final ou entregar resultado ao cliente
+- [x] Criar fluxo de triagem: escopo, requisitos, prazo, formato, riscos e critérios de aceite antes de começar um projeto
+- [x] Criar checklist de produção e revisão final por tipo de serviço, com correções antes da entrega
+- [x] Registrar melhorias aprovadas após cada projeto para que a IA repita o processo em pedidos futuros
+- [x] Exigir confirmação específica do usuário antes de enviar proposta, arquivo, mensagem final ou entregar resultado ao cliente
 
 ## Atendimento de projetos na 99Freelas (pedido do usuário 19/08)
 - [ ] Monitorar oportunidades compatíveis com currículo, revisão, transcrição, redação e planilhas, preservando conexões para vagas com escopo claro
