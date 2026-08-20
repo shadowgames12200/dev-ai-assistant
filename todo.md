@@ -263,9 +263,9 @@
 - [x] Cobrir em regressão que um usuário comum na rota /approvals recebe somente a tela de acesso restrito, sem controles administrativos
 
 ## Prioridade de renda extra e infraestrutura (pedido do usuário 20/08)
-- [ ] Priorizar serviços digitais por texto que possam gerar renda sem câmera e sem carga contínua na VM
-- [ ] Preparar uma sequência prática de divulgação, triagem e entrega com revisão humana antes de qualquer compromisso com cliente
-- [ ] Definir uma regra simples de reinvestimento para melhorar a infraestrutura somente após receita efetivamente recebida
+- [x] Priorizar serviços digitais por texto que possam gerar renda sem câmera e sem carga contínua na VM
+- [x] Preparar uma sequência prática de divulgação, triagem e entrega com revisão humana antes de qualquer compromisso com cliente
+- [x] Definir uma regra simples de reinvestimento para melhorar a infraestrutura somente após receita efetivamente recebida
 
 ## Perguntas do usuário (18/08)
 - [x] Verificar se a auto-melhoria da IA está funcionando na VM
