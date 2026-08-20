@@ -86,6 +86,23 @@
 - [x] Criar QR Code a partir do código Pix Copia e Cola e botão de cópia sem armazenar dados de pagamento de clientes
 - [x] Registrar uma solicitação de recarga pendente, com usuário, pacote e horário, sem liberar créditos automaticamente
 - [ ] Notificar o proprietário por e-mail quando houver solicitação de recarga pendente, se a configuração permitir
+- [x] Inspecionar conectores e configurações disponíveis para e-mail e WhatsApp antes de ativar qualquer alerta externo
+- [x] Ativar o conector Gmail autorizado pelo proprietário e confirmar a disponibilidade sem enviar mensagem
+
+## Confirmação de pagamento Pix e alerta ao proprietário
+- [x] Mapear os dados mínimos que o painel já registra para identificar uma solicitação sem usar dados bancários do cliente
+- [ ] Pesquisar alternativas oficiais de confirmação Pix por webhook e seus requisitos de conta, credenciais e segurança
+- [ ] Comparar a conferência manual atual com a confirmação automatizada por provedor, preservando a aprovação manual de créditos
+- [ ] Solicitar escolha explícita do proprietário antes de conectar banco, provedor Pix ou webhook
+- [ ] Não ativar recebimento automático, aprovação automática ou transferência de valores em nenhuma etapa
+- [ ] Ajustar o alerta de solicitação Pix para informar usuário, pacote, valor e créditos, deixando explícito que o pagamento deve ser conferido manualmente
+- [ ] Validar o alerta integrado ao proprietário sem criar pagamento, solicitação de cliente ou liberar créditos
+- [ ] Configurar uma conta Gmail dedicada como remetente de alertas e o Gmail pessoal do proprietário como destinatário
+- [ ] Solicitar somente a senha de aplicativo do remetente, nunca a senha normal da conta
+- [ ] Iniciar o cadastro da conta Gmail dedicada e interromper para o proprietário preencher dados pessoais, telefone, CAPTCHA ou código de verificação
+- [x] Reconfirmar a verificação em duas etapas e a indisponibilidade atual de senha de aplicativo; não usar senha normal da conta
+- [x] Comparar alternativa de provedor de e-mail transacional se a conta Gmail nova continuar sem senha de aplicativo
+- [x] Registrar a decisão de manter somente o painel administrativo, sem e-mail automático nem provedor externo nesta fase
 - [x] Cobrir em teste o alerta operacional ao proprietário e registrar que a entrega por e-mail depende de canal configurado separadamente
 - [x] Exibir solicitações pendentes no painel administrativo e liberar o pacote somente após confirmação manual do proprietário
 - [x] Cobrir o fluxo com testes de segurança, contrato e interface antes de publicar
@@ -128,6 +145,15 @@
 - [x] Registrar e entregar a avaliação da capacidade da IA e da VM, incluindo a revisão humana necessária
 - [x] Registrar e entregar os riscos de autorização, dados, prazo e escopo identificados
 - [x] Entregar a recomendação objetiva e adiar qualquer proposta até o anúncio se tornar público e o proprietário confirmar o texto
+
+## Avaliação de projeto 777705 da 99Freelas (link enviado pelo proprietário)
+- [x] Ler escopo, orçamento, prazo e entregáveis sem interagir com a plataforma
+- [x] Avaliar capacidade da IA, necessidade de revisão e viabilidade de concorrer
+- [x] Identificar riscos de autorização, dados sensíveis, prazo, escopo e ações externas
+- [x] Preparar recomendação objetiva; acompanhar até o anúncio ficar público sem criar ou enviar proposta
+- [x] Confirmar que o anúncio ainda está exclusivo, com 0 pontos de convite, e não pode receber proposta da conta atual
+- [ ] Preparar proposta com escopo delimitado, valor fechado e prazo responsável sem alegar experiência não comprovada
+- [ ] Apresentar o texto completo ao proprietário e aguardar confirmação específica antes de enviar
 
 ## Auditoria de pendências técnicas (20/08)
 - [x] Verificar no código e na VM se o fluxo de autoaperfeiçoamento com aprovação do dono permanece funcional
