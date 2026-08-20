@@ -86,6 +86,7 @@
 - [x] Criar QR Code a partir do código Pix Copia e Cola e botão de cópia sem armazenar dados de pagamento de clientes
 - [x] Registrar uma solicitação de recarga pendente, com usuário, pacote e horário, sem liberar créditos automaticamente
 - [ ] Notificar o proprietário por e-mail quando houver solicitação de recarga pendente, se a configuração permitir
+- [x] Cobrir em teste o alerta operacional ao proprietário e registrar que a entrega por e-mail depende de canal configurado separadamente
 - [x] Exibir solicitações pendentes no painel administrativo e liberar o pacote somente após confirmação manual do proprietário
 - [x] Cobrir o fluxo com testes de segurança, contrato e interface antes de publicar
 - [x] Registrar os pacotes aprovados: R$ 10 por 25 créditos, R$ 20 por 60 créditos e R$ 50 por 180 créditos
@@ -121,6 +122,12 @@
 - [x] Comparar o trabalho com as capacidades reais da IA, os limites da VM e a necessidade de revisão humana
 - [x] Identificar lacunas de preparo e riscos de qualidade, prazo, dados sensíveis ou ações externas
 - [x] Entregar ao proprietário a recomendação objetiva de não produzir proposta por envolver recuperação de acesso sem autorização verificável
+
+## Avaliação de projeto 777685 da 99Freelas (link enviado pelo proprietário)
+- [x] Ler escopo, orçamento, prazo e entregáveis sem interagir com a plataforma
+- [x] Registrar e entregar a avaliação da capacidade da IA e da VM, incluindo a revisão humana necessária
+- [x] Registrar e entregar os riscos de autorização, dados, prazo e escopo identificados
+- [x] Entregar a recomendação objetiva e adiar qualquer proposta até o anúncio se tornar público e o proprietário confirmar o texto
 
 ## Auditoria de pendências técnicas (20/08)
 - [x] Verificar no código e na VM se o fluxo de autoaperfeiçoamento com aprovação do dono permanece funcional
