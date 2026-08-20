@@ -3,7 +3,6 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { toast } from "sonner";
-import { useLocation } from "wouter";
 import {
   Plus,
   MessageSquare,
@@ -15,6 +14,8 @@ import {
   Check,
   X,
   Coins,
+  MoreVertical,
+  UserRoundCog,
 } from "lucide-react";
 import { trpc } from "@/lib/trpc";
 import { useAuth } from "@/_core/hooks/useAuth";
@@ -29,7 +30,6 @@ import {
 
 export default function Chat() {
   const { user, logout } = useAuth();
-  const [, setLocation] = useLocation();
   const utils = trpc.useUtils();
   const [conversations, setConversations] = useState<
     Array<{ id: number; title: string; updatedAt: Date }>
@@ -66,10 +66,10 @@ export default function Chat() {
   });
 
   const deleteMutation = trpc.chat.conversations.delete.useMutation({
-    onSuccess: () => {
+    onSuccess: (_data, variables) => {
       utils.chat.conversations.list.invalidate();
-      setConversations((prev) => prev.filter((c) => c.id !== selectedId));
-      setSelectedId(null);
+      setConversations((prev) => prev.filter((c) => c.id !== variables.id));
+      setSelectedId((currentId) => (currentId === variables.id ? null : currentId));
       toast.success("Conversa excluída.");
     },
     onError: (err) => toast.error("Erro ao excluir: " + err.message),
@@ -192,30 +192,38 @@ export default function Chat() {
                 ) : (
                   <>
                     <span className="text-sm truncate flex-1">{c.title}</span>
-                    <div className="hidden group-hover:flex items-center gap-0.5 shrink-0">
-                      <Button
-                        variant="ghost"
-                        size="icon"
-                        className="h-7 w-7 text-zinc-400 hover:text-white"
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          startRename(c);
-                        }}
+                    <DropdownMenu>
+                      <DropdownMenuTrigger asChild>
+                        <Button
+                          variant="ghost"
+                          size="icon"
+                          aria-label={`Mais ações para ${c.title}`}
+                          title="Mais ações"
+                          className="h-7 w-7 shrink-0 text-zinc-400 hover:text-white"
+                          onClick={(e) => e.stopPropagation()}
+                        >
+                          <MoreVertical className="h-4 w-4" />
+                        </Button>
+                      </DropdownMenuTrigger>
+                      <DropdownMenuContent
+                        align="end"
+                        side="right"
+                        className="w-44"
+                        onClick={(e) => e.stopPropagation()}
                       >
-                        <Pencil className="h-3.5 w-3.5" />
-                      </Button>
-                      <Button
-                        variant="ghost"
-                        size="icon"
-                        className="h-7 w-7 text-zinc-400 hover:text-red-400"
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          handleDelete(c.id);
-                        }}
-                      >
-                        <Trash2 className="h-3.5 w-3.5" />
-                      </Button>
-                    </div>
+                        <DropdownMenuItem onClick={() => startRename(c)}>
+                          <Pencil className="mr-2 h-4 w-4" />
+                          Renomear
+                        </DropdownMenuItem>
+                        <DropdownMenuItem
+                          onClick={() => handleDelete(c.id)}
+                          className="text-red-400 focus:text-red-400"
+                        >
+                          <Trash2 className="mr-2 h-4 w-4" />
+                          Excluir conversa
+                        </DropdownMenuItem>
+                      </DropdownMenuContent>
+                    </DropdownMenu>
                   </>
                 )}
               </div>
@@ -223,43 +231,58 @@ export default function Chat() {
           </div>
         </ScrollArea>
 
-        <div className="p-3 border-t border-white/10">
-          <DropdownMenu>
-            <DropdownMenuTrigger asChild>
-              <button className="flex items-center gap-3 w-full rounded-lg px-2 py-2 hover:bg-white/5 transition-colors text-left">
-                <div className="h-8 w-8 rounded-full bg-violet-500/20 flex items-center justify-center shrink-0">
-                  <span className="text-xs font-medium text-violet-300">
-                    {user?.name?.charAt(0).toUpperCase() ?? "U"}
-                  </span>
-                </div>
-                <div className="flex-1 min-w-0">
-                  <p className="text-sm font-medium truncate">{user?.name || "-"}</p>
-                  <p className="text-xs text-zinc-500 truncate">
-                    {user?.email || "-"}{" "}
-                    {user?.role === "admin" && "(admin)"}
-                  </p>
-                </div>
-              </button>
-            </DropdownMenuTrigger>
-            <DropdownMenuContent align="end" className="w-44">
-              {user?.role === "admin" && (
-                <DropdownMenuItem
-                  onClick={() => setLocation("/admin")}
-                  className="cursor-pointer"
-                >
-                  <Settings className="mr-2 h-4 w-4" />
-                  Painel admin
-                </DropdownMenuItem>
-              )}
-              <DropdownMenuItem
-                onClick={() => logout()}
-                className="cursor-pointer text-red-400 focus:text-red-400"
+        <div className="relative p-3 border-t border-white/10">
+          <details className="group relative" data-testid="account-menu">
+            <summary
+              aria-label="Abrir menu da conta"
+              className="flex list-none items-center gap-3 rounded-lg px-2 py-2 text-left transition-colors hover:bg-white/5 cursor-pointer [&::-webkit-details-marker]:hidden"
+            >
+              <div className="h-8 w-8 rounded-full bg-violet-500/20 flex items-center justify-center shrink-0">
+                <span className="text-xs font-medium text-violet-300">
+                  {user?.name?.charAt(0).toUpperCase() ?? "U"}
+                </span>
+              </div>
+              <div className="flex-1 min-w-0">
+                <p className="text-sm font-medium truncate">{user?.name || "-"}</p>
+                <p className="text-xs text-zinc-500 truncate">
+                  {user?.email || "-"} {user?.role === "admin" && "(admin)"}
+                </p>
+              </div>
+            </summary>
+            <div
+              role="menu"
+              aria-label="Menu da conta"
+              className="absolute bottom-16 left-0 right-0 z-50 rounded-md border border-white/10 bg-[#191923] p-1 shadow-lg"
+            >
+              <a
+                href="/account"
+                role="menuitem"
+                className="flex w-full items-center gap-2 rounded-sm px-2 py-2 text-left text-sm hover:bg-white/10"
               >
-                <LogOut className="mr-2 h-4 w-4" />
+                <UserRoundCog className="h-4 w-4" />
+                Conta
+              </a>
+              {user?.role === "admin" && (
+                <a
+                  href="/admin"
+                  role="menuitem"
+                  className="flex w-full items-center gap-2 rounded-sm px-2 py-2 text-left text-sm hover:bg-white/10"
+                >
+                  <Settings className="h-4 w-4" />
+                  Painel admin
+                </a>
+              )}
+              <button
+                type="button"
+                role="menuitem"
+                onClick={logout}
+                className="flex w-full items-center gap-2 rounded-sm px-2 py-2 text-left text-sm text-red-400 hover:bg-red-500/10"
+              >
+                <LogOut className="h-4 w-4" />
                 Sair
-              </DropdownMenuItem>
-            </DropdownMenuContent>
-          </DropdownMenu>
+              </button>
+            </div>
+          </details>
         </div>
       </aside>
 

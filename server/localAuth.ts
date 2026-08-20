@@ -10,10 +10,52 @@ import { z } from "zod";
 
 // ─── Password hashing (HMAC + salt, stored in DB) ───
 
+const identifierSchema = z.string().trim().min(3).max(320);
+const usernameSchema = z.string().trim().min(3).max(40).regex(/^[A-Za-zÀ-ÿ0-9._ -]+$/, "Nome de usuário inválido");
+const passwordSchema = z.string().min(6).max(128);
+
 const loginSchema = z.object({
-  email: z.string().min(3).max(320),
+  identifier: identifierSchema.optional(),
+  email: identifierSchema.optional(), // compatibilidade com versões anteriores da interface
   password: z.string().min(6).max(128),
+}).refine(value => Boolean(value.identifier || value.email), {
+  message: "Informe o nome de usuário ou e-mail",
 });
+
+const registerSchema = z.object({
+  name: usernameSchema,
+  email: z.string().trim().email().max(320),
+  password: passwordSchema,
+});
+
+const accountUpdateSchema = z.object({
+  name: usernameSchema,
+  email: z.string().trim().email().max(320),
+  currentPassword: passwordSchema,
+  newPassword: passwordSchema.optional(),
+});
+
+const AUTH_WINDOW_MS = 15 * 60 * 1000;
+const AUTH_MAX_ATTEMPTS = 10;
+const authAttempts = new Map<string, { count: number; resetAt: number }>();
+
+function authRateLimitKey(req: any, action: string) {
+  const forwarded = typeof req.headers?.["x-forwarded-for"] === "string" ? req.headers["x-forwarded-for"].split(",")[0].trim() : "";
+  return `${action}:${forwarded || req.ip || req.socket?.remoteAddress || "unknown"}`;
+}
+
+function consumeAuthAttempt(req: any, action: string) {
+  const key = authRateLimitKey(req, action);
+  const now = Date.now();
+  const current = authAttempts.get(key);
+  const next = !current || current.resetAt <= now ? { count: 1, resetAt: now + AUTH_WINDOW_MS } : { ...current, count: current.count + 1 };
+  authAttempts.set(key, next);
+  return next.count <= AUTH_MAX_ATTEMPTS;
+}
+
+function clearAuthAttempts(req: any, action: string) {
+  authAttempts.delete(authRateLimitKey(req, action));
+}
 
 function hashPassword(password: string, salt: string): string {
   return createHmac("sha256", salt).update(password).digest("hex");
@@ -32,66 +74,44 @@ function isOwnerEmail(email: string): boolean {
 }
 
 /**
- * POST /api/auth/login (via express app) - Login ou cadastro automático.
- * Se o usuário não existir, cria automaticamente.
- * Se existir, valida a senha e faz login.
+ * POST /api/auth/login - autentica uma conta local existente por nome de usuário ou e-mail.
  */
 export async function handleLocalLogin(req: any, res: any) {
   try {
+    if (!consumeAuthAttempt(req, "login")) {
+      res.status(429).json({ error: "Muitas tentativas. Aguarde alguns minutos antes de tentar novamente." });
+      return;
+    }
     const parsed = loginSchema.safeParse(req.body);
     if (!parsed.success) {
-      res.status(400).json({ error: "E-mail e senha são obrigatórios" });
+      res.status(400).json({ error: "Informe o nome de usuário ou e-mail e a senha" });
       return;
     }
 
-    const { email, password } = parsed.data;
-    const normalizedEmail = email.toLowerCase().trim();
-    const name = normalizedEmail.split("@")[0];
-    const openId = `local:${normalizedEmail}`;
-
-    // Stored credential lives in users.passwordHash / users.salt columns?
-    // Simpler: keep a small "credentials" table... For now use DB users metadata
-    // columns `loginMethod` — we store salt+hash in a JSON-friendly way is not available,
-    // so we use a separate `passwords` helper via db.users custom columns.
-    const dbUser = await db.getUserByOpenId(openId);
-
-    if (dbUser && dbUser.loginMethod === "email") {
-      // Existing user — validate password
-      const stored = await getPasswordRecord(normalizedEmail);
-      if (!stored) {
-        // User exists but no password record yet: store the new password and allow
-        console.log("[Auth] Existing user without stored password, setting it now:", normalizedEmail);
-        const salt = generateSalt();
-        const passwordHash = hashPassword(password, salt);
-        await setPasswordRecord(normalizedEmail, passwordHash, salt);
-      } else {
-        const hash = hashPassword(password, stored.salt);
-        if (hash !== stored.passwordHash) {
-          res.status(401).json({ error: "Email ou senha inválidos" });
-          return;
-        }
-      }
-    } else {
-      // New user - auto-register
-      console.log("[Auth] Auto-registering new user:", normalizedEmail);
-      const salt = generateSalt();
-      const passwordHash = hashPassword(password, salt);
-      await setPasswordRecord(normalizedEmail, passwordHash, salt);
+    const { password } = parsed.data;
+    const identifier = (parsed.data.identifier || parsed.data.email || "").trim();
+    const dbUser = await db.getUserByLoginIdentifier(identifier);
+    if (!dbUser || dbUser.loginMethod !== "email") {
+      res.status(401).json({ error: "Nome de usuário/e-mail ou senha inválidos" });
+      return;
+    }
+    const normalizedEmail = String(dbUser.email).toLowerCase().trim();
+    const stored = await getPasswordRecord(normalizedEmail);
+    if (!stored || hashPassword(password, stored.salt) !== stored.passwordHash) {
+      res.status(401).json({ error: "Nome de usuário/e-mail ou senha inválidos" });
+      return;
     }
 
-    // Role: admin if this is the owner's email
-    const isOwner = isOwnerEmail(normalizedEmail);
-
     await db.upsertUser({
-      openId,
-      name,
+      openId: dbUser.openId,
+      name: dbUser.name,
       email: normalizedEmail,
       loginMethod: "email",
-      role: isOwner ? "admin" : "user",
+      role: dbUser.role || (isOwnerEmail(normalizedEmail) ? "admin" : "user"),
       lastSignedIn: new Date(),
     });
 
-    const finalUser = await db.getUserByOpenId(openId);
+    const finalUser = await db.getUserByOpenId(dbUser.openId);
     if (!finalUser) {
       console.error("[Auth] Failed to get user after upsert");
       res.status(500).json({ error: "Falha ao autenticar usuário" });
@@ -99,12 +119,13 @@ export async function handleLocalLogin(req: any, res: any) {
     }
 
     const sessionToken = await sdk.createSessionToken(finalUser.openId, {
-      name: finalUser.name || name,
+      name: finalUser.name || normalizedEmail.split("@")[0],
       expiresInMs: ONE_YEAR_MS,
     });
 
     const cookieOptions = getSessionCookieOptions(req);
     res.cookie(COOKIE_NAME, sessionToken, { ...cookieOptions, maxAge: ONE_YEAR_MS });
+    clearAuthAttempts(req, "login");
 
     res.json({
       success: true,
@@ -119,6 +140,86 @@ export async function handleLocalLogin(req: any, res: any) {
   } catch (error: any) {
     console.error("[Auth] Local login error:", error);
     res.status(500).json({ error: "Erro interno do servidor" });
+  }
+}
+
+/** POST /api/auth/register - cria explicitamente uma nova conta local. */
+export async function handleLocalRegister(req: any, res: any) {
+  try {
+    if (!consumeAuthAttempt(req, "register")) {
+      res.status(429).json({ error: "Muitas tentativas. Aguarde alguns minutos antes de tentar novamente." });
+      return;
+    }
+    const parsed = registerSchema.safeParse(req.body);
+    if (!parsed.success) {
+      res.status(400).json({ error: "Informe nome de usuário, e-mail válido e senha de pelo menos 6 caracteres" });
+      return;
+    }
+    const { name, email, password } = parsed.data;
+    const normalizedEmail = email.toLowerCase().trim();
+    const salt = generateSalt();
+    const created = await db.createLocalAccount({
+      name,
+      email: normalizedEmail,
+      passwordHash: hashPassword(password, salt),
+      salt,
+      role: isOwnerEmail(normalizedEmail) ? "admin" : "user",
+    });
+    if (!created) {
+      res.status(409).json({ error: "Esse nome de usuário ou e-mail já está em uso" });
+      return;
+    }
+    const sessionToken = await sdk.createSessionToken(created.openId, { name: created.name, expiresInMs: ONE_YEAR_MS });
+    res.cookie(COOKIE_NAME, sessionToken, { ...getSessionCookieOptions(req), maxAge: ONE_YEAR_MS });
+    clearAuthAttempts(req, "register");
+    res.status(201).json({ success: true, user: created });
+  } catch (error) {
+    console.error("[Auth] Local register error:", error);
+    res.status(500).json({ error: "Erro interno ao criar a conta" });
+  }
+}
+
+/** POST /api/auth/account - atualiza nome, e-mail e/ou senha da sessão local atual. */
+export async function handleLocalAccountUpdate(req: any, res: any) {
+  try {
+    const currentUser = await sdk.authenticateRequest(req);
+    if (currentUser.loginMethod !== "email") {
+      res.status(403).json({ error: "Esta conta não pode ser editada por este formulário" });
+      return;
+    }
+    const parsed = accountUpdateSchema.safeParse(req.body);
+    if (!parsed.success) {
+      res.status(400).json({ error: "Preencha nome, e-mail e a senha atual corretamente" });
+      return;
+    }
+    const { name, email, currentPassword, newPassword } = parsed.data;
+    const stored = await getPasswordRecord(String(currentUser.email || "").toLowerCase());
+    if (!stored || hashPassword(currentPassword, stored.salt) !== stored.passwordHash) {
+      res.status(401).json({ error: "A senha atual não confere" });
+      return;
+    }
+    const nextSalt = newPassword ? generateSalt() : undefined;
+    const result = await db.updateLocalAccount({
+      openId: currentUser.openId,
+      name,
+      email,
+      passwordHash: newPassword && nextSalt ? hashPassword(newPassword, nextSalt) : undefined,
+      salt: nextSalt,
+    });
+    if (result.status === "duplicate") {
+      res.status(409).json({ error: "Esse nome de usuário ou e-mail já está em uso" });
+      return;
+    }
+    if (!result.user) {
+      res.status(404).json({ error: "Conta não encontrada" });
+      return;
+    }
+    const sessionToken = await sdk.createSessionToken(result.user.openId, { name: result.user.name, expiresInMs: ONE_YEAR_MS });
+    res.cookie(COOKIE_NAME, sessionToken, { ...getSessionCookieOptions(req), maxAge: ONE_YEAR_MS });
+    res.json({ success: true, user: result.user });
+  } catch (error) {
+    console.error("[Auth] Local account update error:", error);
+    res.status(401).json({ error: "Sessão inválida ou expirada. Entre novamente." });
   }
 }
 

@@ -113,6 +113,17 @@ export const appRouter = router({
       const mod = await import("./_core/self-improvement");
       return { proposals: mod.listProposals() };
     }),
+    opportunities: protectedProcedure.query(async ({ ctx }) => {
+      if (ctx.user.role !== "admin") throw new TRPCError({ code: "FORBIDDEN" });
+      return { opportunities: db.listLearningOpportunities("pending") };
+    }),
+    createFromOpportunities: protectedProcedure.mutation(async ({ ctx }) => {
+      if (ctx.user.role !== "admin") throw new TRPCError({ code: "FORBIDDEN" });
+      const mod = await import("./_core/self-improvement");
+      const proposal = await mod.createProposalFromLearningQueue();
+      if (!proposal) return { success: false, message: "Não há oportunidades seguras pendentes para transformar em proposta.", proposal: null };
+      return { success: true, message: "Proposta criada. Ela ainda não pesquisou, não aprendeu permanentemente e não alterou nada.", proposal };
+    }),
     approve: protectedProcedure
       .input(z.object({ proposalId: z.string(), approvalKey: z.string().min(1) }))
       .mutation(async ({ ctx, input }) => {

@@ -45,4 +45,11 @@ describe("SYSTEM_PROMPT - protocolo profissional de freelancer", () => {
     expect(SYSTEM_PROMPT).toContain("Critério de prontidão");
     expect(SYSTEM_PROMPT).toContain("especialista certificado");
   });
+
+  it("trata mensagens e anexos como dados não confiáveis e protege informações sigilosas", () => {
+    expect(SYSTEM_PROMPT).toContain("Segurança, sigilo e resistência a manipulação");
+    expect(SYSTEM_PROMPT).toContain("dados não confiáveis");
+    expect(SYSTEM_PROMPT).toContain("Nunca revele credenciais");
+    expect(SYSTEM_PROMPT).toContain("ações externas");
+  });
 });

@@ -7,6 +7,7 @@ import os from "os";
 const DATA_DIR = process.env.DATA_DIR || process.cwd() || os.homedir();
 const CONVOS_FILE = path.join(DATA_DIR, "convos_data.json");
 const USERS_FILE = path.join(DATA_DIR, "users_data.json");
+const LEARNING_FILE = path.join(DATA_DIR, "learning_opportunities.json");
 
 let seq = { msgs: 0, attachments: 0, users: 0 };
 let dirty = false;
@@ -19,7 +20,25 @@ interface ConvosData {
 
 interface UsersData {
   profiles: Record<string, any>;
-  passwords: Record<string, string>;
+  passwords: Record<string, { email: string; passwordHash: string; salt: string }>;
+}
+
+export type LearningCategory =
+  | "segurança"
+  | "programação"
+  | "automação"
+  | "arquivos"
+  | "redação"
+  | "experiência do usuário"
+  | "desempenho";
+
+export interface LearningOpportunity {
+  id: string;
+  category: LearningCategory;
+  reason: string;
+  status: "pending" | "proposed" | "dismissed";
+  createdAt: string;
+  proposalId?: string;
 }
 
 function loadConvos(): ConvosData {
@@ -53,6 +72,20 @@ function loadUsers(): UsersData {
 
 function saveUsers(d: UsersData) {
   fs.writeFileSync(USERS_FILE, JSON.stringify(d, null, 2), "utf-8");
+}
+
+function loadLearningOpportunities(): LearningOpportunity[] {
+  try {
+    const raw = fs.readFileSync(LEARNING_FILE, "utf-8");
+    const parsed = JSON.parse(raw);
+    return Array.isArray(parsed?.opportunities) ? parsed.opportunities : [];
+  } catch {
+    return [];
+  }
+}
+
+function saveLearningOpportunities(opportunities: LearningOpportunity[]) {
+  fs.writeFileSync(LEARNING_FILE, JSON.stringify({ opportunities }, null, 2), "utf-8");
 }
 
 function nextSeq(kind: "msgs" | "attachments" | "users"): number {
@@ -136,6 +169,99 @@ export async function upsertUser(user: any): Promise<void> {
 export async function getUserByOpenId(openId: string) {
   const u = loadUsers();
   return u.profiles[openId] || null;
+}
+
+/** Encontra uma conta local pelo e-mail ou pelo nome de usuário, sem distinguir maiúsculas/minúsculas. */
+export async function getUserByLoginIdentifier(identifier: string) {
+  const normalized = identifier.trim().toLowerCase();
+  const u = loadUsers();
+  return Object.values(u.profiles).find((profile: any) =>
+    String(profile.email || "").trim().toLowerCase() === normalized ||
+    String(profile.name || "").trim().toLowerCase() === normalized
+  ) || null;
+}
+
+export async function createLocalAccount(input: {
+  name: string;
+  email: string;
+  passwordHash: string;
+  salt: string;
+  role: "admin" | "user";
+}) {
+  const u = loadUsers();
+  const normalizedEmail = input.email.trim().toLowerCase();
+  const normalizedName = input.name.trim().toLowerCase();
+  const duplicate = Object.values(u.profiles).some((profile: any) =>
+    String(profile.email || "").trim().toLowerCase() === normalizedEmail ||
+    String(profile.name || "").trim().toLowerCase() === normalizedName
+  );
+  if (duplicate) return null;
+
+  seq.users = Math.max(seq.users || 0, ...Object.values(u.profiles).map((profile: any) => Number(profile.id) || 0)) + 1;
+  const openId = `local:${normalizedEmail}`;
+  const profile = {
+    openId,
+    id: seq.users,
+    createdAt: Date.now(),
+    name: input.name.trim(),
+    email: normalizedEmail,
+    loginMethod: "email",
+    role: input.role,
+    lastSignedIn: new Date().toISOString(),
+  };
+  u.profiles[openId] = profile;
+  u.passwords[normalizedEmail] = { email: normalizedEmail, passwordHash: input.passwordHash, salt: input.salt };
+  saveUsers(u);
+  return profile;
+}
+
+/**
+ * Atualiza os dados de uma conta local preservando o id numérico.
+ * Créditos e conversas usam esse id, portanto permanecem vinculados à conta.
+ */
+export async function updateLocalAccount(input: {
+  openId: string;
+  name: string;
+  email: string;
+  passwordHash?: string;
+  salt?: string;
+}) {
+  const u = loadUsers();
+  const current = u.profiles[input.openId];
+  if (!current) return { status: "not_found" as const, user: null };
+
+  const normalizedEmail = input.email.trim().toLowerCase();
+  const normalizedName = input.name.trim().toLowerCase();
+  const emailOrNameTaken = Object.entries(u.profiles).some(([openId, profile]: [string, any]) =>
+    openId !== input.openId && (
+      String(profile.email || "").trim().toLowerCase() === normalizedEmail ||
+      String(profile.name || "").trim().toLowerCase() === normalizedName
+    )
+  );
+  if (emailOrNameTaken) return { status: "duplicate" as const, user: null };
+
+  const oldEmail = String(current.email || "").trim().toLowerCase();
+  const nextOpenId = `local:${normalizedEmail}`;
+  const updated = {
+    ...current,
+    openId: nextOpenId,
+    name: input.name.trim(),
+    email: normalizedEmail,
+    lastSignedIn: new Date().toISOString(),
+  };
+
+  if (nextOpenId !== input.openId) delete u.profiles[input.openId];
+  u.profiles[nextOpenId] = updated;
+  if (oldEmail !== normalizedEmail && u.passwords[oldEmail]) {
+    const passwordRecord = u.passwords[oldEmail];
+    delete u.passwords[oldEmail];
+    u.passwords[normalizedEmail] = { ...passwordRecord, email: normalizedEmail };
+  }
+  if (input.passwordHash && input.salt) {
+    u.passwords[normalizedEmail] = { email: normalizedEmail, passwordHash: input.passwordHash, salt: input.salt };
+  }
+  saveUsers(u);
+  return { status: "updated" as const, user: updated };
 }
 
 export async function updateUserRole(id: number, role: "admin" | "user") {
@@ -261,6 +387,57 @@ export async function deleteAttachments(ids: number[]) {
   d.attachments = d.attachments.filter((a) => !ids.includes(a.id));
   saveConvos(d);
   return { success: true };
+}
+
+// ─── Oportunidades de autoaprendizagem ───
+// A fila nunca armazena texto, anexo, identificador de usuário ou credencial.
+// Ela registra somente uma categoria pré-definida e uma justificativa genérica.
+export function detectSafeLearningCategory(content: string): LearningCategory | null {
+  const normalized = content.normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase();
+  if (/(senha|password|token|api[ _-]?key|chave privada|credential|segredo)/.test(normalized)) return null;
+  if (/(invas|seguranc|vazament|autentic|login|permiss|privacidade)/.test(normalized)) return "segurança";
+  if (/(codigo|programa|typescript|javascript|python|bug|erro|api|github|repositorio)/.test(normalized)) return "programação";
+  if (/(automat|integr|webhook|fluxo|\bbot\b)/.test(normalized)) return "automação";
+  if (/(anexo|pdf|docx|xlsx|planilha|arquivo|audio|transcri)/.test(normalized)) return "arquivos";
+  if (/(redacao|revisao|curriculo|texto|artigo|traducao)/.test(normalized)) return "redação";
+  if (/(interface|botao|tela|menu|cadastro|conta|usuario)/.test(normalized)) return "experiência do usuário";
+  if (/(lento|memoria|desempenho|performance|vm)/.test(normalized)) return "desempenho";
+  return null;
+}
+
+export function recordLearningOpportunity(category: LearningCategory): LearningOpportunity | null {
+  const opportunities = loadLearningOpportunities();
+  const oneWeekAgo = Date.now() - 7 * 24 * 60 * 60 * 1000;
+  const alreadyQueued = opportunities.some((item) =>
+    item.category === category && item.status === "pending" && new Date(item.createdAt).getTime() >= oneWeekAgo
+  );
+  if (alreadyQueued) return null;
+  const opportunity: LearningOpportunity = {
+    id: `learn_${Date.now()}_${Math.random().toString(36).slice(2, 7)}`,
+    category,
+    reason: `Uma necessidade relacionada a ${category} foi identificada de forma genérica em uma conversa.`,
+    status: "pending",
+    createdAt: new Date().toISOString(),
+  };
+  opportunities.unshift(opportunity);
+  saveLearningOpportunities(opportunities.slice(0, 100));
+  return opportunity;
+}
+
+export function listLearningOpportunities(status?: LearningOpportunity["status"]) {
+  return loadLearningOpportunities()
+    .filter((item) => !status || item.status === status)
+    .sort((a, b) => b.createdAt.localeCompare(a.createdAt));
+}
+
+export function markLearningOpportunitiesProposed(ids: string[], proposalId: string) {
+  const opportunities = loadLearningOpportunities().map((item) =>
+    ids.includes(item.id) && item.status === "pending"
+      ? { ...item, status: "proposed" as const, proposalId }
+      : item
+  );
+  saveLearningOpportunities(opportunities);
+  return opportunities.filter((item) => item.proposalId === proposalId);
 }
 
 // ─── Admin helpers ───

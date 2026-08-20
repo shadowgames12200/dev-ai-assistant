@@ -8,6 +8,7 @@ import { useAuth } from "./_core/hooks/useAuth";
 import Login from "./pages/Login";
 import Chat from "./pages/Chat";
 import Admin from "./pages/Admin";
+import Account from "./pages/Account";
 
 function Router() {
   const { user, loading } = useAuth();
@@ -40,6 +41,12 @@ function Router() {
     return <>{children}</>;
   };
 
+  const AccountPage = () => (
+    <Protected>
+      <Account />
+    </Protected>
+  );
+
   return (
     <Switch>
       <Route path={"/"} component={LoginPage} />
@@ -53,6 +60,7 @@ function Router() {
           <Admin />
         </Protected>
       </Route>
+      <Route path="/account" component={AccountPage} />
       <Route path={"/404"} component={NotFound} />
       {/* Final fallback route */}
       <Route component={NotFound} />

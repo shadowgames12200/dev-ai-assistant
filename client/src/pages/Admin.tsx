@@ -1,7 +1,7 @@
 import { useState } from "react";
 import { toast } from "sonner";
 import { useLocation } from "wouter";
-import { ShieldCheck, ShieldOff, ArrowLeft, Users, Plus, Minus, Coins } from "lucide-react";
+import { ShieldCheck, ShieldOff, ArrowLeft, Users, Plus, Minus, Coins, BrainCircuit, Lightbulb, Check, X } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import {
@@ -30,6 +30,13 @@ export default function Admin() {
   const creditsByUser = new Map(
     ((creditsList as any[]) || []).map((c: any) => [Number(c.id), Number(c.balance ?? 0)])
   );
+  const { data: proposalsData } = trpc.selfImprove.list.useQuery(undefined, {
+    enabled: user?.role === "admin",
+  });
+  const { data: opportunitiesData } = trpc.selfImprove.opportunities.useQuery(undefined, {
+    enabled: user?.role === "admin",
+  });
+  const [approvalKey, setApprovalKey] = useState("");
 
   // ---- Gestão de créditos (admin) ----
   const { data: costData } = trpc.credits.getCost.useQuery(undefined, {
@@ -66,6 +73,33 @@ export default function Admin() {
       }
     },
   });
+  const createLearningProposalMutation = trpc.selfImprove.createFromOpportunities.useMutation({
+    onSuccess: (result) => {
+      utils.selfImprove.list.invalidate();
+      utils.selfImprove.opportunities.invalidate();
+      result.success ? toast.success(result.message) : toast.info(result.message);
+    },
+    onError: (err) => toast.error("Não foi possível criar a proposta: " + err.message),
+  });
+  const approveProposalMutation = trpc.selfImprove.approve.useMutation({
+    onSuccess: (result) => {
+      if (result.success) {
+        setApprovalKey("");
+        utils.selfImprove.list.invalidate();
+        toast.success("Proposta aprovada. Nenhuma alteração é aplicada automaticamente.");
+      } else {
+        toast.error(result.message);
+      }
+    },
+    onError: (err) => toast.error("Não foi possível aprovar: " + err.message),
+  });
+  const rejectProposalMutation = trpc.selfImprove.reject.useMutation({
+    onSuccess: () => {
+      utils.selfImprove.list.invalidate();
+      toast.success("Proposta rejeitada. Nenhuma mudança foi realizada.");
+    },
+    onError: (err) => toast.error("Não foi possível rejeitar: " + err.message),
+  });
 
   if (user && user.role !== "admin") {
     return (
@@ -94,7 +128,7 @@ export default function Admin() {
 
       <main className="p-6 max-w-4xl mx-auto">
         <p className="text-sm text-zinc-400 mb-4">
-          Gerencie os usuários cadastrados, os créditos e o custo por mensagem.
+          Gerencie os usuários cadastrados, os créditos, o custo por mensagem e as propostas pendentes de autoaprendizagem.
         </p>
 
         {/* ---- Custo por mensagem ---- */}
@@ -136,6 +170,83 @@ export default function Admin() {
               Valor atual:{" "}
               <strong className="text-violet-300">{costData?.costPerMessage ?? 1} crédito(s)</strong>
             </span>
+          </div>
+        </section>
+
+        <section className="mb-8 rounded-lg border border-white/10 bg-white/[0.03] p-5">
+          <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+            <div>
+              <div className="flex items-center gap-2 mb-1">
+                <BrainCircuit className="h-4 w-4 text-violet-400" />
+                <h2 className="text-sm font-semibold">Autoaprendizagem sob aprovação</h2>
+              </div>
+              <p className="max-w-2xl text-xs leading-relaxed text-zinc-400">
+                A fila usa somente temas genéricos identificados nas conversas; não guarda textos, anexos, usuários ou segredos. Criar uma proposta não pesquisa, não aprende permanentemente e não muda o código.
+              </p>
+            </div>
+            <Button
+              size="sm"
+              onClick={() => createLearningProposalMutation.mutate()}
+              disabled={createLearningProposalMutation.isPending || !opportunitiesData?.opportunities?.length}
+            >
+              <Lightbulb className="h-4 w-4 mr-1" />
+              Criar proposta de autoaprendizagem
+            </Button>
+          </div>
+          <p className="mt-3 text-xs text-zinc-500">
+            Oportunidades seguras pendentes: <strong className="text-violet-300">{opportunitiesData?.opportunities?.length ?? 0}</strong>
+          </p>
+          {!opportunitiesData?.opportunities?.length && (
+            <p className="mt-2 text-xs text-zinc-500">Ainda não há temas seguros pendentes. A IA continuará apenas registrando categorias genéricas relevantes.</p>
+          )}
+        </section>
+
+        <section className="mb-8 rounded-lg border border-white/10 bg-white/[0.03] p-5">
+          <div className="flex items-center gap-2 mb-3">
+            <Lightbulb className="h-4 w-4 text-amber-300" />
+            <h2 className="text-sm font-semibold">Propostas para sua aprovação</h2>
+          </div>
+          <p className="mb-4 text-xs leading-relaxed text-zinc-400">
+            Aprove somente se os benefícios, riscos e impacto fizerem sentido. Aprovar registra sua decisão, mas não pesquisa fontes, não mexe em dados e não altera código automaticamente.
+          </p>
+          <Input
+            type="password"
+            autoComplete="off"
+            placeholder="Chave de aprovação do proprietário"
+            value={approvalKey}
+            onChange={(event) => setApprovalKey(event.target.value)}
+            className="mb-4 max-w-md bg-[#0a0a0f]"
+          />
+          <div className="space-y-3">
+            {(proposalsData?.proposals || []).map((proposal: any) => (
+              <article key={proposal.id} className="rounded-md border border-white/10 bg-black/20 p-4">
+                <div className="flex flex-col gap-2 sm:flex-row sm:items-start sm:justify-between">
+                  <div>
+                    <h3 className="text-sm font-medium text-zinc-100">{proposal.title}</h3>
+                    <span className={`mt-1 inline-flex rounded-full px-2 py-0.5 text-[11px] ${proposal.status === "pending" ? "bg-amber-500/15 text-amber-200" : proposal.status === "approved" ? "bg-emerald-500/15 text-emerald-200" : "bg-zinc-500/15 text-zinc-300"}`}>
+                      {proposal.status === "pending" ? "Aguardando decisão" : proposal.status === "approved" ? "Aprovada" : "Rejeitada"}
+                    </span>
+                  </div>
+                  {proposal.status === "pending" && (
+                    <div className="flex gap-2">
+                      <Button size="sm" variant="outline" className="border-red-400/30 text-red-200" onClick={() => rejectProposalMutation.mutate({ proposalId: proposal.id })} disabled={rejectProposalMutation.isPending}>
+                        <X className="mr-1 h-4 w-4" /> Rejeitar
+                      </Button>
+                      <Button size="sm" onClick={() => approveProposalMutation.mutate({ proposalId: proposal.id, approvalKey })} disabled={approveProposalMutation.isPending || !approvalKey.trim()}>
+                        <Check className="mr-1 h-4 w-4" /> Aprovar
+                      </Button>
+                    </div>
+                  )}
+                </div>
+                <p className="mt-3 text-xs leading-relaxed text-zinc-300">{proposal.description}</p>
+                <ProposalDetails label="Benefícios" values={proposal.benefits} />
+                <ProposalDetails label="Riscos" values={proposal.risks} />
+                {proposal.researchPlan && <p className="mt-2 text-xs text-zinc-400"><strong className="text-zinc-200">Pesquisa após aprovação:</strong> {proposal.researchPlan}</p>}
+                {proposal.impact && <p className="mt-2 text-xs text-zinc-400"><strong className="text-zinc-200">Impacto:</strong> {proposal.impact}</p>}
+                {proposal.reversal && <p className="mt-2 text-xs text-zinc-400"><strong className="text-zinc-200">Como desfazer:</strong> {proposal.reversal}</p>}
+              </article>
+            ))}
+            {(!proposalsData?.proposals || proposalsData.proposals.length === 0) && <p className="text-xs text-zinc-500">Nenhuma proposta criada ainda.</p>}
           </div>
         </section>
 
@@ -234,6 +345,12 @@ export default function Admin() {
       </main>
     </div>
   );
+}
+
+function ProposalDetails({ label, values }: { label: string; values?: unknown }) {
+  const items = Array.isArray(values) ? values.filter((value) => typeof value === "string" && value.trim()) : [];
+  if (items.length === 0) return null;
+  return <p className="mt-2 text-xs text-zinc-400"><strong className="text-zinc-200">{label}:</strong> {items.join("; ")}</p>;
 }
 
 function CreditButtons({

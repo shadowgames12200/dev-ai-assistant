@@ -39,10 +39,14 @@ export function getSessionCookieOptions(
   //       ? hostname
   //       : undefined;
 
+  const secure = isSecureRequest(req);
+
   return {
     httpOnly: true,
     path: "/",
-    sameSite: "none",
-    secure: isSecureRequest(req),
+    // Browsers rejeitam `SameSite=None` sem `Secure`. Como a VM é acessada
+    // diretamente por HTTP, use Lax nesse caso para que o cookie seja salvo.
+    sameSite: secure ? "none" : "lax",
+    secure,
   };
 }

@@ -348,6 +348,38 @@ export async function createImprovementProposal(title: any, description: any, fi
     saveProposalsDisk();
     return proposal;
 }
+
+/**
+ * Converte itens anônimos da fila em uma proposta. Esta etapa não pesquisa a
+ * web, não altera regras, não executa código e não incorpora conteúdo de chats.
+ */
+export async function createProposalFromLearningQueue() {
+    const db = await import("../db");
+    const pending = db.listLearningOpportunities("pending").slice(0, 3);
+    if (pending.length === 0) return null;
+    const themes = pending.map((item) => item.category);
+    const proposal = await createImprovementProposal(
+        `Aprendizado proposto: ${themes.join(", ")}`,
+        `A IA identificou oportunidades genéricas relacionadas a ${themes.join(", ")}. Esta proposta pede autorização somente para estudar fontes confiáveis e preparar um plano de aprendizado. Nenhuma informação de conversa foi armazenada e nenhuma mudança será feita nesta etapa.`,
+        [],
+        [
+            "Pesquisa pode consumir limites das APIs configuradas.",
+            "Qualquer regra, documento ou alteração de código exigirá uma aprovação posterior e específica.",
+        ],
+        [
+            "Ajuda a priorizar capacidades úteis sem registrar conteúdo privado de clientes.",
+            "Mantém o proprietário no controle antes de pesquisa, aprendizado persistente ou mudança técnica.",
+        ],
+        "Triagem limitada; sem execução automática"
+    );
+    (proposal as any).kind = "learning-queue";
+    (proposal as any).researchPlan = "Após aprovação, consultar apenas documentação oficial e fontes confiáveis, resumir o aprendizado e apresentar qualquer mudança técnica separadamente.";
+    (proposal as any).impact = "Baixo nesta etapa: apenas planejamento; não há alteração de código, dados, integrações ou credenciais.";
+    (proposal as any).reversal = "Rejeitar encerra a proposta. Aprovar não altera nada automaticamente; qualquer implementação futura será apresentada para revisão.";
+    db.markLearningOpportunitiesProposed(pending.map((item) => item.id), proposal.id);
+    await saveProposalsDisk();
+    return proposal;
+}
 /**
  * Aprovar uma proposta de melhoria (ação do usuário)
  */

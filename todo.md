@@ -79,6 +79,24 @@
 - [x] Criar teste real de interface para o Admin com saldo por usuário e botões de adicionar/remover créditos
 - [x] Substituir as inspeções estáticas de fonte por cobertura de integração/UI baseada em renderização
 
+## Recarga manual por Pix (pedido do usuário 20/08)
+- [x] Definir pacotes, preço, créditos por pacote e a mensagem de que a liberação depende de conferência manual
+- [ ] Gerar dinamicamente o código Pix Copia e Cola por pacote a partir da chave, nome e cidade cadastrados com segurança
+- [ ] Criar uma tela de recarga exibida quando os créditos acabam, com pacotes e instruções de pagamento
+- [ ] Criar QR Code a partir do código Pix Copia e Cola e botão de cópia sem armazenar dados de pagamento de clientes
+- [ ] Registrar uma solicitação de recarga pendente, com usuário, pacote e horário, sem liberar créditos automaticamente
+- [ ] Notificar o proprietário por e-mail quando houver solicitação de recarga pendente, se a configuração permitir
+- [ ] Exibir solicitações pendentes no painel administrativo e liberar o pacote somente após confirmação manual do proprietário
+- [ ] Cobrir o fluxo com testes de segurança, contrato e interface antes de publicar
+- [x] Registrar os pacotes aprovados: R$ 10 por 25 créditos, R$ 20 por 60 créditos e R$ 50 por 180 créditos
+- [ ] Configurar o suporte dos clientes para o WhatsApp 38 99110-9806 sem revelar dados desnecessários
+- [ ] Verificar se há integração WhatsApp Business disponível para o número 38 98405-7434 antes de prometer alerta automático
+- [ ] Configurar aviso inicial ao proprietário pelo e-mail charleshenriquegonsalves05@gmail.com, se o canal de proprietário estiver disponível
+- [x] Configurar os dados de Pix como segredo do servidor, sem deixá-los codificados ou expostos no repositório
+- [ ] Adicionar teste e endpoint leve para validar a geração do payload Pix por pacote sem expor valores de configuração
+- [ ] Validar o canal de e-mail disponível para alertar o proprietário sobre pedidos pendentes
+- [ ] Registrar o WhatsApp Business como melhoria futura, sem bloquear a recarga manual atual
+
 ## Publicação da interface de créditos (20/08)
 - [x] Compilar o cliente e o backend com a experiência de créditos atualizada
 - [x] Publicar os arquivos estáticos e o backend compilado na VM Azure
@@ -104,6 +122,79 @@
 - [x] Mapear item a item as pendências antigas relevantes como cobertas, pendentes ou fora de escopo
 - [x] Acrescentar uma seção de publicação e implantação, separando a VM ativa, a validação local e itens ainda não revalidados
 - [ ] Confirmar no histórico que o checkpoint salvo corresponde à auditoria técnica e à ausência de correção necessária nesta rodada
+
+## Redefinição de chave de aprovação (pedido do usuário 20/08)
+- [x] Localizar a variável de aprovação ativa na VM sem ler ou expor a chave antiga
+- [x] Atualizar a chave de aprovação para o valor escolhido pelo proprietário e reiniciar a aplicação
+- [x] Validar somente a presença da configuração e a saúde do processo, sem expor o segredo
+- [x] Confirmar de forma não sensível se a chave ativa está no ambiente do processo PM2, registrando somente presença ou ausência
+- [x] Revalidar a aceitação da chave sem gravar seu valor em comandos, logs ou documentos
+- [x] Corrigir a ausência atual da configuração de aprovação no ambiente do processo publicado e revalidar sua presença sem revelar o valor
+- [x] Reaplicar a chave no processo PM2 por um método verificável e registrar somente resultado de correspondência, sem expor valores
+- [x] Validar que o fluxo de aprovação aceita a chave ativa sem alterar propostas existentes
+- [x] Reaplicar explicitamente a chave no comando de reinício do PM2 e comprovar presença e correspondência após o processo voltar a ficar online
+- [x] Salvar o estado do PM2 após a reaplicação e documentar, sem valores, o mecanismo de persistência usado
+
+## Correção de acesso da conta do proprietário (pedido do usuário 20/08)
+- [x] Verificar se a aplicação pública responde e se o formulário de login abre normalmente
+- [x] Investigar logs e dados de autenticação sem alterar e-mail, senha, créditos ou conversas
+- [x] Corrigir somente a causa confirmada e validar o login da conta do proprietário
+- [x] Abrir a tela de login sem sessão e confirmar visualmente os campos e o envio pela interface
+
+## Verificação do painel administrativo (pedido do usuário 20/08)
+- [x] Confirmar na conta administrativa que o botão de painel abre a rota e a interface corretas
+- [x] Verificar os controles visíveis sem alterar usuários, créditos ou solicitações
+- [x] Corrigir e publicar somente se for encontrada uma falha real
+
+## Ações de conversa na barra lateral (pedido do usuário 20/08)
+- [x] Revisar a implementação atual da lista de conversas e da exclusão existente
+- [x] Adicionar botão de três pontos acessível ao lado de cada conversa
+- [x] Oferecer ação de exclusão que não selecione a conversa ao ser acionada
+- [x] Cobrir a interação com teste de interface e validar a lista atualizada
+- [x] Compilar, publicar na VM e conferir visualmente a barra lateral atualizada
+
+## Entrar, cadastrar e conta do usuário (pedido do usuário 20/08)
+- [x] Analisar o modelo de usuário e o fluxo de login local para preservar contas, créditos e conversas existentes
+- [x] Separar a tela de acesso em abas claras de Entrar e Cadastrar
+- [x] Permitir que o cadastro crie nome de usuário, e-mail e senha, com validação de duplicidade
+- [x] Criar procedimento protegido para o usuário atualizar nome, e-mail e/ou senha com confirmação da senha atual
+- [x] Criar página Conta para editar os dados e manter a opção Sair no menu da conta
+- [x] Cobrir cadastro, atualização e controles de interface com testes de regressão
+- [x] Compilar, publicar e validar os fluxos sem alterar os dados já persistidos
+- [x] Corrigir a rota publicada /account, que retornou 404 durante a validação da interface
+- [x] Corrigir a abertura do menu da conta administrativa, que não exibiu os atalhos Conta e Sair durante a validação
+
+## Validação final publicada antes do checkpoint (20/08)
+- [x] Registrar que o link Painel admin do menu administrativo alcança /admin e expõe somente os controles esperados
+- [x] Registrar a regressão aprovada para cadastro, login por usuário/e-mail, duplicidade e atualização protegida por senha atual
+- [x] Validar visualmente a remoção de uma conversa da barra lateral sem alterar a conversa ativa
+- [x] Corrigir a atualização visual para remover a conversa efetivamente excluída e preservar a conversa ativa quando outra for apagada
+- [ ] Validar em produção a criação e atualização de uma conta temporária sem afetar identidade, créditos ou conversas de usuários existentes
+
+## Proteção contra acesso indevido e manipulação (pedido do usuário 20/08)
+- [ ] Revisar exposição de rotas, autenticação, sessões, dados persistidos e ações administrativas
+- [ ] Reforçar validação de entrada, limites de tentativas e respostas de erro sem revelar informações sensíveis
+- [ ] Garantir que a IA trate conteúdo de usuários e anexos como dados, e não como instruções de sistema ou autorização para ações externas
+- [ ] Verificar que segredos, chaves e informações de outros usuários não sejam retornados em respostas, logs ou interface
+- [ ] Criar testes de regressão para bloqueios de acesso e tentativas de manipulação por texto
+- [ ] Documentar limites reais e medidas de proteção aplicadas, sem alegar segurança absoluta
+
+## Autoaprendizagem com proposta e aprovação (pedido do usuário 20/08)
+- [ ] Revisar o fluxo atual de propostas e aprovações para manter a autorização exclusiva do proprietário
+- [ ] Estruturar propostas com contexto, problema observado, pesquisa sugerida, benefícios claros, riscos, custo/impacto e arquivos possivelmente afetados
+- [ ] Exigir aprovação explícita antes de pesquisar externamente, registrar aprendizado ou alterar código, dados, configurações ou integrações
+- [ ] Exibir na página de aprovação uma explicação simples sobre o que mudará e como desfazer, quando aplicável
+- [ ] Registrar aprendizagem aprovada como regra, documentação ou código somente após a aprovação correspondente
+- [ ] Cobrir as permissões e os estados de proposta com testes de regressão
+- [ ] Armazenar somente oportunidades mínimas e não sensíveis observadas em conversas, sem pesquisar ou executar ações automaticamente
+- [ ] Permitir ao proprietário criar uma proposta manual usando as oportunidades armazenadas
+- [ ] Criar uma triagem semanal limitada que apenas produza propostas pendentes, sem pesquisar profundamente nem aplicar mudanças
+- [ ] Limitar a triagem a itens relevantes e bloquear dados pessoais, segredos, credenciais e instruções maliciosas
+
+## Prioridade de renda extra e infraestrutura (pedido do usuário 20/08)
+- [ ] Priorizar serviços digitais por texto que possam gerar renda sem câmera e sem carga contínua na VM
+- [ ] Preparar uma sequência prática de divulgação, triagem e entrega com revisão humana antes de qualquer compromisso com cliente
+- [ ] Definir uma regra simples de reinvestimento para melhorar a infraestrutura somente após receita efetivamente recebida
 
 ## Perguntas do usuário (18/08)
 - [x] Verificar se a auto-melhoria da IA está funcionando na VM
