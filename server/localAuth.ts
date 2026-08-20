@@ -1,4 +1,4 @@
-import { createHmac, randomBytes } from "crypto";
+import { createHmac, randomBytes, scrypt, timingSafeEqual } from "crypto";
 import { COOKIE_NAME, ONE_YEAR_MS } from "../shared/const";
 import { ForbiddenError } from "../shared/_core/errors";
 import * as db from "./db";
@@ -8,7 +8,7 @@ import { ENV } from "./_core/env";
 import type { User } from "../drizzle/schema";
 import { z } from "zod";
 
-// ─── Password hashing (HMAC + salt, stored in DB) ───
+// ─── Password hashing (scrypt + salt, stored in JSON persistence) ───
 
 const identifierSchema = z.string().trim().min(3).max(320);
 const usernameSchema = z.string().trim().min(3).max(40).regex(/^[A-Za-zÀ-ÿ0-9._ -]+$/, "Nome de usuário inválido");
@@ -38,6 +38,9 @@ const accountUpdateSchema = z.object({
 const AUTH_WINDOW_MS = 15 * 60 * 1000;
 const AUTH_MAX_ATTEMPTS = 10;
 const authAttempts = new Map<string, { count: number; resetAt: number }>();
+const SCRYPT_KEY_LENGTH = 64;
+const SCRYPT_OPTIONS = { N: 16_384, r: 8, p: 1, maxmem: 32 * 1024 * 1024 };
+const SCRYPT_PREFIX = "scrypt$";
 
 function isLoopbackAddress(value: unknown): boolean {
   return value === "127.0.0.1" || value === "::1" || value === "::ffff:127.0.0.1";
@@ -65,8 +68,38 @@ function clearAuthAttempts(req: any, action: string) {
   authAttempts.delete(authRateLimitKey(req, action));
 }
 
-function hashPassword(password: string, salt: string): string {
+function legacyHashPassword(password: string, salt: string): string {
   return createHmac("sha256", salt).update(password).digest("hex");
+}
+
+async function hashPassword(password: string, salt: string): Promise<string> {
+  const derived = await deriveScrypt(password, salt);
+  return `${SCRYPT_PREFIX}${derived.toString("base64")}`;
+}
+
+function deriveScrypt(password: string, salt: string): Promise<Buffer> {
+  return new Promise((resolve, reject) => {
+    scrypt(password, salt, SCRYPT_KEY_LENGTH, SCRYPT_OPTIONS, (error, derivedKey) => {
+      if (error) reject(error);
+      else resolve(derivedKey);
+    });
+  });
+}
+
+function comparePasswordHashes(expected: Buffer, actual: Buffer): boolean {
+  return expected.length === actual.length && timingSafeEqual(expected, actual);
+}
+
+async function verifyPassword(password: string, stored: { passwordHash: string; salt: string }) {
+  if (!stored.passwordHash.startsWith(SCRYPT_PREFIX)) {
+    const candidate = Buffer.from(legacyHashPassword(password, stored.salt), "hex");
+    const expected = Buffer.from(stored.passwordHash, "hex");
+    return { valid: comparePasswordHashes(expected, candidate), needsUpgrade: true };
+  }
+
+  const expected = Buffer.from(stored.passwordHash.slice(SCRYPT_PREFIX.length), "base64");
+  const derived = await deriveScrypt(password, stored.salt);
+  return { valid: comparePasswordHashes(expected, derived), needsUpgrade: false };
 }
 
 function generateSalt(): string {
@@ -105,9 +138,18 @@ export async function handleLocalLogin(req: any, res: any) {
     }
     const normalizedEmail = String(dbUser.email).toLowerCase().trim();
     const stored = await getPasswordRecord(normalizedEmail);
-    if (!stored || hashPassword(password, stored.salt) !== stored.passwordHash) {
+    if (!stored) {
       res.status(401).json({ error: "Nome de usuário/e-mail ou senha inválidos" });
       return;
+    }
+    const verification = await verifyPassword(password, stored);
+    if (!verification.valid) {
+      res.status(401).json({ error: "Nome de usuário/e-mail ou senha inválidos" });
+      return;
+    }
+    if (verification.needsUpgrade) {
+      const nextSalt = generateSalt();
+      await setPasswordRecord(normalizedEmail, await hashPassword(password, nextSalt), nextSalt);
     }
 
     await db.upsertUser({
@@ -169,7 +211,7 @@ export async function handleLocalRegister(req: any, res: any) {
     const created = await db.createLocalAccount({
       name,
       email: normalizedEmail,
-      passwordHash: hashPassword(password, salt),
+      passwordHash: await hashPassword(password, salt),
       salt,
       role: isOwnerEmail(normalizedEmail) ? "admin" : "user",
     });
@@ -202,16 +244,22 @@ export async function handleLocalAccountUpdate(req: any, res: any) {
     }
     const { name, email, currentPassword, newPassword } = parsed.data;
     const stored = await getPasswordRecord(String(currentUser.email || "").toLowerCase());
-    if (!stored || hashPassword(currentPassword, stored.salt) !== stored.passwordHash) {
+    if (!stored) {
       res.status(401).json({ error: "A senha atual não confere" });
       return;
     }
-    const nextSalt = newPassword ? generateSalt() : undefined;
+    const verification = await verifyPassword(currentPassword, stored);
+    if (!verification.valid) {
+      res.status(401).json({ error: "A senha atual não confere" });
+      return;
+    }
+    const passwordToStore = newPassword || (verification.needsUpgrade ? currentPassword : undefined);
+    const nextSalt = passwordToStore ? generateSalt() : undefined;
     const result = await db.updateLocalAccount({
       openId: currentUser.openId,
       name,
       email,
-      passwordHash: newPassword && nextSalt ? hashPassword(newPassword, nextSalt) : undefined,
+      passwordHash: passwordToStore && nextSalt ? await hashPassword(passwordToStore, nextSalt) : undefined,
       salt: nextSalt,
     });
     if (result.status === "duplicate") {

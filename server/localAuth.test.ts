@@ -1,4 +1,4 @@
-import { createHmac } from "crypto";
+import { createHmac, scryptSync } from "crypto";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
 const passwordStore = new Map<string, { passwordHash: string; salt: string }>();
@@ -78,6 +78,11 @@ function hashed(password: string, salt: string) {
   return createHmac("sha256", salt).update(password).digest("hex");
 }
 
+function scryptHashed(password: string, salt: string) {
+  const derived = scryptSync(password, salt, 64, { N: 16_384, r: 8, p: 1, maxmem: 32 * 1024 * 1024 });
+  return `scrypt$${derived.toString("base64")}`;
+}
+
 describe("autenticação local", () => {
   beforeEach(() => {
     vi.clearAllMocks();
@@ -112,6 +117,21 @@ describe("autenticação local", () => {
     expect(db.getUserByLoginIdentifier).toHaveBeenCalledWith("Teste");
     expect(sdk.createSessionToken).toHaveBeenCalledWith(sampleUser.openId, expect.any(Object));
     expect(cookieCalls[0].options).toMatchObject({ secure: false, sameSite: "lax", httpOnly: true });
+    expect(passwordStore.get(sampleUser.email)?.passwordHash).toMatch(/^scrypt\$/);
+  });
+
+  it("aceita hash scrypt correto e rejeita senha incorreta", async () => {
+    const salt = "salt-scrypt-de-teste";
+    passwordStore.set(sampleUser.email, { passwordHash: scryptHashed("senha-scrypt", salt), salt });
+    vi.mocked(db.getUserByLoginIdentifier).mockResolvedValue(sampleUser);
+
+    const { res: success } = makeRes();
+    await handleLocalLogin(makeReq({ identifier: sampleUser.email, password: "senha-scrypt" }), success);
+    expect(success.status).not.toHaveBeenCalledWith(401);
+
+    const { res: failure } = makeRes();
+    await handleLocalLogin(makeReq({ identifier: sampleUser.email, password: "senha-errada" }), failure);
+    expect(failure.status).toHaveBeenCalledWith(401);
   });
 
   it("rejeita senha incorreta sem revelar se o identificador existe", async () => {
@@ -129,6 +149,7 @@ describe("autenticação local", () => {
     const { res, cookieCalls } = makeRes();
     await handleLocalRegister(makeReq({ name: "Nova Conta", email: "nova@example.com", password: "segredo123" }), res);
     expect(db.createLocalAccount).toHaveBeenCalledWith(expect.objectContaining({ name: "Nova Conta", email: "nova@example.com", role: "user" }));
+    expect(vi.mocked(db.createLocalAccount).mock.calls[0][0].passwordHash).toMatch(/^scrypt\$/);
     expect(res.status).toHaveBeenCalledWith(201);
     expect(cookieCalls).toHaveLength(1);
   });

@@ -152,6 +152,11 @@
 - [x] Usar X-Real-IP somente quando a solicitação vier do proxy local e ignorar X-Forwarded-For manipulável
 - [x] Cobrir em teste que cabeçalhos encaminhados manipulados não alteram a chave de limite
 
+## Migração de hash de senha (20/08)
+- [x] Usar scrypt com sal aleatório para novas senhas, mantendo verificação compatível com hashes legados
+- [x] Atualizar hash legado para scrypt apenas após login ou atualização de conta com senha válida
+- [x] Cobrir hash scrypt, senha incorreta e migração de credencial legada em regressões
+
 ## Avaliação de projeto da 99Freelas (link enviado pelo proprietário)
 - [x] Ler o escopo, prazo, entregáveis e condições do projeto 777684 sem interagir com a plataforma
 - [x] Comparar o trabalho com as capacidades reais da IA, os limites da VM e a necessidade de revisão humana
