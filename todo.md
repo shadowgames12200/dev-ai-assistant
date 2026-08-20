@@ -245,6 +245,10 @@
 - [x] Criar uma triagem semanal limitada que apenas produza propostas pendentes, sem pesquisar profundamente nem aplicar mudanças
 - [x] Limitar a triagem a itens relevantes e bloquear dados pessoais, segredos, credenciais e instruções maliciosas
 
+## Navegação de autoaprendizagem (20/08)
+- [x] Fazer a rota /approvals indicada pelo chat abrir a área de aprovação do painel administrativo, sem expor controles a usuários comuns
+- [x] Cobrir a rota de aprovações em teste de interface, compilar e publicar na VM
+
 ## Prioridade de renda extra e infraestrutura (pedido do usuário 20/08)
 - [ ] Priorizar serviços digitais por texto que possam gerar renda sem câmera e sem carga contínua na VM
 - [ ] Preparar uma sequência prática de divulgação, triagem e entrega com revisão humana antes de qualquer compromisso com cliente
@@ -340,7 +344,7 @@
 - [x] Implementar guardas programáticas ou pós-validação para transcrição, redação e automação antes de declará-las prontas
 - [x] Adicionar testes automatizados de lacunas para transcrição, redação e automação
 - [x] Executar E2E na VM de um caso incompleto de transcrição e de redação ou automação
-- [ ] Corrigir o encerramento duplicado de respostas SSE para eliminar erros `write after end` e estabilizar testes de chat
+- [x] Confirmar o encerramento idempotente de respostas SSE, a regressão de streaming e a ausência de erros `write after end` na VM
 
 ## Perfil freelancer 99Freelas (pedido do usuário 19/08)
 - [x] Preencher título, apresentação e experiência com informações profissionais verificáveis

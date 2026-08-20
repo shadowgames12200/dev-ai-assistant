@@ -62,6 +62,11 @@ function Router() {
           <Admin />
         </Protected>
       </Route>
+      <Route path={"/approvals"}>
+        <Protected>
+          <Admin />
+        </Protected>
+      </Route>
       <Route path="/account" component={AccountPage} />
       <Route path="/recharge">
         <Protected>

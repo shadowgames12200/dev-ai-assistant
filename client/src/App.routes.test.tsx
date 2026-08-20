@@ -2,8 +2,12 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { cleanup, render, screen } from "@testing-library/react";
 
+const { authState } = vi.hoisted(() => ({
+  authState: { user: null as any, loading: false },
+}));
+
 vi.mock("@/_core/hooks/useAuth", () => ({
-  useAuth: () => ({ user: null, loading: false }),
+  useAuth: () => authState,
 }));
 
 vi.mock("@/pages/Login", () => ({
@@ -22,6 +26,8 @@ import App from "./App";
 afterEach(() => {
   cleanup();
   window.history.pushState({}, "", "/");
+  authState.user = null;
+  authState.loading = false;
 });
 
 describe("rotas de acesso", () => {
@@ -31,5 +37,14 @@ describe("rotas de acesso", () => {
     render(<App />);
 
     expect(screen.getByText("Página de acesso local")).not.toBeNull();
+  });
+
+  it("leva um administrador autenticado à área existente de aprovações em /approvals", () => {
+    authState.user = { id: 1, role: "admin" };
+    window.history.pushState({}, "", "/approvals");
+
+    render(<App />);
+
+    expect(screen.getByText("Admin")).not.toBeNull();
   });
 });
