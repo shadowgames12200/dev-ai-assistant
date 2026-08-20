@@ -75,8 +75,17 @@
 - [ ] Verificação final de logs e estabilidade
 - [ ] Checkpoint final
 
+## Auditoria de pendências técnicas (20/08)
+- [x] Verificar no código e na VM se o fluxo de autoaperfeiçoamento com aprovação do dono permanece funcional
+- [x] Concluir auditoria documentada das pendências antigas de qualidade, testes e publicação, identificando o que já foi coberto e o que permanece aberto
+- [x] Registrar explicitamente a inexistência de correção técnica confirmada nesta auditoria, se essa conclusão permanecer após a revisão completa
+- [ ] Salvar o registro final da auditoria e criar um checkpoint específico depois de concluir a revisão documentada
+- [x] Mapear item a item as pendências antigas relevantes como cobertas, pendentes ou fora de escopo
+- [x] Acrescentar uma seção de publicação e implantação, separando a VM ativa, a validação local e itens ainda não revalidados
+- [ ] Confirmar no histórico que o checkpoint salvo corresponde à auditoria técnica e à ausência de correção necessária nesta rodada
+
 ## Perguntas do usuário (18/08)
-- [ ] Verificar se a auto-melhoria da IA está funcionando na VM
+- [x] Verificar se a auto-melhoria da IA está funcionando na VM
 - [ ] Explicar funcionamento híbrido: VM online + LM Studio (Windows 11) local como fallback do LLM
 
 ## Correção da auto-melhoria (pedido do usuário 18/08)
