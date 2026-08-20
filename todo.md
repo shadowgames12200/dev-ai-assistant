@@ -266,6 +266,7 @@
 - [x] Priorizar serviços digitais por texto que possam gerar renda sem câmera e sem carga contínua na VM
 - [x] Preparar uma sequência prática de divulgação, triagem e entrega com revisão humana antes de qualquer compromisso com cliente
 - [x] Definir uma regra simples de reinvestimento para melhorar a infraestrutura somente após receita efetivamente recebida
+- [x] Medir memória, disco e consumo da aplicação na VM para confirmar que a configuração atual suporta o uso previsto
 
 ## Perguntas do usuário (18/08)
 - [x] Verificar se a auto-melhoria da IA está funcionando na VM
