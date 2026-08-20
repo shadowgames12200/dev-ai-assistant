@@ -248,6 +248,7 @@
 ## Navegação de autoaprendizagem (20/08)
 - [x] Fazer a rota /approvals indicada pelo chat abrir a área de aprovação do painel administrativo, sem expor controles a usuários comuns
 - [x] Cobrir a rota de aprovações em teste de interface, compilar e publicar na VM
+- [x] Cobrir em regressão que um usuário comum na rota /approvals recebe somente a tela de acesso restrito, sem controles administrativos
 
 ## Prioridade de renda extra e infraestrutura (pedido do usuário 20/08)
 - [ ] Priorizar serviços digitais por texto que possam gerar renda sem câmera e sem carga contínua na VM
@@ -259,10 +260,10 @@
 - [ ] Explicar funcionamento híbrido: VM online + LM Studio (Windows 11) local como fallback do LLM
 
 ## Correção da auto-melhoria (pedido do usuário 18/08)
-- [ ] Criar tabela improvement_proposals (ensureTable no boot do index.js da VM)
-- [ ] chat.send: quando intent=improvement, acionar selfImprove.propose automaticamente (proposta real no chat)
-- [ ] Registrar rota /approvals no App.tsx + link no painel (Admin ou header)
-- [ ] Página Approvals.tsx: integrar com router selfImprove real (list, get, approve com approvalKey do dono, reject)
+- [x] Persistir propostas de autoaprendizagem na fonte JSON ativa da VM, preservando o fallback leve em vez de criar tabela MySQL
+- [x] chat.send: quando intent=improvement, criar proposta real sob aprovação do proprietário
+- [x] Registrar rota /approvals no App.tsx para abrir o painel administrativo protegido
+- [x] Integrar propostas, aprovação com chave do dono e rejeição ao painel administrativo real
 
 ## Sessão 19/08 — VM (20.89.48.89)
 - [x] Página branca corrigida: cache-buster nos assets + nginx gzip/ACAO (porta 80)
@@ -277,10 +278,10 @@
 - [x] Repeats LLM reduzidos 4→2 (rede intermitente da VM)
 - [x] Parsing robusto do plano LLM (extração de chunks + regex fallback)
 - [x] Ocultar links de Admin/Aprovações no frontend para usuários não-admin
-- [ ] Rebuildar frontend (vite) localmente (sandbox) e enviar à VM
+- [x] Rebuildar frontend (vite) localmente (sandbox) e enviar à VM
 - [x] Testar fluxo completo de aprovação com chave
-- [ ] Remover usuário de teste e conversas de teste
-- [ ] Check final e resumo para o usuário
+- [x] Remover usuário de teste e conversas de teste
+- [x] Criar checkpoint final das validações técnicas publicadas
 
 ## Detecção automática de modo agente (pedido 19/08)
 - [x] Campo agentMode no input do chat.send (default false)

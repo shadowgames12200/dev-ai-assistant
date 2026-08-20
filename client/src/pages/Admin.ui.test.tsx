@@ -10,6 +10,9 @@ const createLearningProposal = vi.fn();
 const approveRecharge = vi.fn();
 const rejectRecharge = vi.fn();
 const pendingRecharges = vi.hoisted(() => ({ requests: [] as Array<{ id: string; userEmail: string; amountCents: number; credits: number; createdAt: number }> }));
+const { authState } = vi.hoisted(() => ({
+  authState: { user: { id: 1, role: "admin" } as { id: number; role: "admin" | "user" } },
+}));
 
 vi.mock("@/lib/trpc", () => ({
   trpc: {
@@ -52,13 +55,14 @@ vi.mock("@/lib/trpc", () => ({
   },
 }));
 
-vi.mock("@/_core/hooks/useAuth", () => ({ useAuth: () => ({ user: { id: 1, role: "admin" } }) }));
+vi.mock("@/_core/hooks/useAuth", () => ({ useAuth: () => authState }));
 vi.mock("wouter", () => ({ useLocation: () => ["/admin", vi.fn()] }));
 vi.mock("sonner", () => ({ toast: { success: vi.fn(), error: vi.fn(), info: vi.fn() } }));
 
 afterEach(() => {
   cleanup();
   pendingRecharges.requests = [];
+  authState.user = { id: 1, role: "admin" };
   approveRecharge.mockReset();
   rejectRecharge.mockReset();
 });
@@ -101,5 +105,15 @@ describe("painel administrativo de créditos", () => {
     expect(approveRecharge).toHaveBeenCalledWith({ requestId: "pix_1" });
     fireEvent.click(within(rechargeCard!).getByRole("button", { name: "Rejeitar" }));
     expect(rejectRecharge).toHaveBeenCalledWith({ requestId: "pix_1" });
+  });
+
+  it("bloqueia usuário comum antes de exibir controles administrativos de aprovação", () => {
+    authState.user = { id: 2, role: "user" };
+
+    render(<Admin />);
+
+    expect(screen.getByText("Acesso restrito a administradores.")).toBeVisible();
+    expect(screen.queryByText("Propostas para sua aprovação")).toBeNull();
+    expect(screen.queryByText("Recargas Pix pendentes")).toBeNull();
   });
 });
