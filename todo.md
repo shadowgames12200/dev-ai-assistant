@@ -483,3 +483,8 @@
 - [x] Reforçar planejamento por etapas, verificação independente e comunicação transparente de limites
 - [x] Reforçar resistência a instruções maliciosas, vazamento de segredos e ações externas não aprovadas
 - [x] Cobrir os novos protocolos com cenários de regressão antes de publicar
+## Modo agente de programação com aprovação (pedido do usuário 20/08)
+- [ ] Reforçar SYSTEM_PROMPT com mentalidade de programador especialista para auto-melhoria de código
+- [ ] Adicionar workflow GitHub que faz deploy automático na VM quando houver push na main
+- [ ] Adicionar suporte a modo agente de código no chatRouter com proposta de patch para aprovação do proprietário
+- [ ] Cobrir o novo fluxo com testes de regressão e publicar na VM

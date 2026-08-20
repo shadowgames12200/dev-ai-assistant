@@ -1,0 +1,79 @@
+name: Deploy to VM
+
+on:
+  push:
+    branches: [main]
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+
+      - name: Install pnpm
+        uses: pnpm/action-setup@v4
+        with:
+          version: 8
+
+      - name: Install dependencies
+        run: pnpm install
+
+      - name: Run tests
+        run: pnpm test
+
+      - name: Build backend
+        run: npx esbuild server/_core/index.ts --platform=node --packages=external --bundle --format=esm --outfile=dist-server/index.js
+
+      - name: Build frontend
+        run: NODE_OPTIONS=--max-old-space-size=1024 pnpm build
+
+      - name: Create deployment archive
+        run: |
+          tar -czf /tmp/deploy.tar.gz \
+            -C dist-server index.js \
+            -C dist/public .
+
+      - name: Upload to VM and restart
+        uses: appleboy/scp-action@master
+        with:
+          host: ${{ secrets.VM_HOST }}
+          username: ${{ secrets.VM_USER }}
+          key: ${{ secrets.VM_SSH_KEY }}
+          source: /tmp/deploy.tar.gz
+          target: /tmp/
+
+      - name: Extract and restart on VM
+        uses: appleboy/ssh-action@v1
+        with:
+          host: ${{ secrets.VM_HOST }}
+          username: ${{ secrets.VM_USER }}
+          key: ${{ secrets.VM_SSH_KEY }}
+          script: |
+            set -e
+            cd /home/azureuser/dev-ai-assistant
+
+            # Extract backend
+            tar -xzf /tmp/deploy.tar.gz -C /tmp/extract-deploy --strip-components=1 2>/dev/null || \
+              (mkdir -p /tmp/extract-deploy && tar -xzf /tmp/deploy.tar.gz -C /tmp/extract-deploy)
+
+            # Deploy backend
+            cp /tmp/extract-deploy/index.js dist-server/index.js
+
+            # Deploy statics
+            rm -rf dist-server/public/public
+            cp -r /tmp/extract-deploy/public/* dist-server/public/
+
+            # Cleanup
+            rm -rf /tmp/extract-deploy /tmp/deploy.tar.gz
+
+            # Restart
+            pm2 restart dev-ai-assistant
+            sleep 3
+            echo "Health check:"
+            curl -s -o /dev/null -w "HTTP %{http_code}\n" http://localhost:3000/chat
