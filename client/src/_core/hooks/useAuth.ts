@@ -28,13 +28,16 @@ export function useAuth(options?: UseAuthOptions) {
   });
 
   const logout = useCallback(async () => {
+    let shouldRedirect = false;
     try {
       await logoutMutation.mutateAsync();
+      shouldRedirect = true;
     } catch (error: unknown) {
       if (
         error instanceof TRPCClientError &&
         error.data?.code === "UNAUTHORIZED"
       ) {
+        shouldRedirect = true;
         return;
       }
       throw error;
@@ -44,9 +47,13 @@ export function useAuth(options?: UseAuthOptions) {
       // backend cookie is cleared by the logout mutation.
       try {
         sessionStorage.removeItem("manus-cookie");
+        localStorage.removeItem("manus-runtime-user-info");
       } catch {}
       utils.auth.me.setData(undefined, null);
       await utils.auth.me.invalidate();
+      if (shouldRedirect && typeof window !== "undefined") {
+        window.location.assign("/");
+      }
     }
   }, [logoutMutation, utils]);
 

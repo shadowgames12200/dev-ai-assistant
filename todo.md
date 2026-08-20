@@ -221,7 +221,9 @@
 - [x] Registrar a regressão aprovada para cadastro, login por usuário/e-mail, duplicidade e atualização protegida por senha atual
 - [x] Validar visualmente a remoção de uma conversa da barra lateral sem alterar a conversa ativa
 - [x] Corrigir a atualização visual para remover a conversa efetivamente excluída e preservar a conversa ativa quando outra for apagada
-- [ ] Validar em produção a criação e atualização de uma conta temporária sem afetar identidade, créditos ou conversas de usuários existentes
+- [x] Validar em produção a criação e atualização de uma conta temporária sem afetar identidade, créditos ou conversas de usuários existentes
+- [x] Confirmar que o logout local funciona por endpoint e corrigir o redirecionamento visual para a rota de acesso suportada
+- [x] Corrigir a rota publicada de acesso que retornou 404 após o logout, antes de executar o cadastro temporário
 
 ## Proteção contra acesso indevido e manipulação (pedido do usuário 20/08)
 - [x] Revisar exposição de rotas, autenticação, sessões, dados persistidos e ações administrativas

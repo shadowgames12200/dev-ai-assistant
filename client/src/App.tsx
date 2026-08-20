@@ -51,6 +51,7 @@ function Router() {
   return (
     <Switch>
       <Route path={"/"} component={LoginPage} />
+      <Route path={"/login"} component={LoginPage} />
       <Route path={"/chat"}>
         <Protected>
           <Chat />
