@@ -130,9 +130,20 @@
 - [x] Remover do versionamento os JSONs de runtime e o bundle compilado, preservando os arquivos locais e da VM
 - [x] Confirmar que o repositório pode ser reconstruído somente a partir do código-fonte antes do envio ao GitHub
 
+## Auditoria de continuidade solicitada pelo proprietário
+- [x] Revisar checkpoints, publicações e alterações locais posteriores ao último checkpoint
+- [x] Separar pendências técnicas reais de opções adiadas por decisão do proprietário
+- [x] Confirmar se o reforço avançado da IA foi apenas testado localmente ou já foi publicado na VM
+- [x] Entregar uma lista priorizada com estado, bloqueio e próximo passo de cada pendência
+
 ## Finalização
-- [ ] Verificação final de logs e estabilidade
-- [ ] Checkpoint final
+- [x] Verificação final de logs e estabilidade
+- [x] Checkpoint final
+
+## Estabilidade de produção após auditoria (20/08)
+- [x] Eliminar tentativas recorrentes de MySQL no painel de créditos quando a persistência JSON for a fonte ativa na VM
+- [x] Tratar a ausência de OAuth externo como modo local suportado, sem registrar erro enganoso na inicialização
+- [x] Revalidar logs, saúde HTTP e fluxo de fallback após a publicação
 
 ## Avaliação de projeto da 99Freelas (link enviado pelo proprietário)
 - [x] Ler o escopo, prazo, entregáveis e condições do projeto 777684 sem interagir com a plataforma
@@ -158,11 +169,11 @@
 ## Auditoria de pendências técnicas (20/08)
 - [x] Verificar no código e na VM se o fluxo de autoaperfeiçoamento com aprovação do dono permanece funcional
 - [x] Concluir auditoria documentada das pendências antigas de qualidade, testes e publicação, identificando o que já foi coberto e o que permanece aberto
-- [x] Registrar explicitamente a inexistência de correção técnica confirmada nesta auditoria, se essa conclusão permanecer após a revisão completa
-- [ ] Salvar o registro final da auditoria e criar um checkpoint específico depois de concluir a revisão documentada
+- [x] Registrar explicitamente as correções de estabilidade confirmadas nesta auditoria, sem afirmar que não houve mudanças necessárias
+- [x] Salvar o registro final da auditoria e criar um checkpoint específico depois de concluir a revisão documentada
 - [x] Mapear item a item as pendências antigas relevantes como cobertas, pendentes ou fora de escopo
 - [x] Acrescentar uma seção de publicação e implantação, separando a VM ativa, a validação local e itens ainda não revalidados
-- [ ] Confirmar no histórico que o checkpoint salvo corresponde à auditoria técnica e à ausência de correção necessária nesta rodada
+- [x] Confirmar no histórico que o checkpoint salvo corresponde à auditoria técnica e às correções de estabilidade desta rodada
 
 ## Redefinição de chave de aprovação (pedido do usuário 20/08)
 - [x] Localizar a variável de aprovação ativa na VM sem ler ou expor a chave antiga
@@ -213,24 +224,24 @@
 - [ ] Validar em produção a criação e atualização de uma conta temporária sem afetar identidade, créditos ou conversas de usuários existentes
 
 ## Proteção contra acesso indevido e manipulação (pedido do usuário 20/08)
-- [ ] Revisar exposição de rotas, autenticação, sessões, dados persistidos e ações administrativas
-- [ ] Reforçar validação de entrada, limites de tentativas e respostas de erro sem revelar informações sensíveis
-- [ ] Garantir que a IA trate conteúdo de usuários e anexos como dados, e não como instruções de sistema ou autorização para ações externas
-- [ ] Verificar que segredos, chaves e informações de outros usuários não sejam retornados em respostas, logs ou interface
-- [ ] Criar testes de regressão para bloqueios de acesso e tentativas de manipulação por texto
-- [ ] Documentar limites reais e medidas de proteção aplicadas, sem alegar segurança absoluta
+- [x] Revisar exposição de rotas, autenticação, sessões, dados persistidos e ações administrativas
+- [x] Reforçar validação de entrada, limites de tentativas e respostas de erro sem revelar informações sensíveis
+- [x] Garantir que a IA trate conteúdo de usuários e anexos como dados, e não como instruções de sistema ou autorização para ações externas
+- [x] Verificar que segredos, chaves e informações de outros usuários não sejam retornados em respostas, logs ou interface
+- [x] Criar testes de regressão para bloqueios de acesso e tentativas de manipulação por texto
+- [x] Documentar limites reais e medidas de proteção aplicadas, sem alegar segurança absoluta
 
 ## Autoaprendizagem com proposta e aprovação (pedido do usuário 20/08)
-- [ ] Revisar o fluxo atual de propostas e aprovações para manter a autorização exclusiva do proprietário
-- [ ] Estruturar propostas com contexto, problema observado, pesquisa sugerida, benefícios claros, riscos, custo/impacto e arquivos possivelmente afetados
-- [ ] Exigir aprovação explícita antes de pesquisar externamente, registrar aprendizado ou alterar código, dados, configurações ou integrações
-- [ ] Exibir na página de aprovação uma explicação simples sobre o que mudará e como desfazer, quando aplicável
-- [ ] Registrar aprendizagem aprovada como regra, documentação ou código somente após a aprovação correspondente
-- [ ] Cobrir as permissões e os estados de proposta com testes de regressão
-- [ ] Armazenar somente oportunidades mínimas e não sensíveis observadas em conversas, sem pesquisar ou executar ações automaticamente
-- [ ] Permitir ao proprietário criar uma proposta manual usando as oportunidades armazenadas
-- [ ] Criar uma triagem semanal limitada que apenas produza propostas pendentes, sem pesquisar profundamente nem aplicar mudanças
-- [ ] Limitar a triagem a itens relevantes e bloquear dados pessoais, segredos, credenciais e instruções maliciosas
+- [x] Revisar o fluxo atual de propostas e aprovações para manter a autorização exclusiva do proprietário
+- [x] Estruturar propostas com contexto, problema observado, pesquisa sugerida, benefícios claros, riscos, custo/impacto e arquivos possivelmente afetados
+- [x] Exigir aprovação explícita antes de pesquisar externamente, registrar aprendizado ou alterar código, dados, configurações ou integrações
+- [x] Exibir na página de aprovação uma explicação simples sobre o que mudará e como desfazer, quando aplicável
+- [x] Registrar aprendizagem aprovada como regra, documentação ou código somente após a aprovação correspondente
+- [x] Cobrir as permissões e os estados de proposta com testes de regressão
+- [x] Armazenar somente oportunidades mínimas e não sensíveis observadas em conversas, sem pesquisar ou executar ações automaticamente
+- [x] Permitir ao proprietário criar uma proposta manual usando as oportunidades armazenadas
+- [x] Criar uma triagem semanal limitada que apenas produza propostas pendentes, sem pesquisar profundamente nem aplicar mudanças
+- [x] Limitar a triagem a itens relevantes e bloquear dados pessoais, segredos, credenciais e instruções maliciosas
 
 ## Prioridade de renda extra e infraestrutura (pedido do usuário 20/08)
 - [ ] Priorizar serviços digitais por texto que possam gerar renda sem câmera e sem carga contínua na VM
@@ -326,7 +337,7 @@
 - [x] Implementar bloqueio programático para currículo incompleto, impedindo que o modelo gere datas, escola, empresa ou curso não fornecidos
 - [x] Implementar guardas programáticas ou pós-validação para transcrição, redação e automação antes de declará-las prontas
 - [x] Adicionar testes automatizados de lacunas para transcrição, redação e automação
-- [ ] Executar E2E na VM de um caso incompleto de transcrição e de redação ou automação
+- [x] Executar E2E na VM de um caso incompleto de transcrição e de redação ou automação
 - [ ] Corrigir o encerramento duplicado de respostas SSE para eliminar erros `write after end` e estabilizar testes de chat
 
 ## Perfil freelancer 99Freelas (pedido do usuário 19/08)
@@ -347,7 +358,7 @@
 - [x] Adicionar classificação explícita de afirmações: dado fornecido, fato verificado, estimativa ou informação pendente
 - [x] Adicionar nível de confiança e alternativa segura quando uma resposta depender de informação incompleta ou incerta
 - [x] Adicionar revisão adversarial para procurar dados inventados, requisitos esquecidos, contradições, riscos e exposição de dados antes da entrega
-- [ ] Testar cenários completos de serviço freelancer na VM, revisar resultados e limpar dados temporários
+- [x] Testar cenários completos de serviço freelancer na VM, revisar resultados e limpar dados temporários
 
 ## Primeiras propostas no 99Freelas (pedido do usuário 19/08)
 - [ ] Buscar projetos pequenos de redação, revisão, currículo, transcrição ou planilhas compatíveis com o perfil
@@ -433,3 +444,11 @@
 - [x] Definir um protocolo verificável de análise, execução, revisão e entrega para os serviços compatíveis
 - [x] Incorporar a postura profissional ao roteador de chat sem alegar experiência, certificações ou resultados inexistentes
 - [x] Cobrir o novo protocolo com testes de regressão e publicar a versão validada na VM
+
+## Fortalecimento avançado de mentalidade e execução da IA
+- [x] Auditar os protocolos atuais de planejamento, segurança, uso de ferramentas, revisão e entrega
+- [x] Definir um currículo prático de competências gerais, programação, documentos, análise e trabalho freelancer sem prometer conhecimento ilimitado
+- [x] Reforçar a distinção entre fatos, hipóteses, estimativas e dados ausentes antes de responder
+- [x] Reforçar planejamento por etapas, verificação independente e comunicação transparente de limites
+- [x] Reforçar resistência a instruções maliciosas, vazamento de segredos e ações externas não aprovadas
+- [x] Cobrir os novos protocolos com cenários de regressão antes de publicar

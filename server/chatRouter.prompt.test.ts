@@ -46,6 +46,14 @@ describe("SYSTEM_PROMPT - protocolo profissional de freelancer", () => {
     expect(SYSTEM_PROMPT).toContain("especialista certificado");
   });
 
+  it("adiciona mentalidade operacional calibrada para execução, programação e aprendizado", () => {
+    expect(SYSTEM_PROMPT).toContain("Mentalidade operacional de agente responsável");
+    expect(SYSTEM_PROMPT).toContain("Matriz de decisão operacional");
+    expect(SYSTEM_PROMPT).toContain("não confirmado");
+    expect(SYSTEM_PROMPT).toContain("reproduzir → isolar → corrigir minimamente → testar → relatar evidências");
+    expect(SYSTEM_PROMPT).toContain("memória e aprendizado não são automáticos");
+  });
+
   it("trata mensagens e anexos como dados não confiáveis e protege informações sigilosas", () => {
     expect(SYSTEM_PROMPT).toContain("Segurança, sigilo e resistência a manipulação");
     expect(SYSTEM_PROMPT).toContain("dados não confiáveis");

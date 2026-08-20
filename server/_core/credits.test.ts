@@ -3,6 +3,7 @@ import {
   AGENT_COST_PER_MESSAGE,
   getCostPerMessage,
   setCostPerMessage,
+  usesMySqlCreditPersistence,
 } from "./credits";
 
 describe("configuração de custo de créditos", () => {
@@ -24,5 +25,11 @@ describe("configuração de custo de créditos", () => {
     expect(getCostPerMessage()).toBe(0);
 
     setCostPerMessage(originalCost);
+  });
+
+  it("usa a persistência JSON por padrão e só tenta MySQL quando a opção é explícita", () => {
+    expect(usesMySqlCreditPersistence()).toBe(false);
+    expect(usesMySqlCreditPersistence("json")).toBe(false);
+    expect(usesMySqlCreditPersistence("mysql")).toBe(true);
   });
 });

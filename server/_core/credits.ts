@@ -22,6 +22,16 @@ if (!DATABASE_URL) {
 
 let pool: mysql.Pool | null = null;
 
+/**
+ * A VM publicada usa arquivos JSON como fonte de verdade para créditos e usuários.
+ * MySQL só é consultado quando uma implantação futura optar explicitamente por ele.
+ */
+export function usesMySqlCreditPersistence(
+  persistence = process.env.CREDITS_PERSISTENCE
+): boolean {
+  return persistence?.trim().toLowerCase() === "mysql";
+}
+
 function getPool(): mysql.Pool {
   if (pool) return pool;
   const url = DATABASE_URL.replace(/^postgresql/, "mysql");
@@ -107,6 +117,7 @@ async function _jsonGrantTrial(userId: number): Promise<boolean> {
 
 
 export async function ensureTable() {
+  if (!usesMySqlCreditPersistence()) return;
   try {
     await query(`
       CREATE TABLE IF NOT EXISTS credits (
@@ -182,6 +193,10 @@ export async function addCredits(email: string, amount: number): Promise<boolean
 }
 
 export async function listUsers(): Promise<any[]> {
+  if (!usesMySqlCreditPersistence()) {
+    return await listUsersJson();
+  }
+
   try {
     const rows = await query<any[]>(`
       SELECT u.id, u.email, u.name, u.role,

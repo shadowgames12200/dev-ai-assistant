@@ -9,6 +9,7 @@ import { appRouter } from "../routers";
 import { createContext } from "./context";
 import { handleLocalAccountUpdate, handleLocalLogin, handleLocalLogout, handleLocalRegister } from "../localAuth";
 import { serveStatic, setupVite } from "./vite";
+import { ENV } from "./env";
 
 function isPortAvailable(port: number): Promise<boolean> {
   return new Promise(resolve => {
@@ -49,7 +50,9 @@ async function startServer() {
   app.use(express.json({ limit: "50mb" }));
   app.use(express.urlencoded({ limit: "50mb", extended: true }));
   registerStorageProxy(app);
-  registerOAuthRoutes(app);
+  if (ENV.oAuthServerUrl) {
+    registerOAuthRoutes(app);
+  }
   // Autenticação local por conta e senha
   app.post("/api/auth/login", handleLocalLogin);
   app.post("/api/auth/register", handleLocalRegister);
