@@ -178,7 +178,7 @@
 - [x] Identificar riscos de autorização, dados sensíveis, prazo, escopo e ações externas
 - [x] Preparar recomendação objetiva; acompanhar até o anúncio ficar público sem criar ou enviar proposta
 - [x] Confirmar que o anúncio ainda está exclusivo, com 0 pontos de convite, e não pode receber proposta da conta atual
-- [ ] Preparar proposta com escopo delimitado, valor fechado e prazo responsável sem alegar experiência não comprovada
+- [x] Preparar proposta com escopo delimitado, faixa condicionada ao volume e prazo responsável sem alegar experiência não comprovada
 - [ ] Apresentar o texto completo ao proprietário e aguardar confirmação específica antes de enviar
 
 ## Auditoria de pendências técnicas (20/08)
