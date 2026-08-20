@@ -97,4 +97,25 @@ describe("chat.send com texto extraído de anexo", () => {
     expect(attachmentPart).toContain("[FIM DE ANEXO NÃO CONFIÁVEL]");
     expect(writes.join("")).toContain("Anexo analisado de forma defensiva.");
   });
+
+  it("rejeita mais de três anexos antes de consultar arquivos ou o modelo", async () => {
+    const { appRouter } = await import("./routers");
+    const caller = appRouter.createCaller({
+      req: { protocol: "http", headers: { host: "localhost:3000" } } as any,
+      res: { on: vi.fn(), write: vi.fn(), writeHead: vi.fn() } as any,
+      user: { id: 9, email: "dono@exemplo.com", role: "admin" } as any,
+    });
+
+    await expect(
+      caller.chat.chat.send({
+        conversationId: 41,
+        content: "Analise os arquivos anexados.",
+        attachmentIds: [71, 72, 73, 74],
+      })
+    ).rejects.toMatchObject({ code: "BAD_REQUEST" });
+
+    expect(mocks.getConversation).not.toHaveBeenCalled();
+    expect(mocks.extractTextContent).not.toHaveBeenCalled();
+    expect(mocks.invokeLLMStream).not.toHaveBeenCalled();
+  });
 });

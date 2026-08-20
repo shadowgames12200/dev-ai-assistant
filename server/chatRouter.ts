@@ -8,6 +8,8 @@ import type { ImageContent, Message, TextContent } from "./_core/llm";
 import { ENV } from "./_core/env";
 import { asUntrustedContent, redactSensitiveText } from "./security";
 
+export const MAX_ATTACHMENTS_PER_MESSAGE = 3;
+
 // Download a file (storage URL or public URL) as a Buffer.
 async function downloadBuffer(url: string): Promise<Buffer> {
   const resp = await fetch(url, { redirect: "follow" });
@@ -580,7 +582,13 @@ export const chatRouter = router({
         z.object({
           conversationId: z.number(),
           content: z.string().min(1).max(50000),
-          attachmentIds: z.array(z.number()).optional(),
+          attachmentIds: z
+            .array(z.number())
+            .max(
+              MAX_ATTACHMENTS_PER_MESSAGE,
+              `Envie no máximo ${MAX_ATTACHMENTS_PER_MESSAGE} anexos por mensagem para manter a análise estável.`
+            )
+            .optional(),
         })
       )
       .mutation(async ({ ctx, input }) => {

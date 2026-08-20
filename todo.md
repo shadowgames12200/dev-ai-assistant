@@ -201,6 +201,8 @@
 - [x] Cobrir por regressão que textos de anexos, inclusive tentativas de prompt injection, chegam à IA como conteúdo não confiável delimitado
 - [x] Simular um anexo textual no fluxo real do chat e comprovar que a mensagem enviada ao modelo inclui as fronteiras de conteúdo não confiável
 - [x] Exercitar chat.send com attachmentIds e extração simulada, verificando o payload efetivamente entregue ao provedor de LLM
+- [x] Limitar a quantidade de anexos analisados por mensagem para preservar memória e contexto na VM de 1 GB
+- [x] Cobrir a rejeição segura de mensagens com anexos acima do limite
 - [x] Validar que o fluxo de aprovação aceita a chave ativa sem alterar propostas existentes
 - [x] Reaplicar explicitamente a chave no comando de reinício do PM2 e comprovar presença e correspondência após o processo voltar a ficar online
 - [x] Salvar o estado do PM2 após a reaplicação e documentar, sem valores, o mecanismo de persistência usado
