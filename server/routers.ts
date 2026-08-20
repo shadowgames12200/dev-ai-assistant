@@ -141,7 +141,7 @@ export const appRouter = router({
         });
         const notified = await notifyOwner({
           title: "Nova solicitação de recarga Pix",
-          content: `Solicitação ${request.id} de ${ctx.user.email || "usuário sem e-mail"}: R$ ${(pkg.amountCents / 100).toFixed(2)} por ${pkg.credits} créditos. A confirmação do pagamento e a liberação continuam manuais.`,
+          content: `Solicitação ${request.id} de ${ctx.user.email || "usuário sem e-mail"}: ${pkg.label} (${pkg.id}), R$ ${(pkg.amountCents / 100).toFixed(2)} por ${pkg.credits} créditos. A confirmação do pagamento e a liberação continuam manuais.`,
         }).catch(() => false);
         return { success: true, request, ownerNotified: notified };
       }),

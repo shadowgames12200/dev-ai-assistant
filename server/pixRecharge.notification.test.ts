@@ -36,8 +36,13 @@ describe("alerta operacional de recarga Pix", () => {
     expect(result.ownerNotified).toBe(true);
     expect(notifyOwner).toHaveBeenCalledWith(expect.objectContaining({
       title: "Nova solicitação de recarga Pix",
-      content: expect.stringContaining("25 créditos"),
+      content: expect.stringContaining("cliente@exemplo.com"),
     }));
+    const alert = notifyOwner.mock.calls[0]?.[0];
+    expect(alert.content).toContain("Pacote básico (basico)");
+    expect(alert.content).toContain("R$ 10.00");
+    expect(alert.content).toContain("25 créditos");
+    expect(alert.content).toContain("confirmação do pagamento e a liberação continuam manuais");
   });
 
   it("mantém a solicitação pendente quando o canal de alerta está indisponível", async () => {

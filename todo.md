@@ -91,12 +91,15 @@
 
 ## Confirmação de pagamento Pix e alerta ao proprietário
 - [x] Mapear os dados mínimos que o painel já registra para identificar uma solicitação sem usar dados bancários do cliente
-- [ ] Pesquisar alternativas oficiais de confirmação Pix por webhook e seus requisitos de conta, credenciais e segurança
-- [ ] Comparar a conferência manual atual com a confirmação automatizada por provedor, preservando a aprovação manual de créditos
-- [ ] Solicitar escolha explícita do proprietário antes de conectar banco, provedor Pix ou webhook
-- [ ] Não ativar recebimento automático, aprovação automática ou transferência de valores em nenhuma etapa
-- [ ] Ajustar o alerta de solicitação Pix para informar usuário, pacote, valor e créditos, deixando explícito que o pagamento deve ser conferido manualmente
-- [ ] Validar o alerta integrado ao proprietário sem criar pagamento, solicitação de cliente ou liberar créditos
+- [x] Pesquisar alternativas oficiais de confirmação Pix por webhook e seus requisitos de conta, credenciais e segurança
+- [x] Comparar a conferência manual atual com a confirmação automatizada por provedor, preservando a aprovação manual de créditos
+- [x] Solicitar escolha explícita do proprietário antes de conectar banco, provedor Pix ou webhook
+- [x] Manter desativado o recebimento automático, a aprovação automática e qualquer transferência de valores
+- [x] Registrar alerta interno de solicitação Pix com usuário, pacote, valor e créditos, deixando explícita a conferência manual
+- [x] Validar em teste o alerta operacional sem criar pagamento, solicitação de cliente ou liberar créditos
+
+## Cobertura detalhada do alerta Pix (20/08)
+- [x] Cobrir e preservar em teste o usuário, pacote, valor, créditos e aviso de conferência manual no alerta interno de recarga
 - [ ] Configurar uma conta Gmail dedicada como remetente de alertas e o Gmail pessoal do proprietário como destinatário
 - [ ] Solicitar somente a senha de aplicativo do remetente, nunca a senha normal da conta
 - [ ] Iniciar o cadastro da conta Gmail dedicada e interromper para o proprietário preencher dados pessoais, telefone, CAPTCHA ou código de verificação
