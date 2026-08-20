@@ -140,6 +140,28 @@ describe("autenticação local", () => {
     expect(res.status).toHaveBeenCalledWith(409);
   });
 
+  it("limita cadastros repetidos da mesma origem antes de criar conta adicional", async () => {
+    vi.mocked(db.createLocalAccount).mockResolvedValue(null);
+    const request = {
+      body: { name: "Conta Limitada", email: "limitada@example.com", password: "segredo123" },
+      protocol: "https",
+      headers: {},
+      ip: "198.51.100.77",
+    };
+
+    for (let attempt = 0; attempt < 10; attempt += 1) {
+      const { res } = makeRes();
+      await handleLocalRegister(request, res);
+      expect(res.status).toHaveBeenCalledWith(409);
+    }
+
+    const { res: limitedResponse } = makeRes();
+    await handleLocalRegister(request, limitedResponse);
+
+    expect(limitedResponse.status).toHaveBeenCalledWith(429);
+    expect(db.createLocalAccount).toHaveBeenCalledTimes(10);
+  });
+
   it("exige a senha atual para alterar a conta", async () => {
     passwordStore.set(sampleUser.email, { passwordHash: hashed("senha-correta", "salt"), salt: "salt" });
     const { res } = makeRes();

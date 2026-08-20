@@ -145,6 +145,9 @@
 - [x] Tratar a ausência de OAuth externo como modo local suportado, sem registrar erro enganoso na inicialização
 - [x] Revalidar logs, saúde HTTP e fluxo de fallback após a publicação
 
+## Regressão de limite de cadastro (20/08)
+- [x] Cobrir que a origem excedendo o limite de cadastro recebe 429 e não cria conta adicional
+
 ## Avaliação de projeto da 99Freelas (link enviado pelo proprietário)
 - [x] Ler o escopo, prazo, entregáveis e condições do projeto 777684 sem interagir com a plataforma
 - [x] Comparar o trabalho com as capacidades reais da IA, os limites da VM e a necessidade de revisão humana
