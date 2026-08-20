@@ -44,6 +44,7 @@ vi.mock("@/lib/trpc", () => ({
       list: { useQuery: () => ({ data: { proposals: [] } }) },
       opportunities: { useQuery: () => ({ data: { opportunities: [{ id: "learn_1", category: "programação" }] } }) },
       createFromOpportunities: { useMutation: () => ({ mutate: createLearningProposal, isPending: false }) },
+      createDirected: { useMutation: () => ({ mutate: vi.fn(), isPending: false, isSuccess: false }) },
       approve: { useMutation: () => ({ mutate: vi.fn(), isPending: false }) },
       reject: { useMutation: () => ({ mutate: vi.fn(), isPending: false }) },
     },

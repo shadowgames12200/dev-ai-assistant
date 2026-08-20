@@ -208,6 +208,16 @@ export const appRouter = router({
         const result = mod.rejectProposal(input.proposalId);
         return { success: true, proposal: result };
       }),
+    // Auto-melhoria direcionada: o proprietário solicita um tema específico
+    createDirected: protectedProcedure
+      .input(z.object({ topic: z.string().min(3).max(500), reason: z.string().max(1000).optional() }))
+      .mutation(async ({ ctx, input }) => {
+        if (ctx.user.role !== "admin") throw new TRPCError({ code: "FORBIDDEN" });
+        const mod = await import("./_core/self-improvement");
+        const proposal = mod.createDirectedProposal(input.topic, input.reason);
+        if (!proposal) return { success: false, message: "Não foi possível criar a proposta. Verifique o tema.", proposal: null };
+        return { success: true, message: "Proposta direcionada criada. Ela ainda não pesquisou, não aprendeu permanentemente e não alterou nada. Revise e aprove no painel.", proposal };
+      }),
   }),
 });
 

@@ -380,6 +380,37 @@ export async function createProposalFromLearningQueue() {
     await saveProposalsDisk();
     return proposal;
 }
+
+/**
+ * Criar proposta de auto-melhoria direcionada pelo proprietário (tema específico).
+ * Não pesquisa, não aprende permanentemente e não altera código nesta etapa.
+ */
+export async function createDirectedProposal(topic: string, reason?: string) {
+    const sanitized = String(topic).trim().slice(0, 500);
+    if (sanitized.length < 3) return null;
+    const reasonText = reason ? ` Motivo: ${String(reason).slice(0, 1000)}` : "";
+    const proposal = await createImprovementProposal(
+        `Aprendizado direcionado: ${sanitized}`,
+        `Proposta solicitada diretamente pelo proprietário. Tema: ${sanitized}.${reasonText} Esta proposta pede autorização somente para estudar fontes confiáveis e preparar um plano de aprendizado. Nenhuma mudança será feita nesta etapa.`,
+        [],
+        [
+            "Pesquisa pode consumir limites das APIs configuradas.",
+            "Qualquer regra, documento ou alteração de código exigirá uma aprovação posterior e específica.",
+        ],
+        [
+            "Permite ao proprietário direcionar o aprendizado da IA para temas específicos.",
+            "Mantém o controle total: nenhuma pesquisa ou mudança acontece sem aprovação.",
+        ],
+        "Solicitação direta do proprietário; sem execução automática"
+    );
+    (proposal as any).kind = "directed";
+    (proposal as any).researchPlan = "Após aprovação, consultar apenas documentação oficial e fontes confiáveis, resumir o aprendizado e apresentar qualquer mudança técnica separadamente.";
+    (proposal as any).impact = "Baixo nesta etapa: apenas planejamento; não há alteração de código, dados, integrações ou credenciais.";
+    (proposal as any).reversal = "Rejeitar encerra a proposta. Aprovar não altera nada automaticamente; qualquer implementação futura será apresentada para revisão.";
+    await saveProposalsDisk();
+    return proposal;
+}
+
 /**
  * Aprovar uma proposta de melhoria (ação do usuário)
  */

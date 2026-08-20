@@ -84,6 +84,23 @@ export default function Admin() {
     },
     onError: (err) => toast.error("Não foi possível criar a proposta: " + err.message),
   });
+
+  // Auto-melhoria direcionada pelo proprietário
+  const [directedTopic, setDirectedTopic] = useState("");
+  const [directedReason, setDirectedReason] = useState("");
+  const createDirectedMutation = trpc.selfImprove.createDirected.useMutation({
+    onSuccess: (result) => {
+      if (result.success) {
+        setDirectedTopic("");
+        setDirectedReason("");
+        utils.selfImprove.list.invalidate();
+        toast.success(result.message);
+      } else {
+        toast.info(result.message);
+      }
+    },
+    onError: (err) => toast.error("Não foi possível criar a proposta: " + err.message),
+  });
   const approveProposalMutation = trpc.selfImprove.approve.useMutation({
     onSuccess: (result) => {
       if (result.success) {
@@ -228,6 +245,45 @@ export default function Admin() {
           )}
         </section>
 
+        {/* ---- Auto-melhoria direcionada pelo proprietário ---- */}
+        <section className="mb-8 rounded-lg border border-white/10 bg-white/[0.03] p-5">
+          <div className="flex items-center gap-2 mb-3">
+            <BrainCircuit className="h-4 w-4 text-emerald-400" />
+            <h2 className="text-sm font-semibold">Solicitar aprendizado específico</h2>
+          </div>
+          <p className="mb-3 text-xs leading-relaxed text-zinc-400">
+            Escolha um tema que você quer que a IA estude. Ao enviar, uma proposta é criada no painel abaixo para sua aprovação. Nenhuma pesquisa ou mudança acontece sem sua aprovação.
+          </p>
+          <div className="flex flex-col gap-3 sm:flex-row">
+            <Input
+              type="text"
+              placeholder="Tema (ex: formatação ABNT, planilhas Excel avançado, etc.)"
+              value={directedTopic}
+              onChange={(event) => setDirectedTopic(event.target.value)}
+              className="max-w-md bg-[#0a0a0f]"
+              maxLength={500}
+            />
+            <Button
+              size="sm"
+              onClick={() => createDirectedMutation.mutate({ topic: directedTopic.trim(), reason: directedReason.trim() || undefined })}
+              disabled={createDirectedMutation.isPending || directedTopic.trim().length < 3}
+            >
+              Solicitar aprendizado
+            </Button>
+          </div>
+          <Input
+            type="text"
+            placeholder="Motivo (opcional)"
+            value={directedReason}
+            onChange={(event) => setDirectedReason(event.target.value)}
+            className="mt-2 max-w-md bg-[#0a0a0f]"
+            maxLength={1000}
+          />
+          {createDirectedMutation.isSuccess && (
+            <p className="mt-2 text-xs text-emerald-300">Proposta criada com sucesso. Revise e aprove no painel abaixo.</p>
+          )}
+        </section>
+
         <section className="mb-8 rounded-lg border border-white/10 bg-white/[0.03] p-5">
           <div className="flex items-center gap-2 mb-3">
             <Lightbulb className="h-4 w-4 text-amber-300" />
@@ -282,7 +338,8 @@ export default function Admin() {
           {isLoading ? (
             <p className="text-sm text-zinc-500">Carregando...</p>
           ) : (
-            <Table>
+            <div className="overflow-x-auto rounded-lg border border-white/10">
+            <Table className="min-w-[700px]">
               <TableHeader>
                 <TableRow className="border-white/10">
                   <TableHead className="text-zinc-300">E-mail</TableHead>
@@ -367,6 +424,7 @@ export default function Admin() {
                 )}
               </TableBody>
             </Table>
+            </div>
           )}
         </section>
       </main>

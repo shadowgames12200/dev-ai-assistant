@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useLocation } from "wouter";
 import { ArrowLeft, Lock, Mail, ShieldCheck, UserRound } from "lucide-react";
 import { toast } from "sonner";
@@ -18,9 +18,12 @@ export default function Account() {
   const [newPassword, setNewPassword] = useState("");
   const [confirmPassword, setConfirmPassword] = useState("");
   const [saving, setSaving] = useState(false);
+  const hydrated = useRef(false);
 
+  // Hydrate once — subsequent useAuth() re-fetches must NOT overwrite edits.
   useEffect(() => {
-    if (user) {
+    if (user && !hydrated.current) {
+      hydrated.current = true;
       setName(user.name || "");
       setEmail(user.email || "");
     }
@@ -80,14 +83,14 @@ export default function Account() {
               <Label htmlFor="account-name" className="text-zinc-200">Nome de usuário</Label>
               <div className="relative">
                 <UserRound className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-zinc-500" />
-                <Input id="account-name" value={name} onChange={(event) => setName(event.target.value)} minLength={3} maxLength={40} required className="bg-[#1e1e28] pl-9 text-white" autoComplete="username" />
+                <Input id="account-name" value={name} onChange={(event) => setName(event.target.value)} minLength={3} maxLength={40} required className="bg-[#1e1e28] pl-9 text-white" autoComplete="username" title="" onInvalid={(event) => event.currentTarget.setCustomValidity("Preencha o nome de usuário (3 a 40 caracteres).")} onInput={(event) => event.currentTarget.setCustomValidity("")} />
               </div>
             </div>
             <div className="space-y-2">
               <Label htmlFor="account-email" className="text-zinc-200">E-mail</Label>
               <div className="relative">
                 <Mail className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-zinc-500" />
-                <Input id="account-email" type="email" value={email} onChange={(event) => setEmail(event.target.value)} required className="bg-[#1e1e28] pl-9 text-white" autoComplete="email" />
+                <Input id="account-email" type="email" value={email} onChange={(event) => setEmail(event.target.value)} required className="bg-[#1e1e28] pl-9 text-white" autoComplete="email" title="" onInvalid={(event) => event.currentTarget.setCustomValidity("Preencha um e-mail válido.")} onInput={(event) => event.currentTarget.setCustomValidity("")} />
               </div>
             </div>
             <div className="border-t border-white/10 pt-5">
@@ -107,7 +110,7 @@ export default function Account() {
               <Label htmlFor="account-current-password" className="text-zinc-200">Senha atual</Label>
               <div className="relative">
                 <Lock className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-zinc-500" />
-                <Input id="account-current-password" type="password" value={currentPassword} onChange={(event) => setCurrentPassword(event.target.value)} required minLength={6} className="bg-[#1e1e28] pl-9 text-white" autoComplete="current-password" />
+                <Input id="account-current-password" type="password" value={currentPassword} onChange={(event) => setCurrentPassword(event.target.value)} required minLength={6} className="bg-[#1e1e28] pl-9 text-white" autoComplete="current-password" title="" onInvalid={(event) => event.currentTarget.setCustomValidity("Preencha sua senha atual para confirmar.")} onInput={(event) => event.currentTarget.setCustomValidity("")} />
               </div>
             </div>
             <Button type="submit" className="w-full bg-violet-600 hover:bg-violet-500" disabled={saving}>
