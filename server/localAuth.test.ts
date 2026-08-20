@@ -162,6 +162,28 @@ describe("autenticação local", () => {
     expect(db.createLocalAccount).toHaveBeenCalledTimes(10);
   });
 
+  it("ignora X-Forwarded-For manipulável e mantém o limite pelo X-Real-IP do proxy local", async () => {
+    vi.mocked(db.createLocalAccount).mockResolvedValue(null);
+    const makeProxiedRequest = (forwardedFor: string) => ({
+      body: { name: "Conta Proxy", email: "proxy@example.com", password: "segredo123" },
+      protocol: "https",
+      headers: { "x-real-ip": "198.51.100.88", "x-forwarded-for": forwardedFor },
+      socket: { remoteAddress: "::1" },
+    });
+
+    for (let attempt = 0; attempt < 10; attempt += 1) {
+      const { res } = makeRes();
+      await handleLocalRegister(makeProxiedRequest(`203.0.113.${attempt}`), res);
+      expect(res.status).toHaveBeenCalledWith(409);
+    }
+
+    const { res: limitedResponse } = makeRes();
+    await handleLocalRegister(makeProxiedRequest("203.0.113.250"), limitedResponse);
+
+    expect(limitedResponse.status).toHaveBeenCalledWith(429);
+    expect(db.createLocalAccount).toHaveBeenCalledTimes(10);
+  });
+
   it("exige a senha atual para alterar a conta", async () => {
     passwordStore.set(sampleUser.email, { passwordHash: hashed("senha-correta", "salt"), salt: "salt" });
     const { res } = makeRes();

@@ -148,6 +148,10 @@
 ## Regressão de limite de cadastro (20/08)
 - [x] Cobrir que a origem excedendo o limite de cadastro recebe 429 e não cria conta adicional
 
+## Origem confiável no limite de autenticação (20/08)
+- [x] Usar X-Real-IP somente quando a solicitação vier do proxy local e ignorar X-Forwarded-For manipulável
+- [x] Cobrir em teste que cabeçalhos encaminhados manipulados não alteram a chave de limite
+
 ## Avaliação de projeto da 99Freelas (link enviado pelo proprietário)
 - [x] Ler o escopo, prazo, entregáveis e condições do projeto 777684 sem interagir com a plataforma
 - [x] Comparar o trabalho com as capacidades reais da IA, os limites da VM e a necessidade de revisão humana

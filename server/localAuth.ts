@@ -39,9 +39,17 @@ const AUTH_WINDOW_MS = 15 * 60 * 1000;
 const AUTH_MAX_ATTEMPTS = 10;
 const authAttempts = new Map<string, { count: number; resetAt: number }>();
 
+function isLoopbackAddress(value: unknown): boolean {
+  return value === "127.0.0.1" || value === "::1" || value === "::ffff:127.0.0.1";
+}
+
 function authRateLimitKey(req: any, action: string) {
-  const forwarded = typeof req.headers?.["x-forwarded-for"] === "string" ? req.headers["x-forwarded-for"].split(",")[0].trim() : "";
-  return `${action}:${forwarded || req.ip || req.socket?.remoteAddress || "unknown"}`;
+  const peerAddress = req.socket?.remoteAddress || req.ip || "unknown";
+  const realIp = typeof req.headers?.["x-real-ip"] === "string" ? req.headers["x-real-ip"].trim() : "";
+  // O Nginx local substitui X-Real-IP pelo endereço remoto real. X-Forwarded-For
+  // pode incluir valores enviados pelo cliente e não deve definir o limite.
+  const sourceAddress = isLoopbackAddress(peerAddress) && realIp ? realIp : peerAddress;
+  return `${action}:${sourceAddress}`;
 }
 
 function consumeAuthAttempt(req: any, action: string) {
