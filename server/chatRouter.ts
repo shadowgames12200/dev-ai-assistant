@@ -293,6 +293,20 @@ export function buildProfessionalServiceDataRequest(gate: ProfessionalServiceGat
   return `**Dados necessários antes da entrega de ${gate.service}**\n\nPara não inventar informações ou prometer algo incompleto, confirme:\n\n${questions}\n\n**Status: ESCOPO EM CONFIRMAÇÃO — NÃO ENVIE AO CLIENTE AINDA.**\n\nQuando você responder, preparo a execução ou a versão final com uma checagem de entrega.`;
 }
 
+export function buildCreditBlockedPayload(
+  agentMode: boolean,
+  balance: number,
+  requiredCredits: number
+) {
+  const required = Math.max(1, requiredCredits);
+  return {
+    content: `Você está sem créditos para ${agentMode ? "o modo agente (5 créditos)" : "enviar mensagens"}. Entre em contato com o administrador para recarregar.`,
+    creditBlocked: true,
+    balance: Math.max(0, balance),
+    requiredCredits: required,
+  };
+}
+
 export type FreelancerProjectTriage = {
   service: "currículo" | "transcrição" | "redação" | "revisão" | "planilha" | "automação";
   missing: string[];
@@ -710,9 +724,7 @@ export const chatRouter = router({
                 safeWrite(
                   encoder.encode(
                     "data: " +
-                      JSON.stringify({
-                        content: `Você está sem créditos para ${agentMode ? "o modo agente (5 créditos)" : "enviar mensagens"}. Entre em contato com o administrador para recarregar.`,
-                      }) +
+                      JSON.stringify(buildCreditBlockedPayload(agentMode, balance, cost)) +
                       "\n\n"
                   )
                 );

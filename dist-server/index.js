@@ -2192,6 +2192,15 @@ ${questions}
 
 Quando voc\xEA responder, preparo a execu\xE7\xE3o ou a vers\xE3o final com uma checagem de entrega.`;
 }
+function buildCreditBlockedPayload(agentMode, balance, requiredCredits) {
+  const required = Math.max(1, requiredCredits);
+  return {
+    content: `Voc\xEA est\xE1 sem cr\xE9ditos para ${agentMode ? "o modo agente (5 cr\xE9ditos)" : "enviar mensagens"}. Entre em contato com o administrador para recarregar.`,
+    creditBlocked: true,
+    balance: Math.max(0, balance),
+    requiredCredits: required
+  };
+}
 function getFreelancerProjectTriage(message, attachmentCount = 0) {
   const text = message.toLowerCase();
   const requestsProfessionalExecution = /fa[çc]a|crie|monte|prepare|transcrev|revis|automatiz|entregar|enviar|pronto|cliente|projeto|99freelas|workana/.test(
@@ -2445,9 +2454,7 @@ var chatRouter = router({
             } else {
               safeWrite(
                 encoder.encode(
-                  "data: " + JSON.stringify({
-                    content: `Voc\xEA est\xE1 sem cr\xE9ditos para ${agentMode ? "o modo agente (5 cr\xE9ditos)" : "enviar mensagens"}. Entre em contato com o administrador para recarregar.`
-                  }) + "\n\n"
+                  "data: " + JSON.stringify(buildCreditBlockedPayload(agentMode, balance, cost)) + "\n\n"
                 )
               );
               safeWrite(encoder.encode("data: [DONE]\n\n"));
@@ -2682,8 +2689,9 @@ var appRouter = router({
   // Credits
   credits: router({
     me: protectedProcedure.query(async ({ ctx }) => {
-      const { getBalance: getBalance2 } = await Promise.resolve().then(() => (init_credits(), credits_exports));
+      const { getBalance: getBalance2, grantTrial: grantTrial2 } = await Promise.resolve().then(() => (init_credits(), credits_exports));
       if (ctx.user.role === "admin") return { balance: -1, unlimited: true };
+      await grantTrial2(ctx.user.id);
       const balance = await getBalance2(ctx.user.id);
       return { balance, unlimited: false };
     }),

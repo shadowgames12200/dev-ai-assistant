@@ -65,8 +65,9 @@ export const appRouter = router({
   // Credits
   credits: router({
     me: protectedProcedure.query(async ({ ctx }) => {
-      const { getBalance } = await import("./_core/credits");
+      const { getBalance, grantTrial } = await import("./_core/credits");
       if (ctx.user.role === "admin") return { balance: -1, unlimited: true };
+      await grantTrial(ctx.user.id);
       const balance = await getBalance(ctx.user.id);
       return { balance, unlimited: false };
     }),

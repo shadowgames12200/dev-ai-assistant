@@ -14,10 +14,12 @@ import {
   Settings,
   Check,
   X,
+  Coins,
 } from "lucide-react";
 import { trpc } from "@/lib/trpc";
 import { useAuth } from "@/_core/hooks/useAuth";
 import ChatView from "@/components/ChatView";
+import { formatCreditLabel } from "@/lib/credits";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -39,6 +41,9 @@ export default function Chat() {
   const renameRef = useRef<HTMLInputElement>(null);
 
   const { data: convs } = trpc.chat.conversations.list.useQuery(undefined, {
+    enabled: !!user,
+  });
+  const { data: credits } = trpc.credits.me.useQuery(undefined, {
     enabled: !!user,
   });
 
@@ -285,7 +290,10 @@ export default function Chat() {
           <span className="text-sm font-medium truncate px-2">
             {conversations.find((c) => c.id === selectedId)?.title ?? "DevAI Assistant"}
           </span>
-          <div className="w-8" />
+          <div className="flex items-center gap-1.5 rounded-full border border-white/10 bg-white/[0.03] px-2 py-1 text-xs text-zinc-300">
+            <Coins className="h-3.5 w-3.5 text-amber-300" />
+            <span>{formatCreditLabel(credits)}</span>
+          </div>
         </header>
         <div className="flex-1 min-h-0">
           {selectedId ? (

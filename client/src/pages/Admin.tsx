@@ -14,6 +14,7 @@ import {
 } from "@/components/ui/table";
 import { trpc } from "@/lib/trpc";
 import { useAuth } from "@/_core/hooks/useAuth";
+import { parseCreditAdjustment } from "@/lib/credits";
 
 export default function Admin() {
   const { user } = useAuth();
@@ -246,12 +247,12 @@ function CreditButtons({
 }) {
   const [amount, setAmount] = useState("");
   const handle = (sign: 1 | -1) => {
-    const v = parseInt(amount, 10);
-    if (isNaN(v) || v <= 0) {
+    const adjustment = parseCreditAdjustment(amount, sign);
+    if (adjustment === null) {
       toast.error("Informe uma quantidade válida.");
       return;
     }
-    onAdjust(email, v * sign);
+    onAdjust(email, adjustment);
     setAmount("");
   };
   return (

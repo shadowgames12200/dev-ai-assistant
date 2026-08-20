@@ -14,8 +14,15 @@ import {
   Archive,
   MoreVertical,
   Cpu,
+  CircleAlert,
+  Coins,
 } from "lucide-react";
 import { trpc } from "@/lib/trpc";
+import {
+  buildCreditBlockedMessage,
+  formatCreditLabel,
+  getChatCreditUiState,
+} from "@/lib/credits";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import {
   DropdownMenu,
@@ -50,6 +57,7 @@ export default function ChatView({ conversationId }: { conversationId: number })
   const [pendingContent, setPendingContent] = useState("");
   const [isStreaming, setIsStreaming] = useState(false);
   const [isAgentMode, setIsAgentMode] = useState(false);
+  const [creditNotice, setCreditNotice] = useState<string | null>(null);
   const [attachments, setAttachments] = useState<
     Array<{ id: number; fileName: string; fileType: string; storageUrl: string }>
   >([]);
@@ -60,6 +68,9 @@ export default function ChatView({ conversationId }: { conversationId: number })
 
   const sendMutation = trpc.chat.chat.send.useMutation();
   const uploadMutation = trpc.chat.upload.uploadFile.useMutation();
+  const { data: credits, isLoading: isCreditsLoading } = trpc.credits.me.useQuery();
+  const creditUiState = getChatCreditUiState(credits);
+  const creditsExhausted = !isCreditsLoading && creditUiState.blocked;
 
   const { data: messagesData } = trpc.chat.conversations.messages.useQuery(
     { id: conversationId },
@@ -141,6 +152,11 @@ export default function ChatView({ conversationId }: { conversationId: number })
               if (json.agentMode === true) {
                 setIsAgentMode(true);
               }
+              if (json.creditBlocked) {
+                setCreditNotice(buildCreditBlockedMessage(json.balance, json.requiredCredits));
+                done = true;
+                break;
+              }
               if (json.content) {
                 setPendingContent((prev) => prev + json.content);
               } else if (json.error) {
@@ -166,11 +182,17 @@ export default function ChatView({ conversationId }: { conversationId: number })
     setIsStreaming(false);
     setPendingContent("");
     setSelectedAttIds([]);
+    utils.credits.me.invalidate();
   };
 
   const handleSend = () => {
     const content = input.trim();
     if (!content || isStreaming) return;
+    if (creditsExhausted) {
+      setCreditNotice(buildCreditBlockedMessage(0, 1));
+      return;
+    }
+    setCreditNotice(null);
     setMessages((prev) => [
       ...prev,
       {
@@ -351,6 +373,20 @@ export default function ChatView({ conversationId }: { conversationId: number })
 
       {/* Input area */}
       <div className="border-t bg-background p-3">
+        {(creditsExhausted || creditNotice) && (
+          <div
+            role="alert"
+            className="mx-auto mb-3 flex max-w-3xl items-start gap-2 rounded-lg border border-amber-400/30 bg-amber-400/10 px-3 py-2 text-xs text-amber-100"
+          >
+            <CircleAlert className="mt-0.5 h-4 w-4 shrink-0 text-amber-300" />
+            <div>
+              <p className="font-medium">Créditos insuficientes</p>
+              <p className="mt-0.5 text-amber-100/80">
+                {creditNotice || creditUiState.notice || buildCreditBlockedMessage(credits?.balance, 1)}
+              </p>
+            </div>
+          </div>
+        )}
         <form
           className="flex items-end gap-2 max-w-3xl mx-auto"
           onSubmit={(e) => {
@@ -363,7 +399,7 @@ export default function ChatView({ conversationId }: { conversationId: number })
             size="icon"
             className="shrink-0 bg-transparent"
             onClick={() => fileInputRef.current?.click()}
-            disabled={isStreaming}
+            disabled={isStreaming || creditsExhausted}
           >
             <Paperclip className="h-4 w-4" />
           </Button>
@@ -379,17 +415,21 @@ export default function ChatView({ conversationId }: { conversationId: number })
             onChange={(e) => setInput(e.target.value)}
             onKeyDown={handleKeyDown}
             placeholder="Pergunte sobre programação ou produtividade..."
-            disabled={isStreaming}
+            disabled={isStreaming || creditsExhausted}
             className="flex-1 bg-muted/50"
           />
           <Button
             onClick={handleSend}
-            disabled={isStreaming || !input.trim()}
+            disabled={isStreaming || creditsExhausted || !input.trim()}
             className="shrink-0 bg-violet-600 hover:bg-violet-500"
           >
             {isStreaming ? <Loader2 className="h-4 w-4 animate-spin" /> : <Send className="h-4 w-4" />}
           </Button>
         </form>
+        <div className="mx-auto mt-2 flex max-w-3xl items-center justify-end gap-1.5 text-[11px] text-muted-foreground">
+          <Coins className="h-3.5 w-3.5 text-amber-300" />
+          <span>{formatCreditLabel(credits)}</span>
+        </div>
       </div>
     </div>
   );

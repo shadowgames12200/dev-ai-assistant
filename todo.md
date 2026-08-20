@@ -67,9 +67,22 @@
 - [x] Teste e2e: trial, recarga admin, bloqueio e dedução OK
 
 ## Sistema de créditos (frontend)
-- [ ] Exibir saldo de créditos no chat (badge; admin mostra ilimitado)
-- [ ] Painel Admin: coluna de saldo + recarga/remoção de créditos por usuário
-- [ ] Mensagem amigável de "créditos esgotados" no chat
+- [x] Exibir saldo de créditos no chat (badge; admin mostra ilimitado)
+- [x] Painel Admin: coluna de saldo + recarga/remoção de créditos por usuário
+- [x] Mensagem amigável de "créditos esgotados" no chat
+- [x] Mapear os componentes e procedimentos existentes antes de alterar a interface de créditos
+- [x] Adicionar testes de interface/contrato para saldo, administração e bloqueio por créditos esgotados
+- [x] Adicionar evidência verificável da coluna de saldo e dos controles de recarga/remoção no painel administrativo
+- [x] Criar teste para o contrato de bloqueio de créditos com creditBlocked, balance e requiredCredits
+- [x] Criar testes de interface que cubram o chat sem crédito e o painel administrativo com saldo por usuário
+- [x] Criar teste real de interface para o ChatView com aviso, campo e botão bloqueados sem créditos
+- [x] Criar teste real de interface para o Admin com saldo por usuário e botões de adicionar/remover créditos
+- [x] Substituir as inspeções estáticas de fonte por cobertura de integração/UI baseada em renderização
+
+## Publicação da interface de créditos (20/08)
+- [x] Compilar o cliente e o backend com a experiência de créditos atualizada
+- [x] Publicar os arquivos estáticos e o backend compilado na VM Azure
+- [x] Reiniciar o processo gerenciado e confirmar estado online, ativos publicados e resposta HTTP local
 
 ## Finalização
 - [ ] Verificação final de logs e estabilidade

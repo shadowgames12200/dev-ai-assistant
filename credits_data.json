@@ -1,0 +1,10 @@
+{
+  "users": {
+    "1": {
+      "balance": 50,
+      "trial_granted": true,
+      "email": null,
+      "created_at": 1787224914452
+    }
+  }
+}
