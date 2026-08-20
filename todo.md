@@ -86,7 +86,8 @@
 
 ## Sincronização do GitHub (20/08)
 - [x] Verificar divergências do repositório local e remoto e excluir dados de runtime do commit
-- [ ] Criar commit limpo da interface de créditos e testes validados
+- [x] Confirmar que o checkpoint cbed5f9 contém explicitamente a interface de créditos e os testes validados
+- [x] Criar commit limpo de remoção de dados de runtime e artefatos gerados do repositório
 - [ ] Enviar a versão ao GitHub e confirmar que a branch remota está atualizada
 - [x] Remover do versionamento os JSONs de runtime e o bundle compilado, preservando os arquivos locais e da VM
 - [x] Confirmar que o repositório pode ser reconstruído somente a partir do código-fonte antes do envio ao GitHub
