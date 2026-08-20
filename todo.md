@@ -208,6 +208,11 @@
 - [x] Realizar e registrar nesta rodada buscas específicas por transcrição e por planilhas com os mesmos critérios de risco e concorrência
 - [x] Confirmar no registro desta rodada que nenhuma proposta foi enviada e nenhuma conexão foi consumida nas buscas de transcrição e planilhas
 
+## Nova revisão da 99Freelas (pedido do usuário 19/08)
+- [x] Conferir o perfil público atualizado, o saldo de conexões e o estado da conta sem realizar alterações
+- [x] Pesquisar e registrar oportunidades novas compatíveis, sem enviar propostas nem consumir conexões
+- [x] Avaliar os resultados e registrar que não houve projeto de escopo claro, baixo risco e concorrência viável para apresentar nesta rodada
+
 ## Melhoria do perfil na 99Freelas (pedido do usuário 19/08)
 - [x] Verificar o resumo atual, o título e a seção adequada para uma apresentação profissional no perfil
 - [x] Preparar texto honesto que destaque serviços, cuidado e compromisso sem alegar experiência não comprovada
@@ -239,6 +244,11 @@
 - [x] Registrar os requisitos da candidatura e reiterar que o usuário deve concluir as avaliações sozinho
 - [ ] Preparar somente orientação geral permitida, sem responder etapas avaliativas ou manipular a candidatura
 - [ ] Apoiar os próximos passos após o resultado informado pelo usuário
+
+## Nova tentativa individual na Audiotext após reprovação (19/08)
+- [x] Registrar a reprovação na prova teórica, a nova tentativa após o prazo da plataforma e a proibição de criar conta duplicada ou burlar a avaliação
+- [x] Preparar um roteiro geral de estudo de regras de transcrição, sem acessar questões, respostas ou arquivos avaliativos
+- [ ] Confirmar com o usuário o resultado de uma nova tentativa e orientar apenas os próximos passos permitidos
 
 ## Captação direta como canal prioritário (pedido do usuário 19/08)
 - [x] Definir uma oferta inicial de serviços simples, com público, preço, prazo e limites claros
