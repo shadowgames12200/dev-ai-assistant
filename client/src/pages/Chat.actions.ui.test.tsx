@@ -37,6 +37,7 @@ vi.mock("@/lib/trpc", () => ({
           },
         },
         rename: { useMutation: () => ({ mutate: vi.fn(), isPending: false }) },
+        clear: { useMutation: () => ({ mutate: vi.fn(), isPending: false }) },
       },
     },
     credits: { me: { useQuery: () => ({ data: { balance: 50, isAdmin: false } }) } },

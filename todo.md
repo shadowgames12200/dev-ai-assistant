@@ -129,7 +129,7 @@
 - [x] Verificar divergências do repositório local e remoto e excluir dados de runtime do commit
 - [x] Confirmar que o checkpoint cbed5f9 contém explicitamente a interface de créditos e os testes validados
 - [x] Criar commit limpo de remoção de dados de runtime e artefatos gerados do repositório
-- [ ] Enviar a versão ao GitHub e confirmar que a branch remota está atualizada
+- [x] Enviar a versão ao GitHub e confirmar que a branch remota está atualizada (push com token renovado pelo proprietário em 20/08; commit 6c0d61c confirmado no remoto como mais recente)
 - [x] Remover do versionamento os JSONs de runtime e o bundle compilado, preservando os arquivos locais e da VM
 - [x] Confirmar que o repositório pode ser reconstruído somente a partir do código-fonte antes do envio ao GitHub
 

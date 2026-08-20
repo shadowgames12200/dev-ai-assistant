@@ -556,6 +556,11 @@ export const chatRouter = router({
         await db.updateConversationTitle(input.id, input.title);
         return { success: true };
       }),
+    clear: protectedProcedure.mutation(async ({ ctx }) => {
+      if (!ctx.user) throw new TRPCError({ code: "UNAUTHORIZED" });
+      const deleted = await db.clearUserConversations(ctx.user.id);
+      return { success: true, deletedCount: deleted };
+    }),
     messages: protectedProcedure
       .input(z.object({ id: z.number() }))
       .query(async ({ ctx, input }) => {

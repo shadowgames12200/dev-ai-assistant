@@ -19,6 +19,7 @@ import {
 } from "lucide-react";
 import { trpc } from "@/lib/trpc";
 import { useAuth } from "@/_core/hooks/useAuth";
+import { useLocation } from "wouter";
 import ChatView from "@/components/ChatView";
 import { formatCreditLabel } from "@/lib/credits";
 import {
@@ -30,6 +31,7 @@ import {
 
 export default function Chat() {
   const { user, logout } = useAuth();
+  const [, setLocation] = useLocation();
   const utils = trpc.useUtils();
   const [conversations, setConversations] = useState<
     Array<{ id: number; title: string; updatedAt: Date }>
@@ -74,6 +76,22 @@ export default function Chat() {
     },
     onError: (err) => toast.error("Erro ao excluir: " + err.message),
   });
+
+  const clearMutation = trpc.chat.conversations.clear.useMutation({
+    onSuccess: () => {
+      utils.chat.conversations.list.invalidate();
+      setConversations([]);
+      setSelectedId(null);
+      toast.success("Todas as conversas foram excluídas.");
+    },
+    onError: (err) => toast.error("Erro ao excluir todas: " + err.message),
+  });
+
+  const handleClearAll = () => {
+    if (window.confirm("Excluir TODAS as conversas? Esta ação não pode ser desfeita.")) {
+      clearMutation.mutate();
+    }
+  };
 
   const renameMutation = trpc.chat.conversations.rename.useMutation({
     onSuccess: () => {
@@ -137,6 +155,25 @@ export default function Chat() {
             Nova conversa
           </Button>
         </div>
+
+        {conversations.length > 0 && (
+          <div className="px-3 pb-1">
+            <Button
+              variant="ghost"
+              size="sm"
+              onClick={handleClearAll}
+              disabled={clearMutation.isPending}
+              className="w-full text-xs text-red-400 hover:text-red-300 hover:bg-red-500/10"
+            >
+              {clearMutation.isPending ? (
+                <span className="h-3 w-3 animate-spin rounded-full border-2 border-red-400/30 border-t-red-400 mr-1" />
+              ) : (
+                <Trash2 className="h-3 w-3 mr-1" />
+              )}
+              Excluir todas
+            </Button>
+          </div>
+        )}
 
         <ScrollArea className="flex-1 px-3 pb-2">
           <div className="flex flex-col gap-1">
@@ -255,8 +292,9 @@ export default function Chat() {
               className="absolute bottom-16 left-0 right-0 z-50 rounded-md border border-white/10 bg-[#191923] p-1 shadow-lg"
             >
               <a
-                href="/account"
                 role="menuitem"
+                href="#"
+                onClick={(e) => { e.preventDefault(); setLocation("/account"); }}
                 className="flex w-full items-center gap-2 rounded-sm px-2 py-2 text-left text-sm hover:bg-white/10"
               >
                 <UserRoundCog className="h-4 w-4" />
@@ -264,8 +302,9 @@ export default function Chat() {
               </a>
               {user?.role === "admin" && (
                 <a
-                  href="/admin"
                   role="menuitem"
+                  href="#"
+                  onClick={(e) => { e.preventDefault(); setLocation("/admin"); }}
                   className="flex w-full items-center gap-2 rounded-sm px-2 py-2 text-left text-sm hover:bg-white/10"
                 >
                   <Settings className="h-4 w-4" />

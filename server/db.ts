@@ -356,6 +356,17 @@ export async function deleteConversation(id: number, userId: number) {
   return true;
 }
 
+export async function clearUserConversations(userId: number) {
+  const d = loadConvos();
+  const userConvoIds = d.convos.filter((c) => c.userId === userId).map((c) => c.id);
+  const deletedCount = userConvoIds.length;
+  d.convos = d.convos.filter((c) => c.userId !== userId);
+  d.msgs = d.msgs.filter((m) => !userConvoIds.includes(m.conversationId));
+  d.attachments = d.attachments.filter((a) => !userConvoIds.includes(a.conversationId));
+  saveConvos(d);
+  return deletedCount;
+}
+
 // ─── Messages ───
 export async function getConversationMessages(conversationId: number) {
   const d = loadConvos();
