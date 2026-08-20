@@ -410,6 +410,40 @@ export function buildFreelancerProjectTriageRequest(triage: FreelancerProjectTri
   return `**BRIEFING PROFISSIONAL INCOMPLETO — EXECUÇÃO BLOQUEADA**\n\n${briefingSection}${riskSection}\n\n**Status: PLANEJAMENTO E ESCOPO — NÃO INICIE NEM ENVIE AO CLIENTE AINDA.**\n\nCom essas informações, preparo um plano de execução, produzo o material e faço a checagem final antes da entrega.`;
 }
 
+/**
+ * Monta exatamente o conteúdo multimodal que seguirá ao modelo na última
+ * mensagem do usuário. Textos extraídos de anexos sempre recebem uma fronteira
+ * explícita de conteúdo não confiável, mesmo quando contêm pedidos maliciosos.
+ */
+export function composeMessageContentWithAttachments(
+  baseContent: string,
+  attachmentTexts: string[],
+  attachmentImages: { fileName: string; base64: string; mime: string }[]
+): (TextContent | ImageContent)[] {
+  const textParts: TextContent[] = attachmentTexts.map((text) => ({
+    type: "text",
+    text: asUntrustedContent(text, "anexo"),
+  }));
+  const imageParts: (TextContent | ImageContent)[] = [];
+
+  for (const img of attachmentImages) {
+    imageParts.push({
+      type: "text",
+      text: `[Imagem anexada: ${img.fileName}]`,
+    });
+    imageParts.push({
+      type: "image_url",
+      image_url: { url: `data:${img.mime};base64,${img.base64}` },
+    });
+  }
+
+  return [
+    { type: "text", text: baseContent },
+    ...textParts,
+    ...imageParts,
+  ];
+}
+
 export type StreamContentState = {
   accumulatedContent: string;
   mode: "unknown" | "delta" | "cumulative";
@@ -611,29 +645,14 @@ export const chatRouter = router({
         ];
         // Append attachment context to the user message
         const lastIdx = llmMessages.length - 1;
-        const extraParts: string[] = [];
-        if (attachmentTextContext.length > 0) {
-          extraParts.push(...attachmentTextContext.map((text) => asUntrustedContent(text, "anexo")));
-        }
         const baseContent = llmMessages[lastIdx].content as string;
-        const imageParts: (TextContent | ImageContent)[] = [];
-        for (const img of attachmentImages) {
-          imageParts.push({
-            type: "text",
-            text: `[Imagem anexada: ${img.fileName}]`,
-          });
-          imageParts.push({
-            type: "image_url",
-            image_url: { url: `data:${img.mime};base64,${img.base64}` },
-          });
-        }
         llmMessages[lastIdx] = {
           ...llmMessages[lastIdx],
-          content: [
-            { type: "text" as const, text: baseContent },
-            ...extraParts.map((t) => ({ type: "text" as const, text: t })),
-            ...imageParts,
-          ],
+          content: composeMessageContentWithAttachments(
+            baseContent,
+            attachmentTextContext,
+            attachmentImages
+          ),
         };
 
         // Streaming response via SSE
