@@ -384,6 +384,15 @@ export default function ChatView({ conversationId }: { conversationId: number })
               <p className="mt-0.5 text-amber-100/80">
                 {creditNotice || creditUiState.notice || buildCreditBlockedMessage(credits?.balance, 1)}
               </p>
+              <Button
+                type="button"
+                size="sm"
+                variant="outline"
+                className="mt-2 border-amber-300/40 text-amber-100 hover:bg-amber-300/10"
+                onClick={() => { window.location.href = "/recharge"; }}
+              >
+                Recarregar créditos
+              </Button>
             </div>
           </div>
         )}

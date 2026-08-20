@@ -54,7 +54,7 @@ export const TRIAL_AMOUNT = 50;
 // ─── JSON fallback persistence (no MySQL needed) ────────────────────────
 import { readFileSync as _rdf, writeFileSync as _wdf, existsSync as _exs } from "fs";
 const _CRED_FILE = path.join(APP_DIR, "credits_data.json");
-let _credCache: Record<string, { balance: number; trial_granted: boolean; email: string | null; created_at: number }> = {};
+let _credCache: Record<string, { balance: number; trial_granted: boolean; email: string | null; created_at: number; appliedRechargeIds?: string[] }> = {};
 function _loadCreds() {
   try {
     if (_exs(_CRED_FILE)) _credCache = JSON.parse(_rdf(_CRED_FILE, "utf-8")).users || {};
@@ -78,6 +78,19 @@ async function _jsonAdjust(userId: number, amount: number): Promise<boolean> {
   _credCache[k] = e;
   _saveCreds();
   return true;
+}
+
+async function _jsonApplyRecharge(userId: number, amount: number, rechargeId: string): Promise<{ applied: boolean; balance: number }> {
+  _loadCreds();
+  const key = String(userId);
+  const entry = _credCache[key] || { balance: 0, trial_granted: false, email: null, created_at: Date.now(), appliedRechargeIds: [] };
+  const appliedRechargeIds = Array.isArray(entry.appliedRechargeIds) ? entry.appliedRechargeIds : [];
+  if (appliedRechargeIds.includes(rechargeId)) return { applied: false, balance: Number(entry.balance || 0) };
+  entry.balance = Math.max(0, Number(entry.balance || 0) + amount);
+  entry.appliedRechargeIds = [...appliedRechargeIds, rechargeId].slice(-500);
+  _credCache[key] = entry;
+  _saveCreds();
+  return { applied: true, balance: entry.balance };
 }
 async function _jsonGrantTrial(userId: number): Promise<boolean> {
   _loadCreds();
@@ -115,6 +128,14 @@ export async function getBalance(userId: number): Promise<number> {
 
 export async function adjust(userId: number, amount: number): Promise<boolean> {
   return await _jsonAdjust(userId, amount);
+}
+
+/** Concede créditos de uma recarga somente uma vez para o mesmo identificador. */
+export async function applyRechargeCredit(userId: number, amount: number, rechargeId: string) {
+  if (!Number.isInteger(amount) || amount <= 0 || !rechargeId) {
+    throw new Error("Recarga inválida para aplicação de créditos.");
+  }
+  return _jsonApplyRecharge(userId, amount, rechargeId);
 }
 
 export async function grantTrial(userId: number): Promise<boolean> {

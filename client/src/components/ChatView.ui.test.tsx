@@ -53,6 +53,9 @@ describe("ChatView sem créditos", () => {
     expect(screen.getByText("Você está sem créditos. Entre em contato com o administrador para recarregar e continuar usando o chat.")).toBeVisible();
     expect(screen.getByPlaceholderText("Pergunte sobre programação ou produtividade...")).toBeDisabled();
     expect(screen.getByText("0 créditos")).toBeVisible();
-    screen.getAllByRole("button").forEach((button) => expect(button).toBeDisabled());
+    expect(screen.getByRole("button", { name: "Recarregar créditos" })).toBeEnabled();
+    screen.getAllByRole("button")
+      .filter((button) => button.textContent !== "Recarregar créditos")
+      .forEach((button) => expect(button).toBeDisabled());
   });
 });

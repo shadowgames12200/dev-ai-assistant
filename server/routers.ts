@@ -6,6 +6,9 @@ import { protectedProcedure, publicProcedure, router } from "./_core/trpc";
 import { z } from "zod";
 import { chatRouter } from "./chatRouter";
 import * as db from "./db";
+import { buildStaticPixBrCode } from "./pixBrCode";
+import { getPixConfig, getPixPackage, PIX_PACKAGES } from "./pixConfig";
+import { notifyOwner } from "./_core/notification";
 
 export const appRouter = router({
     // if you need to use socket.io, read and register route in server/_core/index.ts, all api should start with '/api/' so that the gateway can route correctly
@@ -105,6 +108,67 @@ export const appRouter = router({
       const { listUsers } = await import("./_core/credits");
       return listUsers();
     }),
+  }),
+  pix: router({
+    packages: protectedProcedure.query(({ ctx }) => {
+      const config = getPixConfig();
+      return {
+        packages: PIX_PACKAGES.map((pkg) => ({
+          ...pkg,
+          amount: (pkg.amountCents / 100).toFixed(2),
+          brCode: buildStaticPixBrCode(pkg),
+        })),
+        receiverName: config.receiverName,
+        city: config.city,
+        supportWhatsAppNumber: config.supportWhatsAppNumber,
+        currentUserId: ctx.user.id,
+      };
+    }),
+    myRequests: protectedProcedure.query(({ ctx }) => ({
+      requests: db.listUserRechargeRequests(ctx.user.id),
+    })),
+    requestRecharge: protectedProcedure
+      .input(z.object({ packageId: z.string().min(1).max(32) }))
+      .mutation(async ({ ctx, input }) => {
+        const pkg = getPixPackage(input.packageId);
+        if (!pkg) throw new TRPCError({ code: "BAD_REQUEST", message: "Pacote de recarga inválido." });
+        const request = db.createRechargeRequest({
+          userId: ctx.user.id,
+          userEmail: ctx.user.email || "",
+          packageId: pkg.id,
+          amountCents: pkg.amountCents,
+          credits: pkg.credits,
+        });
+        const notified = await notifyOwner({
+          title: "Nova solicitação de recarga Pix",
+          content: `Solicitação ${request.id} de ${ctx.user.email || "usuário sem e-mail"}: R$ ${(pkg.amountCents / 100).toFixed(2)} por ${pkg.credits} créditos. A confirmação do pagamento e a liberação continuam manuais.`,
+        }).catch(() => false);
+        return { success: true, request, ownerNotified: notified };
+      }),
+    listPending: protectedProcedure.query(({ ctx }) => {
+      if (ctx.user.role !== "admin") throw new TRPCError({ code: "FORBIDDEN" });
+      return { requests: db.listRechargeRequests("pending") };
+    }),
+    approveRecharge: protectedProcedure
+      .input(z.object({ requestId: z.string().min(8).max(100) }))
+      .mutation(async ({ ctx, input }) => {
+        if (ctx.user.role !== "admin") throw new TRPCError({ code: "FORBIDDEN" });
+        const request = db.getRechargeRequest(input.requestId);
+        if (!request) throw new TRPCError({ code: "NOT_FOUND", message: "Solicitação não encontrada." });
+        if (request.status === "rejected") throw new TRPCError({ code: "BAD_REQUEST", message: "Solicitação já rejeitada." });
+        const creditResult = await (await import("./_core/credits")).applyRechargeCredit(request.userId, request.credits, request.id);
+        const approved = db.markRechargeApproved(request.id, ctx.user.id);
+        if (!approved) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: "Não foi possível registrar a aprovação." });
+        return { success: true, request: approved, creditsAdded: creditResult.applied, balance: creditResult.balance };
+      }),
+    rejectRecharge: protectedProcedure
+      .input(z.object({ requestId: z.string().min(8).max(100) }))
+      .mutation(({ ctx, input }) => {
+        if (ctx.user.role !== "admin") throw new TRPCError({ code: "FORBIDDEN" });
+        const request = db.markRechargeRejected(input.requestId, ctx.user.id);
+        if (!request) throw new TRPCError({ code: "BAD_REQUEST", message: "Solicitação indisponível para rejeição." });
+        return { success: true, request };
+      }),
   }),
   // Self-improvement (aprovações)
   selfImprove: router({

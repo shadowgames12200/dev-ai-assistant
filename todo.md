@@ -81,21 +81,23 @@
 
 ## Recarga manual por Pix (pedido do usuário 20/08)
 - [x] Definir pacotes, preço, créditos por pacote e a mensagem de que a liberação depende de conferência manual
-- [ ] Gerar dinamicamente o código Pix Copia e Cola por pacote a partir da chave, nome e cidade cadastrados com segurança
-- [ ] Criar uma tela de recarga exibida quando os créditos acabam, com pacotes e instruções de pagamento
-- [ ] Criar QR Code a partir do código Pix Copia e Cola e botão de cópia sem armazenar dados de pagamento de clientes
-- [ ] Registrar uma solicitação de recarga pendente, com usuário, pacote e horário, sem liberar créditos automaticamente
+- [x] Gerar dinamicamente o código Pix Copia e Cola por pacote a partir da chave, nome e cidade cadastrados com segurança
+- [x] Criar uma tela de recarga exibida quando os créditos acabam, com pacotes e instruções de pagamento
+- [x] Criar QR Code a partir do código Pix Copia e Cola e botão de cópia sem armazenar dados de pagamento de clientes
+- [x] Registrar uma solicitação de recarga pendente, com usuário, pacote e horário, sem liberar créditos automaticamente
 - [ ] Notificar o proprietário por e-mail quando houver solicitação de recarga pendente, se a configuração permitir
-- [ ] Exibir solicitações pendentes no painel administrativo e liberar o pacote somente após confirmação manual do proprietário
-- [ ] Cobrir o fluxo com testes de segurança, contrato e interface antes de publicar
+- [x] Exibir solicitações pendentes no painel administrativo e liberar o pacote somente após confirmação manual do proprietário
+- [x] Cobrir o fluxo com testes de segurança, contrato e interface antes de publicar
 - [x] Registrar os pacotes aprovados: R$ 10 por 25 créditos, R$ 20 por 60 créditos e R$ 50 por 180 créditos
-- [ ] Configurar o suporte dos clientes para o WhatsApp 38 99110-9806 sem revelar dados desnecessários
+- [x] Configurar o suporte dos clientes para o WhatsApp 38 99110-9806 sem revelar dados desnecessários
 - [ ] Verificar se há integração WhatsApp Business disponível para o número 38 98405-7434 antes de prometer alerta automático
 - [ ] Configurar aviso inicial ao proprietário pelo e-mail charleshenriquegonsalves05@gmail.com, se o canal de proprietário estiver disponível
 - [x] Configurar os dados de Pix como segredo do servidor, sem deixá-los codificados ou expostos no repositório
-- [ ] Adicionar teste e endpoint leve para validar a geração do payload Pix por pacote sem expor valores de configuração
+- [x] Adicionar teste e endpoint leve para validar a geração do payload Pix por pacote sem expor valores de configuração
 - [ ] Validar o canal de e-mail disponível para alertar o proprietário sobre pedidos pendentes
-- [ ] Registrar o WhatsApp Business como melhoria futura, sem bloquear a recarga manual atual
+- [x] Registrar o WhatsApp Business como melhoria futura, sem bloquear a recarga manual atual
+- [x] Adicionar teste de interface da página de recarga cobrindo pacotes, QR Code, Pix Copia e Cola, cópia e solicitação manual
+- [x] Adicionar teste de interface do painel administrativo para os estados vazio e pendente de recargas Pix, com ações de aprovar/rejeitar
 
 ## Publicação da interface de créditos (20/08)
 - [x] Compilar o cliente e o backend com a experiência de créditos atualizada
@@ -113,6 +115,12 @@
 ## Finalização
 - [ ] Verificação final de logs e estabilidade
 - [ ] Checkpoint final
+
+## Avaliação de projeto da 99Freelas (link enviado pelo proprietário)
+- [x] Ler o escopo, prazo, entregáveis e condições do projeto 777684 sem interagir com a plataforma
+- [x] Comparar o trabalho com as capacidades reais da IA, os limites da VM e a necessidade de revisão humana
+- [x] Identificar lacunas de preparo e riscos de qualidade, prazo, dados sensíveis ou ações externas
+- [x] Entregar ao proprietário a recomendação objetiva de não produzir proposta por envolver recuperação de acesso sem autorização verificável
 
 ## Auditoria de pendências técnicas (20/08)
 - [x] Verificar no código e na VM se o fluxo de autoaperfeiçoamento com aprovação do dono permanece funcional

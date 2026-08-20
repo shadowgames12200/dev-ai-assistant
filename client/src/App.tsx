@@ -9,6 +9,7 @@ import Login from "./pages/Login";
 import Chat from "./pages/Chat";
 import Admin from "./pages/Admin";
 import Account from "./pages/Account";
+import Recharge from "./pages/Recharge";
 
 function Router() {
   const { user, loading } = useAuth();
@@ -61,6 +62,11 @@ function Router() {
         </Protected>
       </Route>
       <Route path="/account" component={AccountPage} />
+      <Route path="/recharge">
+        <Protected>
+          <Recharge />
+        </Protected>
+      </Route>
       <Route path={"/404"} component={NotFound} />
       {/* Final fallback route */}
       <Route component={NotFound} />

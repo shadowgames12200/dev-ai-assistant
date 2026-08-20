@@ -1,12 +1,15 @@
 // @vitest-environment jsdom
 import "@testing-library/jest-dom/vitest";
 import React from "react";
-import { fireEvent, render, screen } from "@testing-library/react";
-import { describe, expect, it, vi } from "vitest";
+import { cleanup, fireEvent, render, screen, within } from "@testing-library/react";
+import { afterEach, describe, expect, it, vi } from "vitest";
 import Admin from "./Admin";
 
 const addCredits = vi.fn();
 const createLearningProposal = vi.fn();
+const approveRecharge = vi.fn();
+const rejectRecharge = vi.fn();
+const pendingRecharges = vi.hoisted(() => ({ requests: [] as Array<{ id: string; userEmail: string; amountCents: number; credits: number; createdAt: number }> }));
 
 vi.mock("@/lib/trpc", () => ({
   trpc: {
@@ -14,6 +17,7 @@ vi.mock("@/lib/trpc", () => ({
       credits: { list: { invalidate: vi.fn() }, getCost: { invalidate: vi.fn() } },
       admin: { listUsers: { invalidate: vi.fn() } },
       selfImprove: { list: { invalidate: vi.fn() }, opportunities: { invalidate: vi.fn() } },
+      pix: { listPending: { invalidate: vi.fn() } },
     }),
     admin: {
       listUsers: {
@@ -40,12 +44,24 @@ vi.mock("@/lib/trpc", () => ({
       approve: { useMutation: () => ({ mutate: vi.fn(), isPending: false }) },
       reject: { useMutation: () => ({ mutate: vi.fn(), isPending: false }) },
     },
+    pix: {
+      listPending: { useQuery: () => ({ data: { requests: pendingRecharges.requests } }) },
+      approveRecharge: { useMutation: () => ({ mutate: approveRecharge, isPending: false }) },
+      rejectRecharge: { useMutation: () => ({ mutate: rejectRecharge, isPending: false }) },
+    },
   },
 }));
 
 vi.mock("@/_core/hooks/useAuth", () => ({ useAuth: () => ({ user: { id: 1, role: "admin" } }) }));
 vi.mock("wouter", () => ({ useLocation: () => ["/admin", vi.fn()] }));
 vi.mock("sonner", () => ({ toast: { success: vi.fn(), error: vi.fn(), info: vi.fn() } }));
+
+afterEach(() => {
+  cleanup();
+  pendingRecharges.requests = [];
+  approveRecharge.mockReset();
+  rejectRecharge.mockReset();
+});
 
 describe("painel administrativo de créditos", () => {
   it("renderiza o saldo do usuário e envia recargas e remoções pelo controle visível", () => {
@@ -66,5 +82,24 @@ describe("painel administrativo de créditos", () => {
 
     fireEvent.click(screen.getByRole("button", { name: /Criar proposta de autoaprendizagem/i }));
     expect(createLearningProposal).toHaveBeenCalledTimes(1);
+  });
+
+  it("mostra o estado vazio e disponibiliza a aprovação manual apenas para solicitação pendente", () => {
+    pendingRecharges.requests = [];
+    const { unmount } = render(<Admin />);
+    expect(screen.getByText("Nenhuma recarga aguardando conferência.")).toBeVisible();
+    unmount();
+
+    pendingRecharges.requests = [{ id: "pix_1", userEmail: "cliente@exemplo.com", amountCents: 2000, credits: 60, createdAt: 1_786_000_000_000 }];
+    render(<Admin />);
+
+    const rechargeCard = screen.getByText("pix_1").closest("article");
+    expect(rechargeCard).not.toBeNull();
+    expect(within(rechargeCard!).getByText("cliente@exemplo.com")).toBeVisible();
+    expect(within(rechargeCard!).getByText(/60 créditos/i)).toBeVisible();
+    fireEvent.click(within(rechargeCard!).getByRole("button", { name: "Aprovar" }));
+    expect(approveRecharge).toHaveBeenCalledWith({ requestId: "pix_1" });
+    fireEvent.click(within(rechargeCard!).getByRole("button", { name: "Rejeitar" }));
+    expect(rejectRecharge).toHaveBeenCalledWith({ requestId: "pix_1" });
   });
 });

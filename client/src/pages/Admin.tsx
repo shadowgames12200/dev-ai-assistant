@@ -1,7 +1,7 @@
 import { useState } from "react";
 import { toast } from "sonner";
 import { useLocation } from "wouter";
-import { ShieldCheck, ShieldOff, ArrowLeft, Users, Plus, Minus, Coins, BrainCircuit, Lightbulb, Check, X } from "lucide-react";
+import { ShieldCheck, ShieldOff, ArrowLeft, Users, Plus, Minus, Coins, BrainCircuit, Lightbulb, Check, X, QrCode } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import {
@@ -34,6 +34,9 @@ export default function Admin() {
     enabled: user?.role === "admin",
   });
   const { data: opportunitiesData } = trpc.selfImprove.opportunities.useQuery(undefined, {
+    enabled: user?.role === "admin",
+  });
+  const { data: pendingRechargesData } = trpc.pix.listPending.useQuery(undefined, {
     enabled: user?.role === "admin",
   });
   const [approvalKey, setApprovalKey] = useState("");
@@ -99,6 +102,21 @@ export default function Admin() {
       toast.success("Proposta rejeitada. Nenhuma mudança foi realizada.");
     },
     onError: (err) => toast.error("Não foi possível rejeitar: " + err.message),
+  });
+  const approveRechargeMutation = trpc.pix.approveRecharge.useMutation({
+    onSuccess: (result) => {
+      utils.pix.listPending.invalidate();
+      utils.credits.list.invalidate();
+      toast.success(result.creditsAdded ? "Recarga aprovada e créditos liberados." : "Recarga já havia sido aplicada; nenhum crédito foi duplicado.");
+    },
+    onError: (err) => toast.error("Não foi possível aprovar a recarga: " + err.message),
+  });
+  const rejectRechargeMutation = trpc.pix.rejectRecharge.useMutation({
+    onSuccess: () => {
+      utils.pix.listPending.invalidate();
+      toast.success("Solicitação de recarga rejeitada.");
+    },
+    onError: (err) => toast.error("Não foi possível rejeitar a recarga: " + err.message),
   });
 
   if (user && user.role !== "admin") {
@@ -171,6 +189,15 @@ export default function Admin() {
               <strong className="text-violet-300">{costData?.costPerMessage ?? 1} crédito(s)</strong>
             </span>
           </div>
+        </section>
+
+        <section className="mb-8 rounded-lg border border-white/10 bg-white/[0.03] p-5">
+          <div className="flex items-center gap-2 mb-2">
+            <QrCode className="h-4 w-4 text-violet-400" />
+            <h2 className="text-sm font-semibold">Recargas Pix pendentes</h2>
+          </div>
+          <p className="mb-4 text-xs leading-relaxed text-zinc-400">A solicitação não comprova pagamento. Confira o Pix no banco antes de aprovar; a aprovação libera os créditos somente uma vez.</p>
+          {(pendingRechargesData?.requests?.length ?? 0) === 0 ? <p className="text-xs text-zinc-500">Nenhuma recarga aguardando conferência.</p> : <div className="space-y-3">{pendingRechargesData?.requests.map((request: any) => <article key={request.id} className="rounded-md border border-white/10 bg-black/20 p-4"><div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between"><div><p className="text-sm font-medium text-zinc-100">{request.userEmail || "Usuário sem e-mail"}</p><p className="mt-1 text-xs text-zinc-400">R$ {(request.amountCents / 100).toFixed(2).replace(".", ",")} · {request.credits} créditos · {new Date(request.createdAt).toLocaleString("pt-BR")}</p><p className="mt-1 font-mono text-[10px] text-zinc-500">{request.id}</p></div><div className="flex gap-2"><Button size="sm" variant="outline" className="border-red-400/30 text-red-200" onClick={() => rejectRechargeMutation.mutate({ requestId: request.id })} disabled={rejectRechargeMutation.isPending}><X className="mr-1 h-4 w-4" />Rejeitar</Button><Button size="sm" onClick={() => approveRechargeMutation.mutate({ requestId: request.id })} disabled={approveRechargeMutation.isPending}><Check className="mr-1 h-4 w-4" />Aprovar</Button></div></div></article>)}</div>}
         </section>
 
         <section className="mb-8 rounded-lg border border-white/10 bg-white/[0.03] p-5">

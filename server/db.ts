@@ -3,11 +3,13 @@
 import fs from "fs";
 import path from "path";
 import os from "os";
+import { randomUUID } from "crypto";
 
 const DATA_DIR = process.env.DATA_DIR || process.cwd() || os.homedir();
 const CONVOS_FILE = path.join(DATA_DIR, "convos_data.json");
 const USERS_FILE = path.join(DATA_DIR, "users_data.json");
 const LEARNING_FILE = path.join(DATA_DIR, "learning_opportunities.json");
+const RECHARGES_FILE = path.join(DATA_DIR, "pix_recharges_data.json");
 
 let seq = { msgs: 0, attachments: 0, users: 0 };
 let dirty = false;
@@ -39,6 +41,22 @@ export interface LearningOpportunity {
   status: "pending" | "proposed" | "dismissed";
   createdAt: string;
   proposalId?: string;
+}
+
+export type RechargeStatus = "pending" | "approved" | "rejected";
+
+export interface RechargeRequest {
+  id: string;
+  userId: number;
+  userEmail: string;
+  packageId: string;
+  amountCents: number;
+  credits: number;
+  status: RechargeStatus;
+  createdAt: string;
+  updatedAt: string;
+  decidedAt?: string;
+  decidedByUserId?: number;
 }
 
 function loadConvos(): ConvosData {
@@ -86,6 +104,19 @@ function loadLearningOpportunities(): LearningOpportunity[] {
 
 function saveLearningOpportunities(opportunities: LearningOpportunity[]) {
   fs.writeFileSync(LEARNING_FILE, JSON.stringify({ opportunities }, null, 2), "utf-8");
+}
+
+function loadRechargeRequests(): RechargeRequest[] {
+  try {
+    const parsed = JSON.parse(fs.readFileSync(RECHARGES_FILE, "utf-8"));
+    return Array.isArray(parsed?.requests) ? parsed.requests : [];
+  } catch {
+    return [];
+  }
+}
+
+function saveRechargeRequests(requests: RechargeRequest[]) {
+  fs.writeFileSync(RECHARGES_FILE, JSON.stringify({ requests }, null, 2), "utf-8");
 }
 
 function nextSeq(kind: "msgs" | "attachments" | "users"): number {
@@ -387,6 +418,80 @@ export async function deleteAttachments(ids: number[]) {
   d.attachments = d.attachments.filter((a) => !ids.includes(a.id));
   saveConvos(d);
   return { success: true };
+}
+
+// ─── Solicitações de recarga Pix ───
+// Estes registros representam apenas uma intenção de pagamento. A confirmação
+// continua sendo feita manualmente pelo proprietário fora da aplicação.
+export function createRechargeRequest(input: {
+  userId: number;
+  userEmail: string;
+  packageId: string;
+  amountCents: number;
+  credits: number;
+}): RechargeRequest {
+  const requests = loadRechargeRequests();
+  const existing = requests.find((request) =>
+    request.status === "pending" && request.userId === input.userId && request.packageId === input.packageId
+  );
+  if (existing) return existing;
+  const now = new Date().toISOString();
+  const request: RechargeRequest = {
+    id: `pix_${randomUUID()}`,
+    userId: input.userId,
+    userEmail: input.userEmail,
+    packageId: input.packageId,
+    amountCents: input.amountCents,
+    credits: input.credits,
+    status: "pending",
+    createdAt: now,
+    updatedAt: now,
+  };
+  requests.unshift(request);
+  saveRechargeRequests(requests.slice(0, 1000));
+  return request;
+}
+
+export function listRechargeRequests(status?: RechargeStatus): RechargeRequest[] {
+  return loadRechargeRequests()
+    .filter((request) => !status || request.status === status)
+    .sort((a, b) => b.createdAt.localeCompare(a.createdAt));
+}
+
+export function listUserRechargeRequests(userId: number): RechargeRequest[] {
+  return listRechargeRequests().filter((request) => request.userId === userId);
+}
+
+export function getRechargeRequest(id: string): RechargeRequest | null {
+  return loadRechargeRequests().find((request) => request.id === id) ?? null;
+}
+
+export function markRechargeApproved(id: string, adminUserId: number): RechargeRequest | null {
+  const requests = loadRechargeRequests();
+  const request = requests.find((item) => item.id === id);
+  if (!request || request.status === "rejected") return null;
+  if (request.status === "pending") {
+    const now = new Date().toISOString();
+    request.status = "approved";
+    request.updatedAt = now;
+    request.decidedAt = now;
+    request.decidedByUserId = adminUserId;
+    saveRechargeRequests(requests);
+  }
+  return request;
+}
+
+export function markRechargeRejected(id: string, adminUserId: number): RechargeRequest | null {
+  const requests = loadRechargeRequests();
+  const request = requests.find((item) => item.id === id);
+  if (!request || request.status !== "pending") return null;
+  const now = new Date().toISOString();
+  request.status = "rejected";
+  request.updatedAt = now;
+  request.decidedAt = now;
+  request.decidedByUserId = adminUserId;
+  saveRechargeRequests(requests);
+  return request;
 }
 
 // ─── Oportunidades de autoaprendizagem ───
