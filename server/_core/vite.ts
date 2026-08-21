@@ -5,13 +5,19 @@ import { nanoid } from "nanoid";
 import path from "path";
 
 export async function setupVite(app: Express, server: Server) {
+  // Em produção, não fazemos nada e evitamos qualquer importação do Vite
   if (process.env.NODE_ENV === "production") return;
   
   try {
-    // Dynamic import to avoid loading vite in production
-    const { createServer: createViteServer } = await import("vite");
-    // @ts-ignore - only exists in dev
-    const viteConfig = (await import("../../vite.config.ts")).default;
+    // Usamos nomes de módulos em variáveis para evitar análise estática do esbuild/vercel
+    const viteModuleName = "vite";
+    const configPath = "../../vite.config.ts";
+    
+    // Dynamic import usando nomes dinâmicos para "enganar" o bundler
+    const { createServer: createViteServer } = await import(viteModuleName);
+    // @ts-ignore
+    const viteConfigModule = await import(configPath);
+    const viteConfig = viteConfigModule.default;
 
     const serverOptions = {
       middlewareMode: true,
