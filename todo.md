@@ -509,6 +509,11 @@
 - [x] Definir arquitetura segura para site, banco, arquivos, tarefas e executor sem depender da VM Azure
 - [ ] Solicitar autorização antes de conectar contas, criar serviços, migrar dados ou aceitar cobranças
 
+## Escolha de hospedagem comercial
+- [x] Confirmar termos de uso comercial e limites do Render para a DevAI Assistant
+- [x] Comparar disponibilidade para clientes entre Render e Vercel Hobby
+- [ ] Solicitar autorização antes de iniciar qualquer migração ou criar plano/serviço no Render
+
 ## Avaliação de execução online gratuita
 - [x] Definir os limites de segurança, dados e tipos de testes aceitos para execução online de código
 - [x] Pesquisar serviços gratuitos de execução isolada e os limites oficiais de uso

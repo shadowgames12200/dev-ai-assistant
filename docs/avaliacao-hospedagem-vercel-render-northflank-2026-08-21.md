@@ -88,3 +88,13 @@ A DevAI Assistant pretende vender créditos e atender clientes. A documentação
 [15] Vercel Docs, [Hobby Plan](https://vercel.com/docs/plans/hobby).
 
 [16] Vercel Docs, [Fair Use Guidelines](https://vercel.com/docs/limits/fair-use-guidelines).
+
+## Adequação do Render para a versão comercial
+
+Ao contrário do Vercel Hobby, a documentação de preços do Render oferece um workspace Hobby de US$ 0 por mês mais custo de computação e não limita o workspace a uso pessoal não comercial. Assim, ele é mais apropriado para uma **versão inicial comercial** da DevAI Assistant. Contudo, o serviço web gratuito tem 512 MB de RAM e 0,1 CPU; ele hiberna após 15 minutos sem tráfego, leva aproximadamente um minuto para voltar e pode ser reiniciado a qualquer momento. A própria documentação do Render diz para não usar instâncias gratuitas em aplicações de produção.
+
+O Render gratuito não fornece acesso de shell, disco persistente, jobs pontuais ou banco permanente: arquivos locais somem após reinício/hibernação e o Postgres gratuito expira após 30 dias. O caminho técnico mais coerente é, portanto: Render Web Service para uma demonstração comercial de baixo volume, **Supabase** para banco e arquivos persistentes, e GitHub Actions para testes efêmeros aprovados. Para clientes pagantes que esperam resposta imediata e confiável, é necessário trocar o serviço web por uma instância paga adequada; não há garantia de disponibilidade contínua no plano gratuito.
+
+[17] Render Docs, [Deploy for Free](https://render.com/docs/free).
+
+[18] Render, [Pricing](https://render.com/pricing).
