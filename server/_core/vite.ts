@@ -8,7 +8,8 @@ export async function setupVite(app: Express, server: Server) {
   
   // Dynamic import to avoid loading vite in production
   const { createServer: createViteServer } = await import("vite");
-  const viteConfig = (await import("../../vite.config")).default;
+  // @ts-ignore
+  const viteConfig = (await import("../../vite.config.ts")).default;
 
   const serverOptions = {
     middlewareMode: true,
