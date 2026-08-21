@@ -1,9 +1,9 @@
 import { TRPCError } from "@trpc/server";
 import { z } from "zod";
 import { protectedProcedure, publicProcedure, router } from "./_core/trpc";
-import * as db from "./db";
 import { notifyOwner } from "./_core/notification";
 import { generatePixPayload, buildStaticPixBrCode } from "./pix.js";
+import * as db from "./db";
 
 const PIX_PACKAGES = [
   { id: "basico", label: "Básico", amountCents: 1000, credits: 50 },
@@ -175,7 +175,7 @@ export const appRouter = router({
         const history = await db.getMessages(input.conversationId);
         const llmMessages: any[] = [
           { role: "system", content: "Você é o DevAI Assistant." },
-          ...history.map(m => ({ role: m.role, content: m.content }))
+          ...history.map((m: any) => ({ role: m.role, content: m.content }))
         ];
         const stream = await invokeLLMStream({
           model: "gemini-3.6-flash",

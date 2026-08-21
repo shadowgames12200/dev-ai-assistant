@@ -290,26 +290,22 @@ export async function handleLocalLogout(req: any, res: any) {
 
 export async function getPasswordRecord(email: string): Promise<{ passwordHash: string; salt: string } | null> {
   const sdb = await db.getDb();
-  if (!sdb) return null;
-  const { sql } = await import("drizzle-orm");
-  // drizzle mysql2 adapter: execute() returns the driver result; use raw mysql2
-  // connection via the internal pool instead.
-  const conn = (sdb as any).session?.client ?? sdb;
-  const rows = await conn.query(
-    'SELECT "passwordHash", "salt" FROM password_credentials WHERE email = $1 LIMIT 1',
-    [email]
-  );
-  const list = rows.rows as Array<{ passwordHash: string; salt: string }>
-  if (!list || list.length === 0) return null;
-  return { passwordHash: list[0].passwordHash, salt: list[0].salt };
+  const { passwordCredentials } = await import("../drizzle/schema");
+  const { eq } = await import("drizzle-orm");
+  const results = await sdb.select().from(passwordCredentials).where(eq(passwordCredentials.email, email)).limit(1);
+  if (results.length === 0) return null;
+  return { passwordHash: results[0].passwordHash, salt: results[0].salt };
 }
 
 export async function setPasswordRecord(email: string, passwordHash: string, salt: string) {
   const sdb = await db.getDb();
-  if (!sdb) throw new Error("Database not available");
-  const conn = (sdb as any).session?.client ?? sdb;
-  await conn.query(
-    'INSERT INTO password_credentials (email, "passwordHash", "salt") VALUES ($1, $2, $3) ON CONFLICT (email) DO UPDATE SET "passwordHash" = EXCLUDED."passwordHash", "salt" = EXCLUDED."salt"',
-    [email, passwordHash, salt]
-  );
+  const { passwordCredentials } = await import("../drizzle/schema");
+  await sdb.insert(passwordCredentials).values({
+    email,
+    passwordHash,
+    salt,
+  }).onConflictDoUpdate({
+    target: passwordCredentials.email,
+    set: { passwordHash, salt },
+  });
 }
