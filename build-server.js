@@ -14,7 +14,7 @@ async function runBuild() {
       format: 'esm',
       target: 'node20',
       outfile: path.join(__dirname, 'dist/index.js'),
-      mainFields: ['module', 'main'],
+      // Injeta shims para CommonJS em ambiente ESM
       banner: {
         js: `
 import { createRequire } from 'module';
