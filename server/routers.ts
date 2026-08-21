@@ -3,7 +3,7 @@ import { z } from "zod";
 import { protectedProcedure, publicProcedure, router } from "./_core/trpc";
 import * as db from "./db";
 import { notifyOwner } from "./_core/notification";
-import { generatePixPayload, buildStaticPixBrCode } from "./pix";
+import { generatePixPayload, buildStaticPixBrCode } from "./pix.js";
 
 const PIX_PACKAGES = [
   { id: "basico", label: "Básico", amountCents: 1000, credits: 50 },

@@ -10,7 +10,7 @@
     "format": "prettier --write .",
     "test": "vitest run",
     "db:push": "drizzle-kit generate && drizzle-kit migrate",
-    "vercel-build": "vite build && esbuild server/_core/index.ts --platform=node --bundle --format=esm --outfile=dist/index.js --external:postgres"
+    "vercel-build": "vite build && ./node_modules/.bin/esbuild server/_core/index.ts --platform=node --bundle --format=esm --outfile=dist/index.js --external:postgres"
   },
   "dependencies": {
     "@aws-sdk/client-s3": "^3.693.0",
