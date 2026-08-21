@@ -485,6 +485,20 @@
 - [x] Cobrir os novos protocolos com cenários de regressão antes de publicar
 ## Modo agente de programação com aprovação (pedido do usuário 20/08)
 - [ ] Reforçar SYSTEM_PROMPT com mentalidade de programador especialista para auto-melhoria de código
-- [ ] Adicionar workflow GitHub que faz deploy automático na VM quando houver push na main
+- [x] Adicionar workflow GitHub que faz deploy automático na VM quando houver push na main (corrigido: corepack pnpm, env vars CI, staging dir tar, scp-action /tmp/tmp/ path)
 - [ ] Adicionar suporte a modo agente de código no chatRouter com proposta de patch para aprovação do proprietário
 - [ ] Cobrir o novo fluxo com testes de regressão e publicar na VM
+
+## Recuperação de disponibilidade da VM durante teste de melhoria (21/08)
+- [ ] Diagnosticar a indisponibilidade da VM Azure e recuperar o acesso sem alterar dados da aplicação
+- [ ] Revalidar HTTP, SSH, PM2 e o teste de proposta de melhoria após a recuperação
+- [x] Consultar opções de reativação da assinatura Azure sem confirmar cobrança (portal informa avaliação expirada; serviços pausados; valores indisponíveis devido a erro do portal)
+- [x] Pesquisar e comparar alternativas de VM fora da Oracle Cloud para a IA hospedada
+- [x] Priorizar alternativa gratuita permanente, fora da Oracle Cloud, e documentar limitações operacionais (Google Cloud e2-micro, dentro dos limites da camada gratuita)
+
+## Modo agente executor seguro
+- [ ] Definir ambiente isolado para clonar projetos, executar comandos, builds e testes sem afetar a IA pública
+- [ ] Implementar fluxo de tarefa: proposta, aprovação do dono, execução controlada, evidências e aprovação final antes de ações externas
+- [ ] Adicionar integrações restritas para pesquisa web, GitHub e SSH com escopo mínimo, cofres de segredos e auditoria
+- [ ] Aplicar limites de tempo, memória, disco, rede e lista de comandos/servidores autorizados ao executor
+- [x] Auditar o suposto sandbox atual da auto-melhoria e confirmar se há isolamento real antes de habilitá-lo para tarefas de cliente (histórico cita Docker/8443, mas não há configuração versionada; executor atual usa execSync no host)
