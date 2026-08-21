@@ -522,7 +522,7 @@
 ## Capacidade para crescimento de clientes
 - [x] Diferenciar clientes cadastrados, ativos e simultâneos na projeção de capacidade
 - [x] Mapear os gargalos de hospedagem, banco, arquivos, modelos de IA e executor
-- [ ] Definir métricas e pontos de atualização antes de comprometer estabilidade para clientes pagantes
+- [x] Definir métricas e pontos de atualização antes de comprometer estabilidade para clientes pagantes
 
 ## Avaliação de execução online gratuita
 - [x] Definir os limites de segurança, dados e tipos de testes aceitos para execução online de código
