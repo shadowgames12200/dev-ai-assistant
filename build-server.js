@@ -18,6 +18,11 @@ async function runBuild() {
       external: [
         'postgres',
         'fsevents',
+        '@tailwindcss/oxide',
+        '@tailwindcss/oxide-linux-x64-musl',
+        '@tailwindcss/oxide-linux-x64-gnu',
+        '@babel/preset-typescript',
+        'lightningcss'
       ],
       loader: {
         '.ts': 'ts',
