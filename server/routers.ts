@@ -2,7 +2,7 @@ import { TRPCError } from "@trpc/server";
 import { z } from "zod";
 import { protectedProcedure, publicProcedure, router } from "./_core/trpc";
 import { notifyOwner } from "./_core/notification";
-import { generatePixPayload, buildStaticPixBrCode } from "./pix.js";
+import { generatePixPayload, buildStaticPixBrCode } from "./pix";
 import * as db from "./db";
 
 const PIX_PACKAGES = [
