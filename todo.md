@@ -514,3 +514,9 @@
 - [x] Pesquisar serviços gratuitos de execução isolada e os limites oficiais de uso
 - [x] Comparar GitHub Actions e sandboxes online para tarefas aprovadas da DevAI Assistant (recomendado: runners efêmeros do GitHub Actions para repositórios autorizados)
 - [ ] Solicitar autorização antes de conectar um serviço de execução ou enviar código de projeto a terceiros
+
+## Arquitetura de baixo custo com serviços gratuitos
+- [x] Mapear o papel de Vercel, Supabase, GitHub Actions e busca web na IA sem depender da VM Azure
+- [x] Documentar limites inevitáveis de execução, navegadores autenticados e tarefas de alta carga
+- [x] Preservar login manual, CAPTCHA e aprovação explícita para ações externas e contas conectadas
+- [ ] Solicitar autorização antes de alterar a arquitetura, conectar contas ou armazenar novos segredos

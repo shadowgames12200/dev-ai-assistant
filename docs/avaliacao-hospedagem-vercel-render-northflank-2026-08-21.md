@@ -68,3 +68,23 @@ Ele não é um terminal persistente nem deve receber tokens de produção, chave
 | Ações externas | Painel do proprietário | Autorizar separadamente pull request, deploy ou acesso SSH | Proibido executar automaticamente após os testes |
 
 O site na Vercel pode disparar um workflow `workflow_dispatch` por uma API protegida **somente após a aprovação do proprietário**. O job usa um runner descartável, envia apenas o identificador da tarefa/branch e grava um relatório. Ele não substitui um computador permanente: não mantém um terminal aberto, não atende conexões SSH e não pode realizar tarefas sem limite. Essa separação é precisamente o que protege o site caso um teste consuma recursos ou falhe.
+
+## Papel do Supabase na arquitetura de baixo custo
+
+O Supabase pode substituir o banco de dados, autenticação e armazenamento de arquivos da aplicação, evitando dependência do disco local de uma VM. A documentação de preços indica, para o plano gratuito, até dois projetos ativos, 500 MB de banco por projeto, 50 mil usuários ativos mensais e limites de armazenamento; ao atingir os limites, não há garantia de continuidade sem alteração de plano. A plataforma também permite agendar Edge Functions com `pg_cron`, mas isso não transforma a função em um executor de código sem limite.
+
+Assim, o Supabase é adequado para registrar usuários, conversas, créditos, tarefas, aprovações, logs e anexos. Ele não deve receber tokens de GitHub, chaves SSH ou código de clientes para executar. A execução aprovada continua no runner efêmero do GitHub Actions.
+
+## Restrição de uso comercial da Vercel
+
+A DevAI Assistant pretende vender créditos e atender clientes. A documentação da Vercel informa que o plano Hobby é somente para uso pessoal e não comercial. Portanto, ele pode ser utilizado para desenvolvimento e demonstração privada, mas **não** deve hospedar a versão pública com cobrança de créditos. Uma hospedagem comercial exige plano compatível, ou uma plataforma cujos termos autorizem explicitamente esse uso.
+
+[12] Supabase, [Pricing](https://supabase.com/pricing).
+
+[13] Supabase Docs, [About billing on Supabase](https://supabase.com/docs/guides/platform/billing-on-supabase).
+
+[14] Supabase Docs, [Scheduling Edge Functions](https://supabase.com/docs/guides/functions/schedule-functions).
+
+[15] Vercel Docs, [Hobby Plan](https://vercel.com/docs/plans/hobby).
+
+[16] Vercel Docs, [Fair Use Guidelines](https://vercel.com/docs/limits/fair-use-guidelines).
