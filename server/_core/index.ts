@@ -13,7 +13,7 @@ import { ENV } from "./env";
 
 const app = express();
 app.disable("x-powered-by");
-app.use((_req: express.Request, res: express.Response, next: express.NextFunction) => {
+app.use((_req: any, res: any, next: any) => {
   res.setHeader("X-Content-Type-Options", "nosniff");
   res.setHeader("X-Frame-Options", "DENY");
   res.setHeader("Referrer-Policy", "no-referrer");

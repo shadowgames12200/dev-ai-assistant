@@ -1,5 +1,5 @@
 import { drizzle } from "drizzle-orm/postgres-js";
-import postgres from 'postgres';
+import postgres from "postgres";
 import * as schema from "../drizzle/schema";
 import { eq, and, desc, sql } from "drizzle-orm";
 import { randomUUID } from "crypto";
