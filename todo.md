@@ -508,3 +508,9 @@
 - [x] Comparar Vercel, Render e Northflank com documentação oficial, incluindo limites de plano e execução de contêineres
 - [x] Definir arquitetura segura para site, banco, arquivos, tarefas e executor sem depender da VM Azure
 - [ ] Solicitar autorização antes de conectar contas, criar serviços, migrar dados ou aceitar cobranças
+
+## Avaliação de execução online gratuita
+- [x] Definir os limites de segurança, dados e tipos de testes aceitos para execução online de código
+- [x] Pesquisar serviços gratuitos de execução isolada e os limites oficiais de uso
+- [x] Comparar GitHub Actions e sandboxes online para tarefas aprovadas da DevAI Assistant (recomendado: runners efêmeros do GitHub Actions para repositórios autorizados)
+- [ ] Solicitar autorização antes de conectar um serviço de execução ou enviar código de projeto a terceiros

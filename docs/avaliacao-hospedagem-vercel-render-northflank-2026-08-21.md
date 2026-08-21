@@ -45,3 +45,26 @@ Uma arquitetura segura futura pode separar: Vercel para interface/API, banco e a
 [7] Northflank, [Pricing on Northflank](https://northflank.com/docs/v1/application/billing/pricing-on-northflank).
 
 [8] Northflank, [Run containers and micro-services](https://northflank.com/docs/v1/application/run/run-containers-and-micro-services).
+
+## Complemento: execução online gratuita por GitHub Actions
+
+O GitHub Actions é uma alternativa adequada para **testes efêmeros e aprovados** de um repositório autorizado. A documentação do GitHub informa que o uso de runners padrão hospedados pelo GitHub é gratuito para repositórios públicos. Um workflow com o evento `workflow_dispatch` pode ser iniciado manualmente na interface, pela CLI ou API, o que permite ligá-lo a uma aprovação dentro do painel da DevAI Assistant.
+
+Ele não é um terminal persistente nem deve receber tokens de produção, chave SSH ampla, segredo de pagamento ou credenciais de clientes. Cada workflow precisa ser descartável, com permissões mínimas, sem segredos por padrão e limitado a testar uma branch temporária. A ação externa — commit em `main`, pull request, deploy ou SSH — deve permanecer fora do job de teste e requerer aprovação independente.
+
+[9] GitHub Docs, [About billing for GitHub Actions](https://docs.github.com/billing/managing-billing-for-github-actions/about-billing-for-github-actions).
+
+[10] GitHub Docs, [GitHub-hosted runners](https://docs.github.com/actions/using-github-hosted-runners/about-github-hosted-runners).
+
+[11] GitHub Docs, [Manually running a workflow](https://docs.github.com/actions/managing-workflow-runs/manually-running-a-workflow).
+
+## Arquitetura recomendada: Vercel + GitHub Actions
+
+| Componente | Plataforma | Responsabilidade | Limite obrigatório |
+|---|---|---|---|
+| Interface, login, painel, chat e propostas | Vercel | Atender usuários e registrar uma tarefa aprovada | Não executa comandos de projeto de cliente |
+| Banco e anexos | Serviços persistentes externos | Guardar dados, aprovações e referências de arquivo | Sem dependência de disco temporário da função |
+| Executor de testes | GitHub Actions em runner hospedado | Clonar uma branch temporária, instalar dependências, rodar testes e devolver logs | Efêmero; sem segredos de produção, SSH, Pix ou acesso amplo ao GitHub |
+| Ações externas | Painel do proprietário | Autorizar separadamente pull request, deploy ou acesso SSH | Proibido executar automaticamente após os testes |
+
+O site na Vercel pode disparar um workflow `workflow_dispatch` por uma API protegida **somente após a aprovação do proprietário**. O job usa um runner descartável, envia apenas o identificador da tarefa/branch e grava um relatório. Ele não substitui um computador permanente: não mantém um terminal aberto, não atende conexões SSH e não pode realizar tarefas sem limite. Essa separação é precisamente o que protege o site caso um teste consuma recursos ou falhe.
