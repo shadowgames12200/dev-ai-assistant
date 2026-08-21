@@ -302,19 +302,19 @@ export default function ChatView({ conversationId }: { conversationId: number })
         {(creditsExhausted || creditNotice) && (
           <div
             role="alert"
-            className="mx-auto mb-3 flex max-w-3xl items-start gap-2 rounded-lg border border-amber-400/30 bg-amber-400/10 px-3 py-2 text-xs text-amber-100"
+            className="mx-auto mb-3 flex max-w-3xl items-start gap-2 rounded-lg border border-amber-400/30 bg-amber-400/10 px-3 py-2 text-xs text-amber-100 animate-in fade-in slide-in-from-bottom-2 duration-300"
           >
             <CircleAlert className="mt-0.5 h-4 w-4 shrink-0 text-amber-300" />
-            <div>
+            <div className="flex-1">
               <p className="font-medium">Créditos insuficientes</p>
               <p className="mt-0.5 text-amber-100/80">
-                {creditNotice || creditUiState.notice || buildCreditBlockedMessage(credits?.balance, 1)}
+                {creditNotice || creditUiState.notice || buildCreditBlockedMessage(credits?.balance || 0, 1)}
               </p>
               <Button
                 type="button"
                 size="sm"
                 variant="outline"
-                className="mt-2 border-amber-300/40 text-amber-100 hover:bg-amber-300/10"
+                className="mt-2 border-amber-300/40 text-amber-100 hover:bg-amber-300/10 h-7 text-[10px]"
                 onClick={() => { window.location.href = "/recharge"; }}
               >
                 Recarregar créditos

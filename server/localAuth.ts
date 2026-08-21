@@ -259,6 +259,7 @@ export async function handleLocalAccountUpdate(req: any, res: any) {
       openId: currentUser.openId,
       name,
       email,
+      oldEmail: currentUser.email,
       passwordHash: passwordToStore && nextSalt ? await hashPassword(passwordToStore, nextSalt) : undefined,
       salt: nextSalt,
     });

@@ -89,12 +89,18 @@ export async function updateLocalAccount(update: any): Promise<{ status: "succes
     const userUpdate: any = { name: update.name, email: update.email };
     await db.update(schema.users).set(userUpdate).where(eq(schema.users.openId, update.openId));
 
+    // Se o email mudou, precisamos atualizar a PK na tabela password_credentials
+    if (update.oldEmail && update.oldEmail.toLowerCase() !== update.email.toLowerCase()) {
+      await db.update(schema.passwordCredentials)
+        .set({ email: update.email.toLowerCase() })
+        .where(eq(schema.passwordCredentials.email, update.oldEmail.toLowerCase()));
+    }
+
     if (update.passwordHash) {
       await db.update(schema.passwordCredentials).set({
         passwordHash: update.passwordHash,
         salt: update.salt,
-        email: update.email,
-      }).where(eq(schema.passwordCredentials.email, update.email));
+      }).where(eq(schema.passwordCredentials.email, update.email.toLowerCase()));
     }
 
     const user = await getUserByOpenId(update.openId);

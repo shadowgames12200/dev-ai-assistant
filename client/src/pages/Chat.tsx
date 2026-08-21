@@ -236,7 +236,7 @@ export default function Chat() {
                           size="icon"
                           aria-label={`Mais ações para ${c.title}`}
                           title="Mais ações"
-                          className="h-7 w-7 shrink-0 text-zinc-400 hover:text-white"
+                          className="h-7 w-7 shrink-0 text-zinc-400 hover:text-white opacity-0 group-hover:opacity-100 focus:opacity-100 transition-opacity"
                           onClick={(e) => e.stopPropagation()}
                         >
                           <MoreVertical className="h-4 w-4" />
@@ -244,17 +244,17 @@ export default function Chat() {
                       </DropdownMenuTrigger>
                       <DropdownMenuContent
                         align="end"
-                        side="right"
-                        className="w-44"
+                        side="bottom"
+                        className="w-44 bg-[#191923] border-white/10"
                         onClick={(e) => e.stopPropagation()}
                       >
-                        <DropdownMenuItem onClick={() => startRename(c)}>
+                        <DropdownMenuItem onClick={() => startRename(c)} className="cursor-pointer hover:bg-white/10">
                           <Pencil className="mr-2 h-4 w-4" />
                           Renomear
                         </DropdownMenuItem>
                         <DropdownMenuItem
                           onClick={() => handleDelete(c.id)}
-                          className="text-red-400 focus:text-red-400"
+                          className="cursor-pointer text-red-400 focus:text-red-400 hover:bg-red-500/10"
                         >
                           <Trash2 className="mr-2 h-4 w-4" />
                           Excluir conversa

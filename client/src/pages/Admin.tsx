@@ -100,12 +100,13 @@ export default function Admin() {
           )}
         </section>
 
-        <section className="rounded-lg border border-white/10 bg-white/[0.03] p-5 overflow-x-auto">
+        <section className="rounded-lg border border-white/10 bg-white/[0.03] p-5">
           <div className="flex items-center gap-2 mb-4">
             <Users className="h-4 w-4 text-violet-400" />
             <h2 className="text-sm font-semibold">Usuários Cadastrados</h2>
           </div>
-          <Table>
+          <div className="overflow-x-auto -mx-5 px-5">
+            <Table className="min-w-[600px]">
             <TableHeader>
               <TableRow className="border-white/10 hover:bg-transparent">
                 <TableHead className="text-zinc-400">Nome</TableHead>
@@ -141,7 +142,8 @@ export default function Admin() {
                 </TableRow>
               ))}
             </TableBody>
-          </Table>
+            </Table>
+          </div>
         </section>
       </main>
     </div>
