@@ -11,6 +11,11 @@ import { handleLocalAccountUpdate, handleLocalLogin, handleLocalLogout, handleLo
 import { serveStatic, setupVite } from "./vite";
 import { ENV } from "./env";
 
+if (process.argv.includes("--build-only")) {
+  console.log("Build check passed");
+  process.exit(0);
+}
+
 const app = express();
 app.disable("x-powered-by");
 app.use((_req: any, res: any, next: any) => {
