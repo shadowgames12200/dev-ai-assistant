@@ -502,3 +502,9 @@
 - [ ] Adicionar integrações restritas para pesquisa web, GitHub e SSH com escopo mínimo, cofres de segredos e auditoria
 - [ ] Aplicar limites de tempo, memória, disco, rede e lista de comandos/servidores autorizados ao executor
 - [x] Auditar o suposto sandbox atual da auto-melhoria e confirmar se há isolamento real antes de habilitá-lo para tarefas de cliente (histórico cita Docker/8443, mas não há configuração versionada; executor atual usa execSync no host)
+
+## Avaliação de substituição da VM Azure
+- [x] Mapear quais recursos da DevAI Assistant exigem processo persistente, armazenamento e executor isolado
+- [x] Comparar Vercel, Render e Northflank com documentação oficial, incluindo limites de plano e execução de contêineres
+- [x] Definir arquitetura segura para site, banco, arquivos, tarefas e executor sem depender da VM Azure
+- [ ] Solicitar autorização antes de conectar contas, criar serviços, migrar dados ou aceitar cobranças
