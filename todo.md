@@ -514,6 +514,16 @@
 - [x] Comparar disponibilidade para clientes entre Render e Vercel Hobby
 - [ ] Solicitar autorização antes de iniciar qualquer migração ou criar plano/serviço no Render
 
+## Limites de hibernação e modo agente
+- [ ] Impedir que a arquitetura dependa de tráfego artificial para contornar hibernação de plano gratuito
+- [ ] Definir o fluxo aprovado de auto-melhoria: proposta, branch, teste isolado, evidências e aprovação final
+- [ ] Definir encaminhamento de tarefas pesadas para executor compatível em vez de rodá-las no serviço público gratuito
+
+## Capacidade para crescimento de clientes
+- [x] Diferenciar clientes cadastrados, ativos e simultâneos na projeção de capacidade
+- [x] Mapear os gargalos de hospedagem, banco, arquivos, modelos de IA e executor
+- [ ] Definir métricas e pontos de atualização antes de comprometer estabilidade para clientes pagantes
+
 ## Avaliação de execução online gratuita
 - [x] Definir os limites de segurança, dados e tipos de testes aceitos para execução online de código
 - [x] Pesquisar serviços gratuitos de execução isolada e os limites oficiais de uso
