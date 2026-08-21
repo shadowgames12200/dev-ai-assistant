@@ -132,7 +132,7 @@ export const appRouter = router({
       .mutation(async ({ ctx, input }) => {
         const pkg = getPixPackage(input.packageId);
         if (!pkg) throw new TRPCError({ code: "BAD_REQUEST", message: "Pacote de recarga inválido." });
-        const request = db.createRechargeRequest({
+        const request = await db.createRechargeRequest({
           userId: ctx.user.id,
           userEmail: ctx.user.email || "",
           packageId: pkg.id,
@@ -145,27 +145,27 @@ export const appRouter = router({
         }).catch(() => false);
         return { success: true, request, ownerNotified: notified };
       }),
-    listPending: protectedProcedure.query(({ ctx }) => {
+    listPending: protectedProcedure.query(async ({ ctx }) => {
       if (ctx.user.role !== "admin") throw new TRPCError({ code: "FORBIDDEN" });
-      return { requests: db.listRechargeRequests("pending") };
+      return { requests: await db.listRechargeRequests("pending") };
     }),
     approveRecharge: protectedProcedure
       .input(z.object({ requestId: z.string().min(8).max(100) }))
       .mutation(async ({ ctx, input }) => {
         if (ctx.user.role !== "admin") throw new TRPCError({ code: "FORBIDDEN" });
-        const request = db.getRechargeRequest(input.requestId);
+        const request = await db.getRechargeRequest(input.requestId);
         if (!request) throw new TRPCError({ code: "NOT_FOUND", message: "Solicitação não encontrada." });
         if (request.status === "rejected") throw new TRPCError({ code: "BAD_REQUEST", message: "Solicitação já rejeitada." });
         const creditResult = await (await import("./_core/credits")).applyRechargeCredit(request.userId, request.credits, request.id);
-        const approved = db.markRechargeApproved(request.id, ctx.user.id);
+        const approved = await db.markRechargeApproved(request.id, ctx.user.id);
         if (!approved) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: "Não foi possível registrar a aprovação." });
         return { success: true, request: approved, creditsAdded: creditResult.applied, balance: creditResult.balance };
       }),
     rejectRecharge: protectedProcedure
       .input(z.object({ requestId: z.string().min(8).max(100) }))
-      .mutation(({ ctx, input }) => {
+      .mutation(async ({ ctx, input }) => {
         if (ctx.user.role !== "admin") throw new TRPCError({ code: "FORBIDDEN" });
-        const request = db.markRechargeRejected(input.requestId, ctx.user.id);
+        const request = await db.markRechargeRejected(input.requestId, ctx.user.id);
         if (!request) throw new TRPCError({ code: "BAD_REQUEST", message: "Solicitação indisponível para rejeição." });
         return { success: true, request };
       }),
