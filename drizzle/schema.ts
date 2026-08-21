@@ -3,6 +3,7 @@ import { pgTable, serial, text, varchar, timestamp, integer, pgEnum, boolean } f
 export const roleEnum = pgEnum("role", ["user", "admin"]);
 export const learningStatusEnum = pgEnum("learning_status", ["pending", "proposed", "dismissed"]);
 export const rechargeStatusEnum = pgEnum("recharge_status", ["pending", "approved", "rejected"]);
+export const improvementStatusEnum = pgEnum("improvement_status", ["pending", "approved", "rejected", "in-progress", "completed", "failed"]);
 
 /**
  * Core user table backing auth flow.
@@ -14,7 +15,6 @@ export const users = pgTable("users", {
   email: varchar("email", { length: 320 }),
   loginMethod: varchar("login_method", { length: 64 }).default("email"),
   role: roleEnum("role").default("user").notNull(),
-  credits: integer("credits").default(0).notNull(),
   createdAt: timestamp("created_at").defaultNow().notNull(),
   updatedAt: timestamp("updated_at").defaultNow().notNull(),
   lastSignedIn: timestamp("last_signed_in").defaultNow().notNull(),
@@ -55,6 +55,7 @@ export const messages = pgTable("messages", {
   conversationId: integer("conversation_id").references(() => conversations.id).notNull(),
   role: varchar("role", { length: 32 }).notNull(),
   content: text("content").notNull(),
+  metadata: text("metadata"),
   createdAt: timestamp("created_at").defaultNow().notNull(),
 });
 
@@ -62,51 +63,52 @@ export type Message = typeof messages.$inferSelect;
 export type InsertMessage = typeof messages.$inferInsert;
 
 /**
- * Attachments table
+ * Credits table
  */
-export const attachments = pgTable("attachments", {
-  id: serial("id").primaryKey(),
-  conversationId: integer("conversation_id").references(() => conversations.id).notNull(),
-  userId: integer("user_id").references(() => users.id).notNull(),
-  fileName: varchar("file_name", { length: 512 }).notNull(),
-  fileType: varchar("file_type", { length: 128 }).notNull().default("application/octet-stream"),
-  fileSize: integer("file_size").notNull().default(0),
-  storageUrl: text("storage_url").notNull(),
-  createdAt: timestamp("created_at").defaultNow().notNull(),
+export const credits = pgTable("credits", {
+  userId: integer("user_id").references(() => users.id).primaryKey(),
+  amount: integer("amount").default(0).notNull(),
+  updatedAt: timestamp("updated_at").defaultNow().notNull(),
 });
 
-export type Attachment = typeof attachments.$inferSelect;
-export type InsertAttachment = typeof attachments.$inferInsert;
+/**
+ * Recharges table (manual Pix recharge requests)
+ */
+export const recharges = pgTable("recharges", {
+  id: serial("id").primaryKey(),
+  userId: integer("user_id").references(() => users.id).notNull(),
+  amount: integer("amount").notNull(),
+  credits: integer("credits").notNull(),
+  pixCode: text("pix_code").notNull(),
+  status: rechargeStatusEnum("status").default("pending").notNull(),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+  updatedAt: timestamp("updated_at").defaultNow().notNull(),
+});
+
+/**
+ * Self Improvements table
+ */
+export const selfImprovements = pgTable("self_improvements", {
+  id: serial("id").primaryKey(),
+  title: varchar("title", { length: 256 }).notNull(),
+  description: text("description").notNull(),
+  filesToChange: text("files_to_change"),
+  risks: text("risks"),
+  benefits: text("benefits"),
+  estimatedTime: varchar("estimated_time", { length: 64 }),
+  status: improvementStatusEnum("status").default("pending").notNull(),
+  result: text("result"),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+  updatedAt: timestamp("updated_at").defaultNow().notNull(),
+});
 
 /**
  * Learning opportunities for self-improvement
  */
 export const learningOpportunities = pgTable("learning_opportunities", {
-  id: text("id").primaryKey(),
+  id: serial("id").primaryKey(),
   category: varchar("category", { length: 64 }).notNull(),
   reason: text("reason").notNull(),
   status: learningStatusEnum("status").default("pending").notNull(),
-  proposalId: text("proposal_id"),
   createdAt: timestamp("created_at").defaultNow().notNull(),
 });
-
-export type LearningOpportunity = typeof learningOpportunities.$inferSelect;
-
-/**
- * Pix recharge requests for credits
- */
-export const rechargeRequests = pgTable("recharge_requests", {
-  id: text("id").primaryKey(),
-  userId: integer("user_id").references(() => users.id).notNull(),
-  userEmail: varchar("user_email", { length: 320 }).notNull(),
-  packageId: varchar("package_id", { length: 64 }).notNull(),
-  amountCents: integer("amount_cents").notNull(),
-  credits: integer("credits").notNull(),
-  status: rechargeStatusEnum("status").default("pending").notNull(),
-  createdAt: timestamp("created_at").defaultNow().notNull(),
-  updatedAt: timestamp("updated_at").defaultNow().notNull(),
-  decidedAt: timestamp("decided_at"),
-  decidedByUserId: integer("decided_by_user_id").references(() => users.id),
-});
-
-export type RechargeRequest = typeof rechargeRequests.$inferSelect;

@@ -16,6 +16,7 @@ import {
   Cpu,
   CircleAlert,
   Coins,
+  Sparkles,
 } from "lucide-react";
 import { trpc } from "@/lib/trpc";
 import {
@@ -66,8 +67,8 @@ export default function ChatView({ conversationId }: { conversationId: number })
   const scrollRef = useRef<HTMLDivElement>(null);
   const utils = trpc.useUtils();
 
-  const sendMutation = trpc.chat.chat.send.useMutation();
-  const uploadMutation = trpc.chat.upload.uploadFile.useMutation();
+  const sendMutation = trpc.chat.send.useMutation();
+  const uploadMutation = trpc.upload.file.useMutation();
   const { data: credits, isLoading: isCreditsLoading } = trpc.credits.me.useQuery();
   const creditUiState = getChatCreditUiState(credits);
   const creditsExhausted = !isCreditsLoading && creditUiState.blocked;
@@ -99,86 +100,19 @@ export default function ChatView({ conversationId }: { conversationId: number })
     setIsStreaming(true);
     setPendingContent("");
 
-    // Open SSE stream manually (tRPC mutation with SSE is handled server-side)
-    const resp = await fetch("/api/trpc/chat.chat.send", {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-        "trpc-accept": "application/json",
-      },
-      credentials: "include",
-      body: JSON.stringify({
-        json: { conversationId: convId, content: input.trim(), attachmentIds: selectedAttIds },
-      }),
-    });
-
-    if (!resp.ok) {
-      const errText = await resp.text().catch(() => "");
-      let msg = "Erro ao enviar mensagem. Tente novamente.";
-      if (errText.includes("no healthy upstream") || resp.status >= 500) {
-        msg = "Serviço temporariamente indisponível. Tente novamente em instantes.";
-      } else if (errText.includes("4MB")) {
-        msg = "Arquivo muito grande. O limite é 4MB.";
-      }
-      toast.error(msg);
-      setIsStreaming(false);
-      setPendingContent("");
-      return;
-    }
-
-    const reader = resp.body?.getReader();
-    if (!reader) {
-      toast.error("Erro ao receber resposta do assistente.");
-      setIsStreaming(false);
-      return;
-    }
-
-    const decoder = new TextDecoder();
-    let done = false;
-    while (!done) {
-      const { done: d, value } = await reader.read();
-      done = d;
-      if (value) {
-        const text = decoder.decode(value, { stream: true });
-        for (const line of text.split("\n")) {
-          if (line.startsWith("data: ")) {
-            const payload = line.slice(6);
-            if (payload === "[DONE]") {
-              done = true;
-              break;
-            }
-            try {
-              const json = JSON.parse(payload);
-              if (json.agentMode === true) {
-                setIsAgentMode(true);
-              }
-              if (json.creditBlocked) {
-                setCreditNotice(buildCreditBlockedMessage(json.balance, json.requiredCredits));
-                done = true;
-                break;
-              }
-              if (json.content) {
-                setPendingContent((prev) => prev + json.content);
-              } else if (json.error) {
-                toast.error(json.error);
-                done = true;
-                break;
-              }
-            } catch {
-              // ignore
-            }
-          }
-        }
-      }
-    }
-
-    // Refresh messages from DB after streaming completes
     try {
+      await sendMutation.mutateAsync({
+        conversationId: convId,
+        content: input.trim(),
+        attachmentIds: selectedAttIds,
+      });
+      
       const msgs = await utils.chat.conversations.messages.fetch({ id: convId });
       setMessages(msgs as DBMessage[]);
-    } catch {
-      // keep pending content visible
+    } catch (err: any) {
+      toast.error(err.message || "Erro ao enviar mensagem.");
     }
+
     setIsStreaming(false);
     setPendingContent("");
     setSelectedAttIds([]);
@@ -228,13 +162,10 @@ export default function ChatView({ conversationId }: { conversationId: number })
       const result = await uploadMutation.mutateAsync({
         conversationId,
         fileName: file.name,
-        fileContent: base64,
         fileType: file.type || "application/octet-stream",
+        base64,
       });
-      setAttachments((prev) => [
-        ...prev,
-        { id: result.id, fileName: result.fileName, fileType: file.type, storageUrl: result.url },
-      ]);
+      utils.chat.conversations.attachments.invalidate();
       toast.success(`Arquivo "${file.name}" anexado.`);
     } catch (error: any) {
       console.error("[Upload] Error:", error);
@@ -363,11 +294,6 @@ export default function ChatView({ conversationId }: { conversationId: number })
               <span className="truncate max-w-[180px]">{att.fileName}</span>
             </button>
           ))}
-          <p className="text-[10px] text-muted-foreground self-center">
-            {selectedAttIds.length > 0
-              ? `${selectedAttIds.length} selecionado(s) para o contexto`
-              : "Clique em um arquivo para incluí-lo na próxima mensagem"}
-          </p>
         </div>
       )}
 
@@ -415,7 +341,6 @@ export default function ChatView({ conversationId }: { conversationId: number })
           <input
             ref={fileInputRef}
             type="file"
-            accept="image/*,.txt,.md,.json,.js,.ts,.tsx,.py,.java,.c,.cpp,.h,.cs,.html,.css,.zip"
             className="hidden"
             onChange={handleFileSelect}
           />
@@ -425,40 +350,18 @@ export default function ChatView({ conversationId }: { conversationId: number })
             onKeyDown={handleKeyDown}
             placeholder="Pergunte sobre programação ou produtividade..."
             disabled={isStreaming || creditsExhausted}
-            className="flex-1 bg-muted/50"
+            className="flex-1 bg-muted border-none focus-visible:ring-1 focus-visible:ring-violet-500"
           />
           <Button
-            onClick={handleSend}
-            disabled={isStreaming || creditsExhausted || !input.trim()}
-            className="shrink-0 bg-violet-600 hover:bg-violet-500"
+            type="submit"
+            size="icon"
+            className="shrink-0 bg-violet-600 hover:bg-violet-500 text-white"
+            disabled={!input.trim() || isStreaming || creditsExhausted}
           >
-            {isStreaming ? <Loader2 className="h-4 w-4 animate-spin" /> : <Send className="h-4 w-4" />}
+            <Send className="h-4 w-4" />
           </Button>
         </form>
-        <div className="mx-auto mt-2 flex max-w-3xl items-center justify-end gap-1.5 text-[11px] text-muted-foreground">
-          <Coins className="h-3.5 w-3.5 text-amber-300" />
-          <span>{formatCreditLabel(credits)}</span>
-        </div>
       </div>
     </div>
-  );
-}
-
-function Sparkles(props: any) {
-  return (
-    <svg
-      xmlns="http://www.w3.org/2000/svg"
-      width="24"
-      height="24"
-      viewBox="0 0 24 24"
-      fill="none"
-      stroke="currentColor"
-      strokeWidth="2"
-      strokeLinecap="round"
-      strokeLinejoin="round"
-      {...props}
-    >
-      <path d="M9.937 15.5A2 2 0 0 0 8.5 14.063l-6.135-1.582a.5.5 0 0 1 0-.962L8.5 9.936A2 2 0 0 0 9.937 8.5l1.582-6.135a.5.5 0 0 1 .963 0L14.063 8.5A2 2 0 0 0 15.5 9.937l6.135 1.581a.5.5 0 0 1 0 .964L15.5 14.063a2 2 0 0 0-1.437 1.437l-1.582 6.135a.5.5 0 0 1-.963 0z" />
-    </svg>
   );
 }

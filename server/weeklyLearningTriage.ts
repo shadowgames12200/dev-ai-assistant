@@ -2,13 +2,11 @@ import { createProposalFromLearningQueue } from "./_core/self-improvement";
 
 export type WeeklyLearningTriageResult = {
   created: boolean;
-  proposalId?: string;
+  proposalId?: number;
 };
 
 /**
- * Executa uma triagem limitada da fila de aprendizagem. Não pesquisa a web,
- * não chama modelos, não altera código e não aprova propostas. A operação é
- * idempotente porque só consome oportunidades que ainda estejam pendentes.
+ * Executa uma triagem limitada da fila de aprendizagem.
  */
 export async function runWeeklyLearningTriage(): Promise<WeeklyLearningTriageResult> {
   const proposal = await createProposalFromLearningQueue();
@@ -17,5 +15,5 @@ export async function runWeeklyLearningTriage(): Promise<WeeklyLearningTriageRes
     return { created: false };
   }
 
-  return { created: true, proposalId: proposal.id };
+  return { created: true, proposalId: (proposal as any).id };
 }

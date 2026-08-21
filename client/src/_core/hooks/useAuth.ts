@@ -23,7 +23,7 @@ export function useAuth(options?: UseAuthOptions) {
 
   const logoutMutation = trpc.auth.logout.useMutation({
     onSuccess: () => {
-      utils.auth.me.setData(undefined, null);
+      utils.auth.me.setData(undefined, undefined);
     },
   });
 
@@ -49,7 +49,7 @@ export function useAuth(options?: UseAuthOptions) {
         sessionStorage.removeItem("manus-cookie");
         localStorage.removeItem("manus-runtime-user-info");
       } catch {}
-      utils.auth.me.setData(undefined, null);
+      utils.auth.me.setData(undefined, undefined);
       await utils.auth.me.invalidate();
       if (shouldRedirect && typeof window !== "undefined") {
         window.location.assign("/");

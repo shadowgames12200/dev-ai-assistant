@@ -1,222 +1,208 @@
-import { COOKIE_NAME } from "@shared/const";
 import { TRPCError } from "@trpc/server";
-import { getSessionCookieOptions } from "./_core/cookies";
-import { systemRouter } from "./_core/systemRouter";
-import { protectedProcedure, publicProcedure, router } from "./_core/trpc";
 import { z } from "zod";
-import { chatRouter } from "./chatRouter";
+import { protectedProcedure, publicProcedure, router } from "./_core/trpc";
 import * as db from "./db";
-import { buildStaticPixBrCode } from "./pixBrCode";
-import { getPixConfig, getPixPackage, PIX_PACKAGES } from "./pixConfig";
 import { notifyOwner } from "./_core/notification";
+import { generatePixPayload, buildStaticPixBrCode } from "./pix";
+
+const PIX_PACKAGES = [
+  { id: "basico", label: "Básico", amountCents: 1000, credits: 50 },
+  { id: "intermediario", label: "Intermediário", amountCents: 2000, credits: 200 },
+  { id: "avancado", label: "Avançado", amountCents: 5000, credits: 500 },
+];
+
+function getPixPackage(id: string) {
+  return PIX_PACKAGES.find(p => p.id === id);
+}
 
 export const appRouter = router({
-    // if you need to use socket.io, read and register route in server/_core/index.ts, all api should start with '/api/' so that the gateway can route correctly
-  system: systemRouter,
   auth: router({
-    me: publicProcedure.query(opts => opts.ctx.user),
-    logout: publicProcedure.mutation(({ ctx }) => {
-      const cookieOptions = getSessionCookieOptions(ctx.req);
-      (ctx.res as any).clearCookie(COOKIE_NAME, { ...cookieOptions, maxAge: -1 });
-      return {
-        success: true,
-      } as const;
+    me: protectedProcedure.query(({ ctx }) => {
+      return ctx.user;
+    }),
+    logout: protectedProcedure.mutation(async ({ ctx }) => {
+      // O logout é tratado limpando o cookie no cliente/middleware
+      return { success: true };
     }),
   }),
 
-  chat: chatRouter,
-
-  // Admin-only router
-  admin: router({
-    listUsers: protectedProcedure.query(async ({ ctx }) => {
-      if (!ctx.user || ctx.user.role !== "admin") {
-        throw new TRPCError({ code: "FORBIDDEN" });
-      }
-      let rows: any[] = [];
-      try {
-        const sdb = await db.getDb();
-        if (!sdb) throw new Error("no db");
-        const [r] = await (sdb as any).session.client.query(
-          "SELECT id, openId, name, email, loginMethod, role, createdAt, lastSignedIn FROM users ORDER BY createdAt DESC"
-        );
-        rows = r || [];
-      } catch {
-        rows = await db.getAllUsers();
-      }
-      // Normalize JSON profiles to the shape expected by the admin table
-      return rows.map((u: any) => ({
-        id: Number(u.id || 0),
-        openId: u.openId ?? "",
-        name: u.name ?? "",
-        email: u.email ?? "",
-        loginMethod: u.loginMethod ?? "email",
-        role: u.role ?? "user",
-        createdAt: u.createdAt ?? Date.now(),
-        lastSignedIn: u.lastSignedIn ?? 0,
-      }));
-    }),
-    setUserRole: protectedProcedure
-      .input(z.object({ id: z.number(), role: z.enum(["admin", "user"]) }))
-      .mutation(async ({ ctx, input }) => {
-        if (!ctx.user || ctx.user.role !== "admin") {
-          throw new TRPCError({ code: "FORBIDDEN" });
-        }
-        await db.updateUserRole(input.id, input.role);
-        return { success: true };
-      }),
-  }),
-  // Credits
   credits: router({
     me: protectedProcedure.query(async ({ ctx }) => {
-      const { getBalance, grantTrial } = await import("./_core/credits");
-      if (ctx.user.role === "admin") return { balance: -1, unlimited: true };
-      await grantTrial(ctx.user.id);
-      const balance = await getBalance(ctx.user.id);
-      return { balance, unlimited: false };
-    }),
-    add: protectedProcedure
-      .input(z.object({ email: z.string().email(), amount: z.number().int() }))
-      .mutation(async ({ ctx, input }) => {
-        if (ctx.user.role !== "admin") throw new TRPCError({ code: "FORBIDDEN", message: "Somente admin." });
-        const { addCredits } = await import("./_core/credits");
-        const ok = await addCredits(input.email, input.amount);
-        return { success: ok };
-      }),
-    remove: protectedProcedure
-      .input(z.object({ email: z.string().email(), amount: z.number().int().positive() }))
-      .mutation(async ({ ctx, input }) => {
-        if (ctx.user.role !== "admin") throw new TRPCError({ code: "FORBIDDEN", message: "Somente admin." });
-        const { addCredits } = await import("./_core/credits");
-        const ok = await addCredits(input.email, -input.amount);
-        return { success: ok };
-      }),
-    setCost: protectedProcedure
-      .input(z.object({ costPerMessage: z.number().int().min(0).max(100) }))
-      .mutation(async ({ ctx, input }) => {
-        if (ctx.user.role !== "admin") throw new TRPCError({ code: "FORBIDDEN", message: "Somente admin." });
-        const { setCostPerMessage } = await import("./_core/credits");
-        await setCostPerMessage(input.costPerMessage);
-        return { success: true };
-      }),
-    getCost: protectedProcedure.query(async ({ ctx }) => {
-      if (ctx.user.role !== "admin") throw new TRPCError({ code: "FORBIDDEN", message: "Somente admin." });
-      const { getCostPerMessage } = await import("./_core/credits");
-      return { costPerMessage: await getCostPerMessage() };
-    }),
-    list: protectedProcedure.query(async ({ ctx }) => {
-      if (ctx.user.role !== "admin") throw new TRPCError({ code: "FORBIDDEN", message: "Somente admin." });
-      const { listUsers } = await import("./_core/credits");
-      return listUsers();
+      const balance = await db.getUserCredits(ctx.user.id);
+      return { balance };
     }),
   }),
+
+  admin: router({
+    listUsers: protectedProcedure.query(async ({ ctx }) => {
+      if (ctx.user.role !== "admin") throw new TRPCError({ code: "FORBIDDEN" });
+      const users = await db.getAllUsers();
+      const results = [];
+      for (const u of users) {
+        const balance = await db.getUserCredits(u.id);
+        results.push({ ...u, balance });
+      }
+      return results;
+    }),
+    adjustCredits: protectedProcedure
+      .input(z.object({ userId: z.number(), amount: z.number() }))
+      .mutation(async ({ ctx, input }) => {
+        if (ctx.user.role !== "admin") throw new TRPCError({ code: "FORBIDDEN" });
+        await db.addCredits(input.userId, input.amount);
+        return { success: true };
+      }),
+  }),
+
   pix: router({
-    packages: protectedProcedure.query(({ ctx }) => {
-      const config = getPixConfig();
+    packages: publicProcedure.query(async () => {
       return {
-        packages: PIX_PACKAGES.map((pkg) => ({
+        packages: PIX_PACKAGES.map(pkg => ({
           ...pkg,
           amount: (pkg.amountCents / 100).toFixed(2),
           brCode: buildStaticPixBrCode(pkg),
         })),
-        receiverName: config.receiverName,
-        city: config.city,
-        supportWhatsAppNumber: config.supportWhatsAppNumber,
-        currentUserId: ctx.user.id,
+        receiverName: process.env.PIX_RECEIVER_NAME || "Charles Henrique",
+        city: process.env.PIX_CITY || "Pirapora",
+        supportWhatsAppNumber: process.env.SUPPORT_WHATSAPP_NUMBER || "38991109806",
       };
     }),
-    myRequests: protectedProcedure.query(async ({ ctx }) => ({
-      requests: await db.listUserRechargeRequests(ctx.user.id),
-    })),
+    myRequests: protectedProcedure.query(async ({ ctx }) => {
+      const dbInstance = await db.getDb();
+      const { recharges } = await import("../drizzle/schema");
+      const { eq, desc } = await import("drizzle-orm");
+      const requests = await dbInstance
+        .select()
+        .from(recharges)
+        .where(eq(recharges.userId, ctx.user.id))
+        .orderBy(desc(recharges.createdAt));
+      return { requests };
+    }),
     requestRecharge: protectedProcedure
-      .input(z.object({ packageId: z.string().min(1).max(32) }))
+      .input(z.object({ packageId: z.string() }))
       .mutation(async ({ ctx, input }) => {
         const pkg = getPixPackage(input.packageId);
-        if (!pkg) throw new TRPCError({ code: "BAD_REQUEST", message: "Pacote de recarga inválido." });
-        const request = await db.createRechargeRequest({
-          userId: ctx.user.id,
-          userEmail: ctx.user.email || "",
-          packageId: pkg.id,
-          amountCents: pkg.amountCents,
-          credits: pkg.credits,
-        });
+        if (!pkg) throw new TRPCError({ code: "BAD_REQUEST", message: "Pacote inválido" });
+        
+        const request = await db.createRechargeRequest(
+          ctx.user.id,
+          pkg.amountCents / 100,
+          pkg.credits,
+          buildStaticPixBrCode(pkg)
+        );
+
         const notified = await notifyOwner({
-          title: "Nova solicitação de recarga Pix",
-          content: `Solicitação ${request.id} de ${ctx.user.email || "usuário sem e-mail"}: ${pkg.label} (${pkg.id}), R$ ${(pkg.amountCents / 100).toFixed(2)} por ${pkg.credits} créditos. A confirmação do pagamento e a liberação continuam manuais.`,
+          title: "Nova recarga Pix",
+          content: `Usuário ${ctx.user.email} solicitou ${pkg.credits} créditos.`,
         }).catch(() => false);
-        return { success: true, request, ownerNotified: notified };
+
+        return { success: true, request, ownerNotified: !!notified };
       }),
     listPending: protectedProcedure.query(async ({ ctx }) => {
       if (ctx.user.role !== "admin") throw new TRPCError({ code: "FORBIDDEN" });
-      return { requests: await db.listRechargeRequests("pending") };
+      const requests = await db.getPendingRecharges();
+      return { requests };
     }),
     approveRecharge: protectedProcedure
-      .input(z.object({ requestId: z.string().min(8).max(100) }))
+      .input(z.object({ id: z.number() }))
       .mutation(async ({ ctx, input }) => {
         if (ctx.user.role !== "admin") throw new TRPCError({ code: "FORBIDDEN" });
-        const request = await db.getRechargeRequest(input.requestId);
-        if (!request) throw new TRPCError({ code: "NOT_FOUND", message: "Solicitação não encontrada." });
-        if (request.status === "rejected") throw new TRPCError({ code: "BAD_REQUEST", message: "Solicitação já rejeitada." });
-        const creditResult = await (await import("./_core/credits")).applyRechargeCredit(request.userId, request.credits, request.id);
-        const approved = await db.markRechargeApproved(request.id, ctx.user.id);
-        if (!approved) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: "Não foi possível registrar a aprovação." });
-        return { success: true, request: approved, creditsAdded: creditResult.applied, balance: creditResult.balance };
-      }),
-    rejectRecharge: protectedProcedure
-      .input(z.object({ requestId: z.string().min(8).max(100) }))
-      .mutation(async ({ ctx, input }) => {
-        if (ctx.user.role !== "admin") throw new TRPCError({ code: "FORBIDDEN" });
-        const request = await db.markRechargeRejected(input.requestId, ctx.user.id);
-        if (!request) throw new TRPCError({ code: "BAD_REQUEST", message: "Solicitação indisponível para rejeição." });
-        return { success: true, request };
+        await db.approveRecharge(input.id);
+        return { success: true };
       }),
   }),
-  // Self-improvement (aprovações)
-  selfImprove: router({
-    list: protectedProcedure.query(async ({ ctx }) => {
-      if (ctx.user.role !== "admin") throw new TRPCError({ code: "FORBIDDEN" });
-      const mod = await import("./_core/self-improvement");
-      return { proposals: mod.listProposals() };
+
+  chat: router({
+    conversations: router({
+      list: protectedProcedure.query(async ({ ctx }) => {
+        return db.getConversations(ctx.user.id);
+      }),
+      create: protectedProcedure
+        .input(z.object({ title: z.string().optional() }))
+        .mutation(async ({ ctx, input }) => {
+          return db.createConversation(ctx.user.id, input.title || "Nova conversa");
+        }),
+      delete: protectedProcedure
+        .input(z.object({ id: z.number() }))
+        .mutation(async ({ ctx, input }) => {
+          await db.deleteConversation(input.id, ctx.user.id);
+          return { success: true };
+        }),
+      rename: protectedProcedure
+        .input(z.object({ id: z.number(), title: z.string() }))
+        .mutation(async ({ ctx, input }) => {
+          const dbInstance = await db.getDb();
+          const { conversations } = await import("../drizzle/schema");
+          const { eq, and } = await import("drizzle-orm");
+          await dbInstance
+            .update(conversations)
+            .set({ title: input.title, updatedAt: new Date() })
+            .where(and(eq(conversations.id, input.id), eq(conversations.userId, ctx.user.id)));
+          return { success: true };
+        }),
+      clear: protectedProcedure.mutation(async ({ ctx }) => {
+        await db.clearAllConversations(ctx.user.id);
+        return { success: true };
+      }),
+      messages: protectedProcedure
+        .input(z.object({ id: z.number() }))
+        .query(async ({ ctx, input }) => {
+          return db.getMessages(input.id);
+        }),
+      attachments: protectedProcedure
+        .input(z.object({ conversationId: z.number() }))
+        .query(async ({ ctx, input }) => {
+          const dbInstance = await db.getDb();
+          const { messages } = await import("../drizzle/schema");
+          const { eq, and, isNotNull } = await import("drizzle-orm");
+          const msgs = await dbInstance
+            .select()
+            .from(messages)
+            .where(and(eq(messages.conversationId, input.conversationId), isNotNull(messages.metadata)));
+          return msgs.map((m: any) => JSON.parse(m.metadata || "{}")).filter((meta: any) => meta.type === "attachment");
+        }),
     }),
-    opportunities: protectedProcedure.query(async ({ ctx }) => {
-      if (ctx.user.role !== "admin") throw new TRPCError({ code: "FORBIDDEN" });
-      return { opportunities: await db.listLearningOpportunities("pending") };
-    }),
-    createFromOpportunities: protectedProcedure.mutation(async ({ ctx }) => {
-      if (ctx.user.role !== "admin") throw new TRPCError({ code: "FORBIDDEN" });
-      const mod = await import("./_core/self-improvement");
-      const proposal = await mod.createProposalFromLearningQueue();
-      if (!proposal) return { success: false, message: "Não há oportunidades seguras pendentes para transformar em proposta.", proposal: null };
-      return { success: true, message: "Proposta criada. Ela ainda não pesquisou, não aprendeu permanentemente e não alterou nada.", proposal };
-    }),
-    approve: protectedProcedure
-      .input(z.object({ proposalId: z.string(), approvalKey: z.string().min(1) }))
+    send: protectedProcedure
+      .input(
+        z.object({
+          conversationId: z.number(),
+          content: z.string(),
+          attachmentIds: z.array(z.number()).optional(),
+        })
+      )
       .mutation(async ({ ctx, input }) => {
-        if (ctx.user.role !== "admin") throw new TRPCError({ code: "FORBIDDEN" });
-        const mod = await import("./_core/self-improvement");
-        const approvalKey = (process.env as any).APPROVAL_KEY || "";
-        if (input.approvalKey.trim() !== approvalKey) {
-          return { success: false, message: "Chave de aprovação inválida. Só o dono pode aprovar melhorias." };
+        await db.addMessage(input.conversationId, "user", input.content);
+        const { invokeLLMStream } = await import("./_core/llm");
+        const history = await db.getMessages(input.conversationId);
+        const llmMessages: any[] = [
+          { role: "system", content: "Você é o DevAI Assistant." },
+          ...history.map(m => ({ role: m.role, content: m.content }))
+        ];
+        const stream = await invokeLLMStream({
+          model: "gemini-3.6-flash",
+          messages: llmMessages,
+        });
+        const reader = (stream.body as ReadableStream).getReader();
+        let full = "";
+        while (true) {
+          const { done, value } = await reader.read();
+          if (done) break;
+          full += new TextDecoder().decode(value);
         }
-        const proposal = mod.approveProposal(input.proposalId);
-        return { success: true, message: "Proposta aprovada pelo dono. Execute os arquivos via o comando de melhoria.", proposal };
+        await db.addMessage(input.conversationId, "assistant", full);
+        return { success: true };
       }),
-    reject: protectedProcedure
-      .input(z.object({ proposalId: z.string() }))
+  }),
+
+  upload: router({
+    file: protectedProcedure
+      .input(z.object({ conversationId: z.number(), fileName: z.string(), fileType: z.string(), base64: z.string() }))
       .mutation(async ({ ctx, input }) => {
-        if (ctx.user.role !== "admin") throw new TRPCError({ code: "FORBIDDEN" });
-        const mod = await import("./_core/self-improvement");
-        const result = mod.rejectProposal(input.proposalId);
-        return { success: true, proposal: result };
-      }),
-    // Auto-melhoria direcionada: o proprietário solicita um tema específico
-    createDirected: protectedProcedure
-      .input(z.object({ topic: z.string().min(3).max(500), reason: z.string().max(1000).optional() }))
-      .mutation(async ({ ctx, input }) => {
-        if (ctx.user.role !== "admin") throw new TRPCError({ code: "FORBIDDEN" });
-        const mod = await import("./_core/self-improvement");
-        const proposal = mod.createDirectedProposal(input.topic, input.reason);
-        if (!proposal) return { success: false, message: "Não foi possível criar a proposta. Verifique o tema.", proposal: null };
-        return { success: true, message: "Proposta direcionada criada. Ela ainda não pesquisou, não aprendeu permanentemente e não alterou nada. Revise e aprove no painel.", proposal };
+        const { storagePut } = await import("./storage");
+        const buf = Buffer.from(input.base64, "base64");
+        const { url } = await storagePut(`uploads/${input.fileName}`, buf, input.fileType);
+        const meta = { type: "attachment", fileName: input.fileName, fileType: input.fileType, storageUrl: url };
+        await db.addMessage(input.conversationId, "system", `Arquivo anexado: ${input.fileName}`, meta);
+        return { success: true, url };
       }),
   }),
 });
