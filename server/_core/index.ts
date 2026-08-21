@@ -90,4 +90,5 @@ if (process.env.NODE_ENV === "development") {
   serveStatic(app);
 }
 
+export { app };
 export default app;
