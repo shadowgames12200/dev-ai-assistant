@@ -12,8 +12,19 @@ async function runBuild() {
       bundle: true,
       platform: 'node',
       format: 'esm',
+      target: 'node20',
       outfile: path.join(__dirname, 'dist/index.js'),
-      // Externals que causam problemas ou são nativos do Node
+      mainFields: ['module', 'main'],
+      banner: {
+        js: `
+import { createRequire } from 'module';
+import { fileURLToPath } from 'url';
+import { dirname } from 'path';
+const require = createRequire(import.meta.url);
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = dirname(__filename);
+`,
+      },
       external: [
         'path',
         'fs',
@@ -36,7 +47,8 @@ async function runBuild() {
         '@babel/core',
         'lightningcss',
         'vite',
-        'rollup'
+        'rollup',
+        'esbuild'
       ],
       loader: {
         '.ts': 'ts',
