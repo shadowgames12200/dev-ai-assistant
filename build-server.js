@@ -25,9 +25,7 @@ async function runBuild() {
         '@babel/core',
         'lightningcss',
         'vite',
-        'rollup',
-        '@rollup/rollup-linux-x64-gnu',
-        '@rollup/rollup-linux-x64-musl'
+        'rollup'
       ],
       loader: {
         '.ts': 'ts',

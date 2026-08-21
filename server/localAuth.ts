@@ -118,30 +118,37 @@ function isOwnerEmail(email: string): boolean {
  * POST /api/auth/login - autentica uma conta local existente por nome de usuário ou e-mail.
  */
 export async function handleLocalLogin(req: any, res: any) {
+  console.log(`[Auth] Login attempt for: ${req.body?.identifier || req.body?.email}`);
   try {
     if (!consumeAuthAttempt(req, "login")) {
+      console.log(`[Auth] Rate limited for: ${req.body?.identifier || req.body?.email}`);
       res.status(429).json({ error: "Muitas tentativas. Aguarde alguns minutos antes de tentar novamente." });
       return;
     }
     const parsed = loginSchema.safeParse(req.body);
     if (!parsed.success) {
+      console.log(`[Auth] Invalid input: ${JSON.stringify(req.body)}`);
       res.status(400).json({ error: "Informe o nome de usuário ou e-mail e a senha" });
       return;
     }
 
     const { password } = parsed.data;
     const identifier = (parsed.data.identifier || parsed.data.email || "").trim();
+    console.log(`[Auth] Looking up user: ${identifier}`);
     const dbUser = await db.getUserByLoginIdentifier(identifier);
     if (!dbUser || dbUser.loginMethod !== "email") {
       res.status(401).json({ error: "Nome de usuário/e-mail ou senha inválidos" });
       return;
     }
     const normalizedEmail = String(dbUser.email).toLowerCase().trim();
+    console.log(`[Auth] User found, fetching password record for: ${normalizedEmail}`);
     const stored = await getPasswordRecord(normalizedEmail);
     if (!stored) {
+      console.log(`[Auth] No password record for: ${normalizedEmail}`);
       res.status(401).json({ error: "Nome de usuário/e-mail ou senha inválidos" });
       return;
     }
+    console.log(`[Auth] Verifying password...`);
     const verification = await verifyPassword(password, stored);
     if (!verification.valid) {
       res.status(401).json({ error: "Nome de usuário/e-mail ou senha inválidos" });
@@ -168,11 +175,13 @@ export async function handleLocalLogin(req: any, res: any) {
       return;
     }
 
+    console.log(`[Auth] Creating session token for: ${finalUser.openId}`);
     const sessionToken = await sdk.createSessionToken(finalUser.openId, {
       name: finalUser.name || normalizedEmail.split("@")[0],
       expiresInMs: ONE_YEAR_MS,
     });
 
+    console.log(`[Auth] Setting cookie and responding...`);
     const cookieOptions = getSessionCookieOptions(req);
     res.cookie(COOKIE_NAME, sessionToken, { ...cookieOptions, maxAge: ONE_YEAR_MS });
     clearAuthAttempts(req, "login");
