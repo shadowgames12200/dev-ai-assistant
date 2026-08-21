@@ -36,6 +36,8 @@
     "nanoid": "^5.0.9",
     "wouter": "^3.7.1",
     "sonner": "^1.7.1",
+    "qrcode": "^1.5.4",
+    "@types/qrcode": "^1.5.5",
     "clsx": "^2.1.1",
     "tailwind-merge": "^2.5.5"
   },
