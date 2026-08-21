@@ -85,7 +85,8 @@ export default function Recharge() {
     return <main className="min-h-screen bg-[#0a0a0f] p-6 text-zinc-200"><div className="mx-auto max-w-4xl rounded-lg border border-red-400/30 bg-red-400/10 p-4"><p className="text-sm">Não foi possível carregar as opções de recarga agora.</p><Button className="mt-3" variant="outline" onClick={() => setLocation("/chat")}>Voltar ao chat</Button></div></main>;
   }
 
-  const pendingForSelected = (requestsData?.requests ?? []).find((request: any) => request.status === "pending" && request.packageId === selectedPackage.id);
+  const requests = (requestsData?.requests ?? []) as any[];
+  const pendingForSelected = requests.find((request: any) => request.status === "pending" && request.packageId === selectedPackage.id);
   const whatsappUrl = `https://wa.me/${data?.supportWhatsAppNumber}?text=${encodeURIComponent("Olá, preciso de ajuda com uma recarga de créditos da DevAI.")}`;
 
   return (
@@ -136,7 +137,7 @@ export default function Recharge() {
           </div>
         </section>
 
-        {(requestsData?.requests?.length ?? 0) > 0 && <section className="mt-6 rounded-xl border border-white/10 bg-white/[0.03] p-5"><h2 className="text-sm font-semibold">Minhas solicitações</h2><div className="mt-3 space-y-2">{requestsData?.requests.slice(0, 5).map((request: any) => <div key={request.id} className="flex flex-wrap items-center justify-between gap-2 rounded-md bg-black/20 px-3 py-2 text-xs"><span>R$ {(request.amountCents / 100).toFixed(2).replace(".", ",")} · {request.credits} créditos</span><span className={request.status === "approved" ? "text-emerald-300" : request.status === "rejected" ? "text-red-300" : "text-amber-200"}>{requestStatusLabel(request.status)}</span></div>)}</div></section>}
+        {requests.length > 0 && <section className="mt-6 rounded-xl border border-white/10 bg-white/[0.03] p-5"><h2 className="text-sm font-semibold">Minhas solicitações</h2><div className="mt-3 space-y-2">{requests.slice(0, 5).map((request: any) => <div key={request.id} className="flex flex-wrap items-center justify-between gap-2 rounded-md bg-black/20 px-3 py-2 text-xs"><span>R$ {(request.amountCents / 100).toFixed(2).replace(".", ",")} · {request.credits} créditos</span><span className={request.status === "approved" ? "text-emerald-300" : request.status === "rejected" ? "text-red-300" : "text-amber-200"}>{requestStatusLabel(request.status)}</span></div>)}</div></section>}
       </div>
     </main>
   );

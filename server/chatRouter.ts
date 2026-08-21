@@ -626,7 +626,7 @@ export const chatRouter = router({
         // Não armazena o texto, anexos, usuário, credenciais ou instruções do chat.
         try {
           const category = db.detectSafeLearningCategory(input.content);
-          if (category) db.recordLearningOpportunity(category);
+          if (category) db.recordLearningOpportunity(category, input.content.slice(0, 100));
         } catch (learningQueueError) {
           console.warn("[Chat] learning opportunity not recorded:", learningQueueError);
         }
@@ -638,7 +638,7 @@ export const chatRouter = router({
         const attIds = input.attachmentIds ?? [];
         if (attIds.length > 0) {
           const allAttachments = await db.getConversationAttachments(input.conversationId);
-          const selected = allAttachments.filter((a) => attIds.includes(a.id));
+          const selected = allAttachments.filter((a: any) => attIds.includes(a.id));
           const { extractTextContent } = await import("./fileExtraction");
           // Resolve storage-relative URLs against this server's base so the
           // storage proxy (/manus-storage/*) serves them (works in dev and in
@@ -668,8 +668,8 @@ export const chatRouter = router({
         const llmMessages: Message[] = [
           { role: "system", content: SYSTEM_PROMPT },
           ...recent
-            .filter((m) => m.role === "user" || m.role === "assistant")
-            .map((m) => ({
+            .filter((m: any) => m.role === "user" || m.role === "assistant")
+            .map((m: any) => ({
               role: m.role as "user" | "assistant",
               content: m.role === "user" ? asUntrustedContent(m.content, "mensagem") : m.content,
             })),

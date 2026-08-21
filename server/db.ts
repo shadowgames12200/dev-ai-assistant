@@ -279,6 +279,13 @@ export async function listLearningOpportunities(status?: any) {
   return await query.orderBy(desc(schema.learningOpportunities.createdAt));
 }
 
+export async function markLearningOpportunitiesProposed(ids: string[], proposalId: string) {
+  const db = await getDb();
+  await db.update(schema.learningOpportunities)
+    .set({ status: "proposed", proposalId })
+    .where(sql`id = ANY(${ids})`);
+}
+
 export async function addLearningOpportunity(category: any, reason: string) {
   const db = await getDb();
   const id = `learn_${randomUUID()}`;
@@ -288,6 +295,18 @@ export async function addLearningOpportunity(category: any, reason: string) {
     reason,
     status: "pending",
   });
+}
+
+export async function recordLearningOpportunity(category: any, reason: string) {
+  return await addLearningOpportunity(category, reason);
+}
+
+export function detectSafeLearningCategory(content: string): "coding" | "productivity" | "general" | null {
+  const c = content.toLowerCase();
+  if (c.includes("código") || c.includes("programação") || c.includes("bug") || c.includes("erro")) return "coding";
+  if (c.includes("produtividade") || c.includes("organizar") || c.includes("planilha")) return "productivity";
+  if (c.includes("melhoria") || c.includes("aprender")) return "general";
+  return null;
 }
 
 export async function updateLearningStatus(id: string, status: any, proposalId?: string) {

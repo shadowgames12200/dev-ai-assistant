@@ -231,16 +231,16 @@ export default function Admin() {
             <Button
               size="sm"
               onClick={() => createLearningProposalMutation.mutate()}
-              disabled={createLearningProposalMutation.isPending || !opportunitiesData?.opportunities?.length}
+              disabled={createLearningProposalMutation.isPending || !((opportunitiesData?.opportunities as any[])?.length)}
             >
               <Lightbulb className="h-4 w-4 mr-1" />
               Criar proposta de autoaprendizagem
             </Button>
           </div>
           <p className="mt-3 text-xs text-zinc-500">
-            Oportunidades seguras pendentes: <strong className="text-violet-300">{opportunitiesData?.opportunities?.length ?? 0}</strong>
+            Oportunidades seguras pendentes: <strong className="text-violet-300">{(opportunitiesData?.opportunities as any[])?.length ?? 0}</strong>
           </p>
-          {!opportunitiesData?.opportunities?.length && (
+          {!((opportunitiesData?.opportunities as any[])?.length) && (
             <p className="mt-2 text-xs text-zinc-500">Ainda não há temas seguros pendentes. A IA continuará apenas registrando categorias genéricas relevantes.</p>
           )}
         </section>

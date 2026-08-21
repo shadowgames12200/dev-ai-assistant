@@ -355,9 +355,10 @@ export async function createImprovementProposal(title: any, description: any, fi
  */
 export async function createProposalFromLearningQueue() {
     const db = await import("../db");
-    const pending = db.listLearningOpportunities("pending").slice(0, 3);
+    const allPending = await db.listLearningOpportunities("pending");
+    const pending = allPending.slice(0, 3);
     if (pending.length === 0) return null;
-    const themes = pending.map((item) => item.category);
+    const themes = pending.map((item: any) => item.category);
     const proposal = await createImprovementProposal(
         `Aprendizado proposto: ${themes.join(", ")}`,
         `A IA identificou oportunidades genéricas relacionadas a ${themes.join(", ")}. Esta proposta pede autorização somente para estudar fontes confiáveis e preparar um plano de aprendizado. Nenhuma informação de conversa foi armazenada e nenhuma mudança será feita nesta etapa.`,
@@ -376,7 +377,7 @@ export async function createProposalFromLearningQueue() {
     (proposal as any).researchPlan = "Após aprovação, consultar apenas documentação oficial e fontes confiáveis, resumir o aprendizado e apresentar qualquer mudança técnica separadamente.";
     (proposal as any).impact = "Baixo nesta etapa: apenas planejamento; não há alteração de código, dados, integrações ou credenciais.";
     (proposal as any).reversal = "Rejeitar encerra a proposta. Aprovar não altera nada automaticamente; qualquer implementação futura será apresentada para revisão.";
-    db.markLearningOpportunitiesProposed(pending.map((item) => item.id), proposal.id);
+    await db.markLearningOpportunitiesProposed(pending.map((item: any) => item.id), proposal.id);
     await saveProposalsDisk();
     return proposal;
 }

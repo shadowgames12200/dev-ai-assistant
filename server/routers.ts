@@ -124,8 +124,8 @@ export const appRouter = router({
         currentUserId: ctx.user.id,
       };
     }),
-    myRequests: protectedProcedure.query(({ ctx }) => ({
-      requests: db.listUserRechargeRequests(ctx.user.id),
+    myRequests: protectedProcedure.query(async ({ ctx }) => ({
+      requests: await db.listUserRechargeRequests(ctx.user.id),
     })),
     requestRecharge: protectedProcedure
       .input(z.object({ packageId: z.string().min(1).max(32) }))
@@ -179,7 +179,7 @@ export const appRouter = router({
     }),
     opportunities: protectedProcedure.query(async ({ ctx }) => {
       if (ctx.user.role !== "admin") throw new TRPCError({ code: "FORBIDDEN" });
-      return { opportunities: db.listLearningOpportunities("pending") };
+      return { opportunities: await db.listLearningOpportunities("pending") };
     }),
     createFromOpportunities: protectedProcedure.mutation(async ({ ctx }) => {
       if (ctx.user.role !== "admin") throw new TRPCError({ code: "FORBIDDEN" });
