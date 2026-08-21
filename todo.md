@@ -30,3 +30,8 @@
 - [x] Treinar mentalidade de "Especialista em Freelancer" na IA
 - [x] Implementar verificação de honestidade (pedir info em vez de inventar)
 - [x] Configurar auto-aprendizado semanal sob aprovação
+
+- [ ] Implementar mentalidade de Engenheiro Sênior de Programação e Dados
+- [ ] Adicionar "Consciência de Ambiente" (Local vs Nuvem) ao raciocínio da IA
+- [ ] Criar protocolo de decisão de negócios e consulta estratégica
+- [ ] Gerar guia de configuração para LM Studio / Ollama (Modelo Local)
