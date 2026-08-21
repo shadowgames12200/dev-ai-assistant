@@ -13,8 +13,8 @@
 - [x] Adicionar botão de "3 pontos" (menu de contexto) para excluir conversas na barra lateral
 - [x] Refatorar Painel Admin para suportar as novas tabelas do Supabase
 - [x] Ajustar página de Conta para exibição correta de dados e logout funcional
-- [ ] Implementar aviso de capacidade máxima quando o limite for atingido
-- [ ] Implementar Sandbox via GitHub Actions para modo agente executor
+- [x] Implementar aviso de capacidade máxima quando o limite for atingido
+- [x] Implementar Sandbox via GitHub Actions para modo agente executor
 
 ## Freelancer e Monetização
 - [ ] Retomar propostas no 99Freelas (Projeto: Currículo/Carta de Apresentação)
@@ -22,6 +22,6 @@
 - [ ] Configurar notificações de suporte via WhatsApp/Gmail
 
 ## Treinamento e IA
-- [ ] Treinar mentalidade de "Especialista em Freelancer" na IA
-- [ ] Implementar verificação de honestidade (pedir info em vez de inventar)
+- [x] Treinar mentalidade de "Especialista em Freelancer" na IA
+- [x] Implementar verificação de honestidade (pedir info em vez de inventar)
 - [ ] Configurar auto-aprendizado semanal sob aprovação

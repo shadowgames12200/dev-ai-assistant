@@ -1,7 +1,7 @@
 import { useState } from "react";
 import { toast } from "sonner";
 import { useLocation } from "wouter";
-import { ShieldCheck, ShieldOff, ArrowLeft, Users, Plus, Minus, Coins, BrainCircuit, Lightbulb, Check, X, QrCode } from "lucide-react";
+import { ShieldCheck, ShieldOff, ArrowLeft, Users, Plus, Minus, Coins, BrainCircuit, Lightbulb, Check, X, QrCode, Cpu } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import {
@@ -28,6 +28,10 @@ export default function Admin() {
     enabled: user?.role === "admin",
   });
 
+  const { data: improvementsData } = trpc.improvements.list.useQuery(undefined, {
+    enabled: user?.role === "admin",
+  });
+
   const [approvalKey, setApprovalKey] = useState("");
 
   const adjustMutation = trpc.admin.adjustCredits.useMutation({
@@ -45,6 +49,14 @@ export default function Admin() {
       toast.success("Recarga aprovada e créditos liberados.");
     },
     onError: (err) => toast.error("Não foi possível aprovar a recarga: " + err.message),
+  });
+
+  const approveImprovementMutation = trpc.improvements.approve.useMutation({
+    onSuccess: () => {
+      utils.improvements.list.invalidate();
+      toast.success("Melhoria aprovada para execução.");
+    },
+    onError: (err) => toast.error("Erro ao aprovar melhoria: " + err.message),
   });
 
   if (user && user.role !== "admin") {
@@ -98,6 +110,53 @@ export default function Admin() {
               ))}
             </div>
           )}
+        </section>
+
+        <section className="mb-8 rounded-lg border border-white/10 bg-white/[0.03] p-5">
+          <div className="flex items-center gap-2 mb-4">
+            <Cpu className="h-4 w-4 text-violet-400" />
+            <h2 className="text-sm font-semibold">Propostas de Auto-Melhoria</h2>
+          </div>
+          <div className="space-y-4">
+            <div className="flex gap-2 mb-4">
+              <Input 
+                placeholder="Chave de aprovação (charlespaz)" 
+                type="password"
+                value={approvalKey}
+                onChange={(e) => setApprovalKey(e.target.value)}
+                className="h-9 bg-[#1e1e28] border-white/10"
+              />
+            </div>
+            {(!improvementsData || improvementsData.length === 0) ? (
+              <p className="text-xs text-zinc-500">Nenhuma proposta de melhoria pendente.</p>
+            ) : (
+              improvementsData.map((imp: any) => (
+                <article key={imp.id} className="rounded-md border border-white/10 bg-black/20 p-4">
+                  <div className="flex flex-col gap-3">
+                    <div className="flex items-center justify-between">
+                      <h3 className="text-sm font-medium text-violet-300">{imp.title}</h3>
+                      <span className={`text-[10px] uppercase px-2 py-0.5 rounded-full ${
+                        imp.status === "approved" ? "bg-green-500/20 text-green-400" : "bg-amber-500/20 text-amber-400"
+                      }`}>
+                        {imp.status}
+                      </span>
+                    </div>
+                    <p className="text-xs text-zinc-400">{imp.description}</p>
+                    {imp.status === "pending" && (
+                      <Button 
+                        size="sm" 
+                        onClick={() => approveImprovementMutation.mutate({ id: imp.id, approvalKey })}
+                        disabled={approveImprovementMutation.isPending || !approvalKey}
+                        className="w-full sm:w-auto self-end"
+                      >
+                        <Check className="mr-1 h-4 w-4" />Aprovar Melhoria
+                      </Button>
+                    )}
+                  </div>
+                </article>
+              ))
+            )}
+          </div>
         </section>
 
         <section className="rounded-lg border border-white/10 bg-white/[0.03] p-5">

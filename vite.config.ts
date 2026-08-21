@@ -75,36 +75,29 @@ function vitePluginManusDebugCollector(): Plugin {
   };
 }
 
-export default defineConfig(async () => {
-  const plugins = [
+export default defineConfig({
+  plugins: [
     react(),
-    process.env.NODE_ENV === "development"
-      ? (await import("@tailwindcss/vite")).default()
-      : null,
     vitePluginManusDebugCollector(),
-  ].filter(Boolean);
-
-  return {
-    plugins,
-    resolve: {
-      alias: {
-        "@": path.resolve(PROJECT_ROOT, "client", "src"),
-        "@shared": path.resolve(PROJECT_ROOT, "shared"),
-        "@assets": path.resolve(PROJECT_ROOT, "attached_assets"),
-      },
+  ],
+  resolve: {
+    alias: {
+      "@": path.resolve(PROJECT_ROOT, "client", "src"),
+      "@shared": path.resolve(PROJECT_ROOT, "shared"),
+      "@assets": path.resolve(PROJECT_ROOT, "attached_assets"),
     },
-    envDir: PROJECT_ROOT,
-    root: path.resolve(PROJECT_ROOT, "client"),
-    publicDir: path.resolve(PROJECT_ROOT, "client", "public"),
-    build: {
-      outDir: path.resolve(PROJECT_ROOT, "dist/public"),
-      emptyOutDir: true,
-      reportCompressedSize: false,
-    },
-    server: {
-      host: true,
-      allowedHosts: [".manuspre.computer", ".manus.computer", ".manus-asia.computer", ".manuscomputer.ai", ".manusvm.computer", "localhost", "127.0.0.1"],
-      fs: { strict: true, deny: ["**/.*"] },
-    },
-  };
+  },
+  envDir: PROJECT_ROOT,
+  root: path.resolve(PROJECT_ROOT, "client"),
+  publicDir: path.resolve(PROJECT_ROOT, "client", "public"),
+  build: {
+    outDir: path.resolve(PROJECT_ROOT, "dist/public"),
+    emptyOutDir: true,
+    reportCompressedSize: false,
+  },
+  server: {
+    host: true,
+    allowedHosts: [".manuspre.computer", ".manus.computer", ".manus-asia.computer", ".manuscomputer.ai", ".manusvm.computer", "localhost", "127.0.0.1"],
+    fs: { strict: true, deny: ["**/.*"] },
+  },
 });

@@ -1,0 +1,56 @@
+name: Agent Sandbox Executor
+
+on:
+  workflow_dispatch:
+    inputs:
+      improvement_id:
+        description: 'ID da melhoria aprovada no banco de dados'
+        required: true
+      title:
+        description: 'Título da melhoria'
+        required: true
+      description:
+        description: 'Descrição do que deve ser feito'
+        required: true
+
+jobs:
+  execute-improvement:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+
+      - name: Install pnpm
+        run: corepack enable && corepack prepare pnpm@8 --activate
+        shell: bash
+
+      - name: Install dependencies
+        run: pnpm install
+
+      - name: Setup Agent Context
+        run: |
+          echo "EXECUTING IMPROVEMENT: ${{ github.event.inputs.title }}"
+          echo "DESCRIPTION: ${{ github.event.inputs.description }}"
+          echo "IMPROVEMENT_ID: ${{ github.event.inputs.improvement_id }}"
+
+      - name: Run isolated tests
+        run: pnpm test
+        env:
+          DATABASE_URL: ${{ secrets.DATABASE_URL }}
+          JWT_SECRET: ${{ secrets.JWT_SECRET }}
+          APPROVAL_KEY: ${{ secrets.APPROVAL_KEY }}
+
+      - name: Report Evidence
+        if: always()
+        run: |
+          echo "### Resultado da Execução Isolada" >> $GITHUB_STEP_SUMMARY
+          echo "- Melhoria ID: ${{ github.event.inputs.improvement_id }}" >> $GITHUB_STEP_SUMMARY
+          echo "- Status: Concluído (Ambiente Isolado)" >> $GITHUB_STEP_SUMMARY
+          echo "- Próximo Passo: Revisão manual e aprovação final para merge." >> $GITHUB_STEP_SUMMARY

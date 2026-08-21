@@ -70,8 +70,12 @@ export default function ChatView({ conversationId }: { conversationId: number })
   const sendMutation = trpc.chat.send.useMutation();
   const uploadMutation = trpc.upload.file.useMutation();
   const { data: credits, isLoading: isCreditsLoading } = trpc.credits.me.useQuery();
+  const { data: capacity } = trpc.chat.checkCapacity.useQuery(undefined, {
+    refetchInterval: 10000,
+  });
   const creditUiState = getChatCreditUiState(credits);
   const creditsExhausted = !isCreditsLoading && creditUiState.blocked;
+  const capacityExhausted = capacity && !capacity.available;
 
   const { data: messagesData } = trpc.chat.conversations.messages.useQuery(
     { id: conversationId },
@@ -299,26 +303,35 @@ export default function ChatView({ conversationId }: { conversationId: number })
 
       {/* Input area */}
       <div className="border-t bg-background p-3">
-        {(creditsExhausted || creditNotice) && (
+        {(creditsExhausted || creditNotice || capacityExhausted) && (
           <div
             role="alert"
-            className="mx-auto mb-3 flex max-w-3xl items-start gap-2 rounded-lg border border-amber-400/30 bg-amber-400/10 px-3 py-2 text-xs text-amber-100 animate-in fade-in slide-in-from-bottom-2 duration-300"
+            className={`mx-auto mb-3 flex max-w-3xl items-start gap-2 rounded-lg border px-3 py-2 text-xs animate-in fade-in slide-in-from-bottom-2 duration-300 ${
+              capacityExhausted 
+                ? "border-blue-400/30 bg-blue-400/10 text-blue-100" 
+                : "border-amber-400/30 bg-amber-400/10 text-amber-100"
+            }`}
           >
-            <CircleAlert className="mt-0.5 h-4 w-4 shrink-0 text-amber-300" />
+            <CircleAlert className={`mt-0.5 h-4 w-4 shrink-0 ${capacityExhausted ? "text-blue-300" : "text-amber-300"}`} />
             <div className="flex-1">
-              <p className="font-medium">Créditos insuficientes</p>
-              <p className="mt-0.5 text-amber-100/80">
-                {creditNotice || creditUiState.notice || buildCreditBlockedMessage(credits?.balance || 0, 1)}
+              <p className="font-medium">{capacityExhausted ? "Capacidade máxima" : "Créditos insuficientes"}</p>
+              <p className={`mt-0.5 ${capacityExhausted ? "text-blue-100/80" : "text-amber-100/80"}`}>
+                {capacityExhausted 
+                  ? (capacity?.message || "O sistema está com muitos acessos. Tente novamente em instantes.")
+                  : (creditNotice || creditUiState.notice || buildCreditBlockedMessage(credits?.balance || 0, 1))
+                }
               </p>
-              <Button
-                type="button"
-                size="sm"
-                variant="outline"
-                className="mt-2 border-amber-300/40 text-amber-100 hover:bg-amber-300/10 h-7 text-[10px]"
-                onClick={() => { window.location.href = "/recharge"; }}
-              >
-                Recarregar créditos
-              </Button>
+              {!capacityExhausted && (
+                <Button
+                  type="button"
+                  size="sm"
+                  variant="outline"
+                  className="mt-2 border-amber-300/40 text-amber-100 hover:bg-amber-300/10 h-7 text-[10px]"
+                  onClick={() => { window.location.href = "/recharge"; }}
+                >
+                  Recarregar créditos
+                </Button>
+              )}
             </div>
           </div>
         )}
@@ -334,7 +347,7 @@ export default function ChatView({ conversationId }: { conversationId: number })
             size="icon"
             className="shrink-0 bg-transparent"
             onClick={() => fileInputRef.current?.click()}
-            disabled={isStreaming || creditsExhausted}
+            disabled={isStreaming || creditsExhausted || capacityExhausted}
           >
             <Paperclip className="h-4 w-4" />
           </Button>
@@ -348,15 +361,21 @@ export default function ChatView({ conversationId }: { conversationId: number })
             value={input}
             onChange={(e) => setInput(e.target.value)}
             onKeyDown={handleKeyDown}
-            placeholder="Pergunte sobre programação ou produtividade..."
-            disabled={isStreaming || creditsExhausted}
+            placeholder={
+              isStreaming 
+                ? "Aguarde a resposta..." 
+                : capacityExhausted 
+                  ? "Capacidade máxima atingida..." 
+                  : "Pergunte sobre programação ou produtividade..."
+            }
+            disabled={isStreaming || creditsExhausted || capacityExhausted}
             className="flex-1 bg-muted border-none focus-visible:ring-1 focus-visible:ring-violet-500"
           />
           <Button
             type="submit"
             size="icon"
             className="shrink-0 bg-violet-600 hover:bg-violet-500 text-white"
-            disabled={!input.trim() || isStreaming || creditsExhausted}
+            disabled={!input.trim() || isStreaming || creditsExhausted || capacityExhausted}
           >
             <Send className="h-4 w-4" />
           </Button>
