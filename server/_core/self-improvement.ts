@@ -30,6 +30,38 @@ export async function createDirectedProposal(topic: string, reason?: string) {
 }
 
 export async function createProposalFromLearningQueue() {
-  // TODO: Implementar lógica de triagem semanal
-  return null;
+  const dbInstance = await db.getDb();
+  const { learningOpportunities, selfImprovements } = await import("../../drizzle/schema");
+  const { eq, and } = await import("drizzle-orm");
+
+  // Buscar oportunidades pendentes
+  const opportunities = await dbInstance
+    .select()
+    .from(learningOpportunities)
+    .where(eq(learningOpportunities.status, "pending"))
+    .limit(5);
+
+  if (opportunities.length === 0) return null;
+
+  const topics = opportunities.map((o: any) => o.topic).join(", ");
+  
+  // Criar uma proposta consolidada
+  const [proposal] = await dbInstance.insert(selfImprovements).values({
+    title: `Triagem Semanal: Aprendizado Consolidado`,
+    description: `Melhoria baseada nas interações recentes sobre: ${topics}`,
+    filesToChange: "Múltiplos arquivos (definidos pelo Agente Sandbox)",
+    risks: "Execução isolada em GitHub Actions",
+    benefits: "Expansão da base de conhecimento e correção de padrões de erro.",
+    status: "pending"
+  }).returning();
+
+  // Marcar oportunidades como processadas
+  for (const opt of opportunities) {
+    await dbInstance
+      .update(learningOpportunities)
+      .set({ status: "processed" })
+      .where(eq(learningOpportunities.id, opt.id));
+  }
+
+  return proposal;
 }

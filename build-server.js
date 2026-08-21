@@ -22,7 +22,9 @@ async function runBuild() {
         '@tailwindcss/oxide-linux-x64-musl',
         '@tailwindcss/oxide-linux-x64-gnu',
         '@babel/preset-typescript',
-        'lightningcss'
+        '@babel/core',
+        'lightningcss',
+        'vite'
       ],
       loader: {
         '.ts': 'ts',

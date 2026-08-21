@@ -96,7 +96,7 @@ export const appRouter = router({
 
         const notified = await notifyOwner({
           title: "Nova recarga Pix",
-          content: `Usuário ${ctx.user.email} solicitou ${pkg.credits} créditos.`,
+          content: `Usuário ${ctx.user.email} solicitou ${pkg.credits} créditos (R$ ${(pkg.amountCents / 100).toFixed(2)}).\nID: ${request.id}`,
         }).catch(() => false);
 
         return { success: true, request, ownerNotified: !!notified };

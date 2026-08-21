@@ -3,6 +3,8 @@ name: Deploy to VM
 on:
   push:
     branches: [main]
+  schedule:
+    - cron: '0 0 * * 0' # Toda meia-noite de domingo
 
 jobs:
   deploy:
@@ -38,6 +40,12 @@ jobs:
 
       - name: Build weekly learning triage script
         run: npx esbuild scripts/weekly-learning-triage.ts --platform=node --packages=external --bundle --format=esm --outfile=dist/weekly-learning-triage.js
+
+      - name: Run weekly learning triage
+        if: github.event_name == 'schedule'
+        run: node dist/weekly-learning-triage.js
+        env:
+          DATABASE_URL: ${{ secrets.DATABASE_URL }}
 
       - name: Create deployment archive
         run: |

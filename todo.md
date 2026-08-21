@@ -17,11 +17,15 @@
 - [x] Implementar Sandbox via GitHub Actions para modo agente executor
 
 ## Freelancer e Monetização
-- [ ] Retomar propostas no 99Freelas (Projeto: Currículo/Carta de Apresentação)
-- [ ] Validar sistema de créditos e admin com o proprietário
-- [ ] Configurar notificações de suporte via WhatsApp/Gmail
+- [x] Retomar propostas no 99Freelas (Projeto: TCC ABNT - Enviada R$ 40,00)
+- [x] Retomar propostas no 99Freelas (Projeto: Currículo/Carta de Apresentação - Verificado, sem projetos abertos ideais no momento)
+- [ ] Monitorar novos projetos de digitação/planilhas no 99Freelas (Cadastro e conferência de informações - disponível em 23h)
+- [ ] Resolver falha de login no site da IA (Vercel)
+- [ ] Adicionar OWNER_OPEN_ID e APPROVAL_KEY às variáveis de ambiente na Vercel
+- [x] Validar sistema de créditos e admin com o proprietário
+- [x] Configurar notificações de suporte via WhatsApp/Gmail
 
 ## Treinamento e IA
 - [x] Treinar mentalidade de "Especialista em Freelancer" na IA
 - [x] Implementar verificação de honestidade (pedir info em vez de inventar)
-- [ ] Configurar auto-aprendizado semanal sob aprovação
+- [x] Configurar auto-aprendizado semanal sob aprovação
