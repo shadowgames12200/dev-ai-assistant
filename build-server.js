@@ -18,9 +18,6 @@ async function runBuild() {
       external: [
         'postgres',
         'fsevents',
-        'vite',
-        '@tailwindcss/vite',
-        'tailwindcss'
       ],
       loader: {
         '.ts': 'ts',
