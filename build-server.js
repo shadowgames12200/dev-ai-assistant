@@ -18,8 +18,6 @@ async function runBuild() {
         'fsevents', 
         'dotenv', 
         'dotenv/config',
-        'axios', 
-        'jose', 
         'express', 
         'cookie-parser', 
         'superjson', 
