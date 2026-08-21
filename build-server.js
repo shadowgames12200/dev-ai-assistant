@@ -13,8 +13,20 @@ async function runBuild() {
       platform: 'node',
       format: 'esm',
       outfile: path.join(__dirname, 'dist/index.js'),
-      // Apenas pacotes que sabidamente causam erro ao serem empacotados ou que a Vercel já fornece.
+      // Externals que causam problemas ou são nativos do Node
       external: [
+        'path',
+        'fs',
+        'http',
+        'https',
+        'net',
+        'url',
+        'crypto',
+        'stream',
+        'util',
+        'os',
+        'events',
+        'zlib',
         'postgres',
         'fsevents',
         '@tailwindcss/oxide',
@@ -29,7 +41,6 @@ async function runBuild() {
       loader: {
         '.ts': 'ts',
       },
-      // Suprimir avisos de módulos que não podem ser resolvidos estaticamente
       logLevel: 'info',
     });
     console.log('Build successful');
