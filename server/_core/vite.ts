@@ -63,7 +63,20 @@ export async function setupVite(app: Express, server: Server) {
 }
 
 export function serveStatic(app: any) {
-  const distPath = path.resolve(import.meta.dirname, "../../dist/public");
+  // Em ambientes serverless (Vercel), o bundle do servidor está em dist/index.js
+  // mas o diretório public pode estar em um nível diferente dependendo do deploy.
+  // Tentamos o caminho relativo padrão e um fallback para o diretório de execução.
+  let distPath = path.resolve(import.meta.dirname, "../../dist/public");
+  
+  if (!fs.existsSync(distPath)) {
+    // Tenta caminho alternativo para Vercel onde dist/public pode estar na raiz da task
+    distPath = path.resolve(process.cwd(), "dist/public");
+  }
+  
+  if (!fs.existsSync(distPath)) {
+    // Terceira tentativa: apenas "public" na raiz
+    distPath = path.resolve(process.cwd(), "public");
+  }
   if (!fs.existsSync(distPath)) {
     console.error(
       `Could not find the build directory: ${distPath}, make sure to build the client first`
