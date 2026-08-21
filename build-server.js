@@ -14,7 +14,6 @@ async function runBuild() {
       format: 'esm',
       outfile: path.join(__dirname, 'dist/index.js'),
       // Apenas pacotes que sabidamente causam erro ao serem empacotados ou que a Vercel já fornece.
-      // Postgres é marcado como externo para usar o driver nativo se necessário.
       external: [
         'postgres',
         'fsevents',
@@ -23,13 +22,12 @@ async function runBuild() {
         '@tailwindcss/oxide-linux-x64-gnu',
         '@babel/preset-typescript',
         '@babel/core',
-        'lightningcss'
+        'lightningcss',
+        'vite',
+        'rollup'
       ],
       loader: {
         '.ts': 'ts',
-      },
-      banner: {
-        js: "import { createRequire } from 'module'; const require = createRequire(import.meta.url);",
       },
       // Suprimir avisos de módulos que não podem ser resolvidos estaticamente
       logLevel: 'info',
