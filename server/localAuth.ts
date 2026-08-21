@@ -295,11 +295,11 @@ export async function getPasswordRecord(email: string): Promise<{ passwordHash: 
   // drizzle mysql2 adapter: execute() returns the driver result; use raw mysql2
   // connection via the internal pool instead.
   const conn = (sdb as any).session?.client ?? sdb;
-  const [rows] = await conn.query(
-    "SELECT passwordHash, salt FROM password_credentials WHERE email = ? LIMIT 1",
+  const rows = await conn.query(
+    'SELECT "passwordHash", "salt" FROM password_credentials WHERE email = $1 LIMIT 1',
     [email]
   );
-  const list = rows as Array<{ passwordHash: string; salt: string }>
+  const list = rows.rows as Array<{ passwordHash: string; salt: string }>
   if (!list || list.length === 0) return null;
   return { passwordHash: list[0].passwordHash, salt: list[0].salt };
 }
@@ -309,7 +309,7 @@ export async function setPasswordRecord(email: string, passwordHash: string, sal
   if (!sdb) throw new Error("Database not available");
   const conn = (sdb as any).session?.client ?? sdb;
   await conn.query(
-    "INSERT INTO password_credentials (email, passwordHash, salt) VALUES (?, ?, ?) ON DUPLICATE KEY UPDATE passwordHash = VALUES(passwordHash), salt = VALUES(salt)",
+    'INSERT INTO password_credentials (email, "passwordHash", "salt") VALUES ($1, $2, $3) ON CONFLICT (email) DO UPDATE SET "passwordHash" = EXCLUDED."passwordHash", "salt" = EXCLUDED."salt"',
     [email, passwordHash, salt]
   );
 }
