@@ -20,6 +20,7 @@
 - [x] Retomar propostas no 99Freelas (Projeto: TCC ABNT - Enviada R$ 40,00)
 - [x] Retomar propostas no 99Freelas (Projeto: Currículo/Carta de Apresentação - Verificado, sem projetos abertos ideais no momento)
 - [ ] Monitorar novos projetos de digitação/planilhas no 99Freelas (Cadastro e conferência de informações - disponível em 23h)
+- [ ] Implementar protocolo de teste final no site após auto-melhoria no System Prompt da IA
 - [ ] Resolver falha de login no site da IA (Vercel)
 - [ ] Adicionar OWNER_OPEN_ID e APPROVAL_KEY às variáveis de ambiente na Vercel
 - [x] Validar sistema de créditos e admin com o proprietário
