@@ -65,7 +65,10 @@ async function runBuild() {
         '@trpc/client',
         '@trpc/react-query',
         '@trpc/server',
-        'lucide-react'
+        'lucide-react',
+        '@babel/core',
+        '@babel/preset-typescript',
+        '@babel/preset-typescript/package.json'
       ],
       loader: {
         '.ts': 'ts',
