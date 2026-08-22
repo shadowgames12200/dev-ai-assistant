@@ -42,20 +42,8 @@ export default function Chat() {
   const [selectedId, setSelectedId] = useState<number | null>(null);
   const [editingId, setEditingId] = useState<number | null>(null);
   const [editingTitle, setEditingTitle] = useState("");
-  const [sidebarOpen, setSidebarOpen] = useState(false); // Iniciar fechado e abrir no mount se necessário
+  const [sidebarOpen, setSidebarOpen] = useState(false);
   const renameRef = useRef<HTMLInputElement>(null);
-  const accountMenuRef = useRef<HTMLDetailsElement>(null);
-
-  // Fechar menu da conta ao clicar fora
-  useEffect(() => {
-    const handleClickOutside = (event: MouseEvent) => {
-      if (accountMenuRef.current && !accountMenuRef.current.contains(event.target as Node)) {
-        accountMenuRef.current.removeAttribute('open');
-      }
-    };
-    document.addEventListener('mousedown', handleClickOutside);
-    return () => document.removeEventListener('mousedown', handleClickOutside);
-  }, []);
 
   const { data: convs } = trpc.chat.conversations.list.useQuery(undefined, {
     enabled: !!user,
@@ -74,10 +62,9 @@ export default function Chat() {
     }
   }, [conversations, selectedId, isMobile]);
 
+  // Sincronizar estado inicial do sidebar com o dispositivo
   useEffect(() => {
-    if (isMobile !== undefined) {
-      setSidebarOpen(!isMobile);
-    }
+    setSidebarOpen(!isMobile);
   }, [isMobile]);
 
   const createMutation = trpc.chat.conversations.create.useMutation({
@@ -156,10 +143,7 @@ export default function Chat() {
       {isMobile && sidebarOpen && (
         <div 
           className="fixed inset-0 bg-black/60 z-40 backdrop-blur-sm transition-opacity duration-300"
-          onClick={(e) => {
-            e.stopPropagation();
-            setSidebarOpen(false);
-          }}
+          onClick={() => setSidebarOpen(false)}
         />
       )}
 
@@ -169,7 +153,6 @@ export default function Chat() {
           ${sidebarOpen ? (isMobile ? "fixed inset-y-0 left-0 z-50 w-72" : "w-72") : (isMobile ? "fixed inset-y-0 left-0 z-50 w-0 -translate-x-full" : "w-0")} 
           shrink-0 border-r border-white/10 bg-[#0f0f16] flex flex-col transition-all duration-300 overflow-hidden
         `}
-        onClick={(e) => e.stopPropagation()}
       >
         <div className="p-3 flex items-center justify-between border-b border-white/10">
           <div className="flex items-center gap-2 min-w-0">
@@ -232,14 +215,12 @@ export default function Chat() {
                 }`}
                 onClick={() => {
                   setSelectedId(c.id);
-                  // Somente fechar se não estiver clicando no botão de menu de 3 pontos
-                  // A propagação já está sendo parada no botão de menu, então isso deve funcionar
                   if (isMobile) setSidebarOpen(false);
                 }}
               >
                 <MessageSquare className="h-4 w-4 text-zinc-400 shrink-0" />
                 {editingId === c.id ? (
-                  <div className="flex items-center gap-1 flex-1 min-w-0">
+                  <div className="flex items-center gap-1 flex-1 min-w-0" onClick={(e) => e.stopPropagation()}>
                     <Input
                       ref={renameRef}
                       value={editingTitle}
@@ -254,23 +235,9 @@ export default function Chat() {
                       variant="ghost"
                       size="icon"
                       className="h-6 w-6 shrink-0"
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        submitRename(c.id);
-                      }}
+                      onClick={() => submitRename(c.id)}
                     >
                       <Check className="h-3.5 w-3.5" />
-                    </Button>
-                    <Button
-                      variant="ghost"
-                      size="icon"
-                      className="h-6 w-6 shrink-0"
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        setEditingId(null);
-                      }}
-                    >
-                      <X className="h-3.5 w-3.5" />
                     </Button>
                   </div>
                 ) : (
@@ -281,30 +248,21 @@ export default function Chat() {
                         <Button
                           variant="ghost"
                           size="icon"
-                          aria-label={`Mais ações para ${c.title}`}
-                          title="Mais ações"
-                          className={`h-7 w-7 shrink-0 text-zinc-400 hover:text-white transition-opacity ${isMobile ? "opacity-100" : "opacity-0 group-hover:opacity-100 focus:opacity-100"}`}
+                          className={`h-7 w-7 shrink-0 text-zinc-400 hover:text-white transition-opacity ${isMobile ? "opacity-100" : "opacity-0 group-hover:opacity-100"}`}
                           onClick={(e) => e.stopPropagation()}
                         >
                           <MoreVertical className="h-4 w-4" />
                         </Button>
                       </DropdownMenuTrigger>
-                      <DropdownMenuContent
-                        align="end"
-                        side="bottom"
-                        className="w-44 bg-[#191923] border-white/10"
-                        onClick={(e) => e.stopPropagation()}
-                      >
-                        <DropdownMenuItem onClick={() => startRename(c)} className="cursor-pointer hover:bg-white/10">
-                          <Pencil className="mr-2 h-4 w-4" />
-                          Renomear
+                      <DropdownMenuContent align="end" className="w-44 bg-[#191923] border-white/10">
+                        <DropdownMenuItem onClick={(e) => { e.stopPropagation(); startRename(c); }}>
+                          <Pencil className="mr-2 h-4 w-4" /> Renomear
                         </DropdownMenuItem>
                         <DropdownMenuItem
-                          onClick={() => handleDelete(c.id)}
-                          className="cursor-pointer text-red-400 focus:text-red-400 hover:bg-red-500/10"
+                          onClick={(e) => { e.stopPropagation(); handleDelete(c.id); }}
+                          className="text-red-400 focus:text-red-400"
                         >
-                          <Trash2 className="mr-2 h-4 w-4" />
-                          Excluir conversa
+                          <Trash2 className="mr-2 h-4 w-4" /> Excluir
                         </DropdownMenuItem>
                       </DropdownMenuContent>
                     </DropdownMenu>
@@ -341,28 +299,16 @@ export default function Chat() {
               sideOffset={10}
               className="w-64 bg-[#191923] border-white/10 p-1"
             >
-              <DropdownMenuItem
-                onClick={() => setLocation("/account")}
-                className="flex items-center gap-2 px-2 py-2 cursor-pointer hover:bg-white/10"
-              >
-                <UserRoundCog className="h-4 w-4" />
-                Conta
+              <DropdownMenuItem onClick={() => setLocation("/account")}>
+                <UserRoundCog className="h-4 w-4 mr-2" /> Conta
               </DropdownMenuItem>
               {user?.role === "admin" && (
-                <DropdownMenuItem
-                  onClick={() => setLocation("/admin")}
-                  className="flex items-center gap-2 px-2 py-2 cursor-pointer hover:bg-white/10"
-                >
-                  <Settings className="h-4 w-4" />
-                  Painel admin
+                <DropdownMenuItem onClick={() => setLocation("/admin")}>
+                  <Settings className="h-4 w-4 mr-2" /> Painel admin
                 </DropdownMenuItem>
               )}
-              <DropdownMenuItem
-                onClick={() => logout()}
-                className="flex items-center gap-2 px-2 py-2 cursor-pointer text-red-400 focus:text-red-400 hover:bg-red-500/10"
-              >
-                <LogOut className="h-4 w-4" />
-                Sair
+              <DropdownMenuItem onClick={() => logout()} className="text-red-400 focus:text-red-400">
+                <LogOut className="h-4 w-4 mr-2" /> Sair
               </DropdownMenuItem>
             </DropdownMenuContent>
           </DropdownMenu>
@@ -378,36 +324,12 @@ export default function Chat() {
               size="icon"
               className="text-zinc-400 lg:hidden"
               onClick={(e) => {
-                e.preventDefault();
                 e.stopPropagation();
                 setSidebarOpen((v) => !v);
               }}
             >
               <Menu className="h-5 w-5" />
             </Button>
-            {!isMobile && (
-              <Button
-                variant="ghost"
-                size="icon"
-                className="text-zinc-400"
-                onClick={() => setSidebarOpen((v) => !v)}
-              >
-                <span className="sr-only">Alternar painel</span>
-                <svg
-                  xmlns="http://www.w3.org/2000/svg"
-                  width="18"
-                  height="18"
-                  viewBox="0 0 24 24"
-                  fill="none"
-                  stroke="currentColor"
-                  strokeWidth="2"
-                  strokeLinecap="round"
-                  strokeLinejoin="round"
-                >
-                  <path d="M3 6h18M3 12h18M3 18h18" />
-                </svg>
-              </Button>
-            )}
             <span className="text-sm font-medium truncate px-1">
               {conversations.find((c) => c.id === selectedId)?.title ?? "DevAI Assistant"}
             </span>
@@ -422,9 +344,7 @@ export default function Chat() {
             <ChatView conversationId={selectedId} />
           ) : (
             <div className="flex items-center justify-center h-full text-zinc-500 p-4 text-center">
-              <p className="text-sm">
-                Selecione uma conversa ou crie uma nova para começar.
-              </p>
+              <p className="text-sm">Selecione uma conversa ou crie uma nova para começar.</p>
             </div>
           )}
         </div>

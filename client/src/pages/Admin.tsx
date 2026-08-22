@@ -162,20 +162,20 @@ export default function Admin() {
           </div>
         </section>
 
-        <section className="rounded-lg border border-white/10 bg-white/[0.03] p-4 sm:p-5 overflow-hidden">
+        <section className="rounded-lg border border-white/10 bg-white/[0.03] p-4 sm:p-5">
           <div className="flex items-center gap-2 mb-4">
             <Users className="h-4 w-4 text-violet-400" />
             <h2 className="text-sm font-semibold">Usuários Cadastrados</h2>
           </div>
-          <div className="overflow-x-auto -mx-4 px-4 sm:-mx-5 sm:px-5">
-            <Table className="min-w-[600px]">
-              <TableHeader>
+          <div className="overflow-x-auto rounded-md border border-white/10">
+            <Table>
+              <TableHeader className="bg-white/[0.02]">
                 <TableRow className="border-white/10 hover:bg-transparent">
-                  <TableHead className="text-zinc-400 text-xs">Nome</TableHead>
-                  <TableHead className="text-zinc-400 text-xs">Email</TableHead>
-                  <TableHead className="text-zinc-400 text-xs">Papel</TableHead>
-                  <TableHead className="text-zinc-400 text-xs">Créditos</TableHead>
-                  <TableHead className="text-zinc-400 text-xs">Ações</TableHead>
+                  <TableHead className="text-zinc-400 text-xs py-3">Nome</TableHead>
+                  <TableHead className="text-zinc-400 text-xs py-3">Email</TableHead>
+                  <TableHead className="text-zinc-400 text-xs py-3">Papel</TableHead>
+                  <TableHead className="text-zinc-400 text-xs py-3">Créditos</TableHead>
+                  <TableHead className="text-zinc-400 text-xs py-3 text-right">Ações</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
@@ -183,21 +183,21 @@ export default function Admin() {
                   <TableRow><TableCell colSpan={5} className="text-center py-8 text-zinc-500 text-xs">Carregando usuários...</TableCell></TableRow>
                 ) : (usersData || []).map((u: any) => (
                   <TableRow key={u.id} className="border-white/10 hover:bg-white/[0.02]">
-                    <TableCell className="font-medium text-xs min-w-[100px]">{u.name || "Sem nome"}</TableCell>
-                    <TableCell className="text-zinc-400 text-xs min-w-[150px] break-all">{u.email}</TableCell>
-                    <TableCell className="min-w-[80px]">
+                    <TableCell className="font-medium text-xs whitespace-nowrap">{u.name || "Sem nome"}</TableCell>
+                    <TableCell className="text-zinc-400 text-xs min-w-[150px]">{u.email}</TableCell>
+                    <TableCell>
                       <span className={`text-[9px] uppercase tracking-wider px-2 py-0.5 rounded-full ${u.role === "admin" ? "bg-violet-500/20 text-violet-300" : "bg-zinc-500/20 text-zinc-400"}`}>
                         {u.role}
                       </span>
                     </TableCell>
-                    <TableCell className="text-violet-300 font-medium text-xs min-w-[60px]">{u.balance}</TableCell>
-                    <TableCell className="min-w-[100px]">
-                      <div className="flex gap-1.5">
-                        <Button size="icon" variant="outline" className="h-8 w-8" onClick={() => adjustMutation.mutate({ userId: u.id, amount: 50 })}>
-                          <Plus className="h-4 w-4" />
+                    <TableCell className="text-violet-300 font-medium text-xs">{u.balance}</TableCell>
+                    <TableCell className="text-right">
+                      <div className="flex gap-1.5 justify-end">
+                        <Button size="icon" variant="outline" className="h-7 w-7 sm:h-8 sm:w-8" onClick={() => adjustMutation.mutate({ userId: u.id, amount: 50 })}>
+                          <Plus className="h-3 w-3 sm:h-4 sm:w-4" />
                         </Button>
-                        <Button size="icon" variant="outline" className="h-8 w-8" onClick={() => adjustMutation.mutate({ userId: u.id, amount: -50 })}>
-                          <Minus className="h-4 w-4" />
+                        <Button size="icon" variant="outline" className="h-7 w-7 sm:h-8 sm:w-8" onClick={() => adjustMutation.mutate({ userId: u.id, amount: -50 })}>
+                          <Minus className="h-3 w-3 sm:h-4 sm:w-4" />
                         </Button>
                       </div>
                     </TableCell>
