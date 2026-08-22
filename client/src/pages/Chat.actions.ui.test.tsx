@@ -63,8 +63,8 @@ vi.mock("@/components/ui/dropdown-menu", () => ({
     children: React.ReactNode;
     onClick?: React.MouseEventHandler<HTMLDivElement>;
   }) => <div onClick={onClick}>{children}</div>,
-  DropdownMenuItem: ({ children, onClick }: { children: React.ReactNode; onClick?: () => void }) => (
-    <button role="menuitem" onClick={onClick}>{children}</button>
+  DropdownMenuItem: ({ children, onClick, ...props }: React.ButtonHTMLAttributes<HTMLButtonElement>) => (
+    <button role="menuitem" onClick={onClick} {...props}>{children}</button>
   ),
 }));
 vi.mock("wouter", () => ({ useLocation: () => ["/chat", vi.fn()] }));
@@ -96,7 +96,7 @@ describe("ações de conversa na barra lateral", () => {
     render(<Chat />);
 
     fireEvent.click(screen.getByLabelText("Abrir menu da conta"));
-    expect(screen.getByTestId("account-menu")).toHaveAttribute("open");
+    expect(screen.getByTestId("account-menu")).toHaveAttribute("data-state", "open");
     expect(screen.getByRole("menu", { name: "Menu da conta" })).toBeVisible();
     expect(screen.getByRole("menuitem", { name: "Conta" })).toBeVisible();
 

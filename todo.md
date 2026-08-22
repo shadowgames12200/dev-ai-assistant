@@ -39,8 +39,8 @@
 - [x] Gerar guia de configuração para LM Studio / Ollama (Modelo Local)
 
 ## Auditoria de produção e sincronização
-- [ ] Enviar o estado atual do projeto para o repositório GitHub solicitado pelo proprietário.
-- [ ] Verificar o status do deploy e os logs disponíveis na Vercel.
-- [ ] Auditar novamente o site em produção: login, menus, navegação, painel admin, conta, créditos e responsividade.
-- [ ] Registrar e corrigir qualquer falha encontrada durante a auditoria de produção.
+- [x] Enviar o estado atual do projeto para o repositório GitHub solicitado pelo proprietário.
+- [ ] Verificar os logs de build e runtime do deployment concluído na Vercel.
+- [ ] Auditar novamente o site em produção: menu do usuário, navegação, recarga/créditos e responsividade mobile/desktop.
+- [ ] Registrar os resultados completos da auditoria de produção e corrigir qualquer falha confirmada.
 - [ ] Criar checkpoint final após validação e push.

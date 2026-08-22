@@ -43,6 +43,7 @@ export default function Chat() {
   const [editingId, setEditingId] = useState<number | null>(null);
   const [editingTitle, setEditingTitle] = useState("");
   const [sidebarOpen, setSidebarOpen] = useState(false);
+  const [accountMenuOpen, setAccountMenuOpen] = useState(false);
   const renameRef = useRef<HTMLInputElement>(null);
 
   const { data: convs } = trpc.chat.conversations.list.useQuery(undefined, {
@@ -248,6 +249,7 @@ export default function Chat() {
                         <Button
                           variant="ghost"
                           size="icon"
+                          aria-label={`Mais ações para ${c.title}`}
                           className={`h-7 w-7 shrink-0 text-zinc-400 hover:text-white transition-opacity ${isMobile ? "opacity-100" : "opacity-0 group-hover:opacity-100"}`}
                           onClick={(e) => e.stopPropagation()}
                         >
@@ -255,10 +257,11 @@ export default function Chat() {
                         </Button>
                       </DropdownMenuTrigger>
                       <DropdownMenuContent align="end" className="w-44 bg-[#191923] border-white/10">
-                        <DropdownMenuItem onClick={(e) => { e.stopPropagation(); startRename(c); }}>
+                        <DropdownMenuItem aria-label="Renomear conversa" onClick={(e) => { e.stopPropagation(); startRename(c); }}>
                           <Pencil className="mr-2 h-4 w-4" /> Renomear
                         </DropdownMenuItem>
                         <DropdownMenuItem
+                          aria-label="Excluir conversa"
                           onClick={(e) => { e.stopPropagation(); handleDelete(c.id); }}
                           className="text-red-400 focus:text-red-400"
                         >
@@ -273,45 +276,72 @@ export default function Chat() {
           </div>
         </ScrollArea>
 
-        <div className="p-3 border-t border-white/10">
-          <DropdownMenu>
-            <DropdownMenuTrigger asChild>
+        <div className="relative p-3 border-t border-white/10">
+          {accountMenuOpen && (
+            <div
+              role="menu"
+              aria-label="Menu da conta"
+              data-testid="account-menu"
+              data-state="open"
+              className="absolute bottom-full right-3 left-3 z-[60] mb-2 rounded-lg border border-white/10 bg-[#191923] p-1 shadow-xl"
+            >
               <Button
                 variant="ghost"
-                className="w-full flex items-center gap-3 px-2 py-6 h-auto hover:bg-white/5 transition-colors"
+                role="menuitem"
+                className="w-full justify-start gap-2 text-sm"
+                onClick={() => {
+                  setAccountMenuOpen(false);
+                  setLocation("/account");
+                }}
               >
-                <div className="h-8 w-8 rounded-full bg-violet-500/20 flex items-center justify-center shrink-0">
-                  <span className="text-xs font-medium text-violet-300">
-                    {user?.name?.charAt(0).toUpperCase() ?? "U"}
-                  </span>
-                </div>
-                <div className="flex-1 min-w-0 text-left">
-                  <p className="text-sm font-medium truncate">{user?.name || "-"}</p>
-                  <p className="text-xs text-zinc-500 truncate">
-                    {user?.email || "-"} {user?.role === "admin" && "(admin)"}
-                  </p>
-                </div>
+                <UserRoundCog className="h-4 w-4" /> Conta
               </Button>
-            </DropdownMenuTrigger>
-            <DropdownMenuContent
-              align="end"
-              side="top"
-              sideOffset={10}
-              className="w-64 bg-[#191923] border-white/10 p-1"
-            >
-              <DropdownMenuItem onClick={() => setLocation("/account")}>
-                <UserRoundCog className="h-4 w-4 mr-2" /> Conta
-              </DropdownMenuItem>
               {user?.role === "admin" && (
-                <DropdownMenuItem onClick={() => setLocation("/admin")}>
-                  <Settings className="h-4 w-4 mr-2" /> Painel admin
-                </DropdownMenuItem>
+                <Button
+                  variant="ghost"
+                  role="menuitem"
+                  className="w-full justify-start gap-2 text-sm"
+                  onClick={() => {
+                    setAccountMenuOpen(false);
+                    setLocation("/admin");
+                  }}
+                >
+                  <Settings className="h-4 w-4" /> Painel admin
+                </Button>
               )}
-              <DropdownMenuItem onClick={() => logout()} className="text-red-400 focus:text-red-400">
-                <LogOut className="h-4 w-4 mr-2" /> Sair
-              </DropdownMenuItem>
-            </DropdownMenuContent>
-          </DropdownMenu>
+              <Button
+                variant="ghost"
+                role="menuitem"
+                className="w-full justify-start gap-2 text-sm text-red-400 hover:bg-red-500/10 hover:text-red-300"
+                onClick={() => {
+                  setAccountMenuOpen(false);
+                  logout();
+                }}
+              >
+                <LogOut className="h-4 w-4" /> Sair
+              </Button>
+            </div>
+          )}
+          <Button
+            variant="ghost"
+            aria-label="Abrir menu da conta"
+            aria-haspopup="menu"
+            aria-expanded={accountMenuOpen}
+            className="w-full flex items-center gap-3 px-2 py-6 h-auto hover:bg-white/5 transition-colors"
+            onClick={() => setAccountMenuOpen((open) => !open)}
+          >
+            <div className="h-8 w-8 rounded-full bg-violet-500/20 flex items-center justify-center shrink-0">
+              <span className="text-xs font-medium text-violet-300">
+                {user?.name?.charAt(0).toUpperCase() ?? "U"}
+              </span>
+            </div>
+            <div className="flex-1 min-w-0 text-left">
+              <p className="text-sm font-medium truncate">{user?.name || "-"}</p>
+              <p className="text-xs text-zinc-500 truncate">
+                {user?.email || "-"} {user?.role === "admin" && "(admin)"}
+              </p>
+            </div>
+          </Button>
         </div>
       </aside>
 
