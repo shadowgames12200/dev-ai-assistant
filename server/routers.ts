@@ -203,8 +203,8 @@ export const appRouter = router({
           await db.addMessage(input.conversationId, "user", input.content);
           
           const { checkContextSufficiency } = await import("./honestyGuardrail");
-          const history = await db.getMessages(input.conversationId);
-          const sufficiency = checkContextSufficiency(input.content, history);
+          const msgHistory = await db.getMessages(input.conversationId);
+          const sufficiency = checkContextSufficiency(input.content, msgHistory);
           
           if (!sufficiency.isSufficient) {
             const reply = sufficiency.missingInfo || "Preciso de mais informações para realizar esta tarefa corretamente.";
@@ -216,7 +216,7 @@ export const appRouter = router({
           
           const llmMessages: any[] = [
             { role: "system", content: SYSTEM_PROMPT },
-            ...history.map((m: any) => ({ role: m.role, content: m.content }))
+            ...msgHistory.map((m: any) => ({ role: m.role, content: m.content }))
           ];
 
           const stream = await invokeLLMStream({

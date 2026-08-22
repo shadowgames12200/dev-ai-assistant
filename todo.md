@@ -17,8 +17,8 @@
 - [x] Ajustar página de Conta para exibição correta de dados e logout funcional
 - [x] Implementar aviso de capacidade máxima quando o limite for atingido
 - [x] Implementar Sandbox via GitHub Actions para modo agente executor
-- [ ] Verificar e ajustar responsividade (Mobile/Desktop)
-- [ ] Testar interface em diferentes viewports (iPhone, Android, Desktop)
+- [x] Verificar e ajustar responsividade (Mobile/Desktop)
+- [x] Testar interface em diferentes viewports (iPhone, Android, Desktop)
 
 ## Freelancer e Monetização
 - [x] Retomar propostas no 99Freelas (Projeto: TCC ABNT - Enviada R$ 40,00)
