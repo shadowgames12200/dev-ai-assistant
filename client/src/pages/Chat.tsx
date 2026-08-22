@@ -42,8 +42,20 @@ export default function Chat() {
   const [selectedId, setSelectedId] = useState<number | null>(null);
   const [editingId, setEditingId] = useState<number | null>(null);
   const [editingTitle, setEditingTitle] = useState("");
-  const [sidebarOpen, setSidebarOpen] = useState(!isMobile);
+  const [sidebarOpen, setSidebarOpen] = useState(false); // Iniciar fechado e abrir no mount se necessário
   const renameRef = useRef<HTMLInputElement>(null);
+  const accountMenuRef = useRef<HTMLDetailsElement>(null);
+
+  // Fechar menu da conta ao clicar fora
+  useEffect(() => {
+    const handleClickOutside = (event: MouseEvent) => {
+      if (accountMenuRef.current && !accountMenuRef.current.contains(event.target as Node)) {
+        accountMenuRef.current.removeAttribute('open');
+      }
+    };
+    document.addEventListener('mousedown', handleClickOutside);
+    return () => document.removeEventListener('mousedown', handleClickOutside);
+  }, []);
 
   const { data: convs } = trpc.chat.conversations.list.useQuery(undefined, {
     enabled: !!user,
@@ -63,10 +75,8 @@ export default function Chat() {
   }, [conversations, selectedId, isMobile]);
 
   useEffect(() => {
-    if (isMobile) {
-      setSidebarOpen(false);
-    } else {
-      setSidebarOpen(true);
+    if (isMobile !== undefined) {
+      setSidebarOpen(!isMobile);
     }
   }, [isMobile]);
 
@@ -145,17 +155,21 @@ export default function Chat() {
       {/* Mobile Overlay */}
       {isMobile && sidebarOpen && (
         <div 
-          className="fixed inset-0 bg-black/50 z-40 backdrop-blur-sm"
-          onClick={() => setSidebarOpen(false)}
+          className="fixed inset-0 bg-black/60 z-40 backdrop-blur-sm transition-opacity duration-300"
+          onClick={(e) => {
+            e.stopPropagation();
+            setSidebarOpen(false);
+          }}
         />
       )}
 
       {/* Sidebar */}
       <aside
         className={`
-          ${sidebarOpen ? (isMobile ? "fixed inset-y-0 left-0 z-50 w-72" : "w-72") : "w-0"} 
+          ${sidebarOpen ? (isMobile ? "fixed inset-y-0 left-0 z-50 w-72" : "w-72") : (isMobile ? "fixed inset-y-0 left-0 z-50 w-0 -translate-x-full" : "w-0")} 
           shrink-0 border-r border-white/10 bg-[#0f0f16] flex flex-col transition-all duration-300 overflow-hidden
         `}
+        onClick={(e) => e.stopPropagation()}
       >
         <div className="p-3 flex items-center justify-between border-b border-white/10">
           <div className="flex items-center gap-2 min-w-0">
@@ -218,6 +232,8 @@ export default function Chat() {
                 }`}
                 onClick={() => {
                   setSelectedId(c.id);
+                  // Somente fechar se não estiver clicando no botão de menu de 3 pontos
+                  // A propagação já está sendo parada no botão de menu, então isso deve funcionar
                   if (isMobile) setSidebarOpen(false);
                 }}
               >
@@ -300,11 +316,30 @@ export default function Chat() {
         </ScrollArea>
 
         <div className="relative p-3 border-t border-white/10">
-          <details className="group relative" data-testid="account-menu">
-            <summary
-              aria-label="Abrir menu da conta"
-              className="flex list-none items-center gap-3 rounded-lg px-2 py-2 text-left transition-colors hover:bg-white/5 cursor-pointer [&::-webkit-details-marker]:hidden"
-            >
+          <details 
+            ref={accountMenuRef}
+            className="group relative" 
+            data-testid="account-menu"
+          >
+              <summary
+                aria-label="Abrir menu da conta"
+                className="flex list-none items-center gap-3 rounded-lg px-2 py-2 text-left transition-colors hover:bg-white/5 cursor-pointer [&::-webkit-details-marker]:hidden"
+                onClick={(e) => {
+                  // Prevenir o comportamento padrão do <summary> que é abrir/fechar o <details>
+                  // para termos controle total e evitar o fechamento rápido
+                  e.preventDefault();
+                  e.stopPropagation();
+                  const details = e.currentTarget.closest('details');
+                  if (details) {
+                    if (details.hasAttribute('open')) {
+                      details.removeAttribute('open');
+                    } else {
+                      // Fechar outros menus se houver, mas aqui só temos um
+                      details.setAttribute('open', '');
+                    }
+                  }
+                }}
+              >
               <div className="h-8 w-8 rounded-full bg-violet-500/20 flex items-center justify-center shrink-0">
                 <span className="text-xs font-medium text-violet-300">
                   {user?.name?.charAt(0).toUpperCase() ?? "U"}
@@ -325,7 +360,12 @@ export default function Chat() {
               <a
                 role="menuitem"
                 href="#"
-                onClick={(e) => { e.preventDefault(); setLocation("/account"); }}
+                onClick={(e) => { 
+                  e.preventDefault(); 
+                  const details = e.currentTarget.closest('details');
+                  if (details) details.removeAttribute('open');
+                  setLocation("/account"); 
+                }}
                 className="flex w-full items-center gap-2 rounded-sm px-2 py-2 text-left text-sm hover:bg-white/10"
               >
                 <UserRoundCog className="h-4 w-4" />
@@ -335,7 +375,12 @@ export default function Chat() {
                 <a
                   role="menuitem"
                   href="#"
-                  onClick={(e) => { e.preventDefault(); setLocation("/admin"); }}
+                  onClick={(e) => { 
+                    e.preventDefault(); 
+                    const details = e.currentTarget.closest('details');
+                    if (details) details.removeAttribute('open');
+                    setLocation("/admin"); 
+                  }}
                   className="flex w-full items-center gap-2 rounded-sm px-2 py-2 text-left text-sm hover:bg-white/10"
                 >
                   <Settings className="h-4 w-4" />
@@ -345,7 +390,11 @@ export default function Chat() {
               <button
                 type="button"
                 role="menuitem"
-                onClick={logout}
+                onClick={(e) => {
+                  const details = e.currentTarget.closest('details');
+                  if (details) details.removeAttribute('open');
+                  logout();
+                }}
                 className="flex w-full items-center gap-2 rounded-sm px-2 py-2 text-left text-sm text-red-400 hover:bg-red-500/10"
               >
                 <LogOut className="h-4 w-4" />
@@ -364,7 +413,13 @@ export default function Chat() {
               variant="ghost"
               size="icon"
               className="text-zinc-400 lg:hidden"
-              onClick={() => setSidebarOpen(true)}
+              onClick={(e) => {
+                // Parar propagação para evitar que o clique no botão de menu 
+                // seja capturado por elementos pai que possam fechar a barra
+                e.preventDefault();
+                e.stopPropagation();
+                setSidebarOpen(true);
+              }}
             >
               <Menu className="h-5 w-5" />
             </Button>

@@ -3,7 +3,7 @@ import {
   consumeStreamContentChunk,
   stripThinkingContent,
   type StreamContentState,
-} from "./chatRouter";
+} from "./systemPrompt";
 
 const initialState = (): StreamContentState => ({
   accumulatedContent: "",

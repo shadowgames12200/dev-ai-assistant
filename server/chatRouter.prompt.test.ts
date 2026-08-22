@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { SYSTEM_PROMPT } from "./chatRouter";
+import { SYSTEM_PROMPT } from "./systemPrompt";
 
 describe("SYSTEM_PROMPT - protocolo profissional de freelancer", () => {
   it("proíbe inventar dados e exige confirmação dos fatos", () => {

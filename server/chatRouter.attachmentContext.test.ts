@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { composeMessageContentWithAttachments } from "./chatRouter";
+import { composeMessageContentWithAttachments } from "./systemPrompt";
 
 describe("contexto de anexos no fluxo do chat", () => {
   it("envia texto extraído de anexo ao modelo dentro da fronteira de conteúdo não confiável", () => {

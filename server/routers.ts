@@ -26,6 +26,10 @@ export const appRouter = router({
       return ctx.user;
     }),
     logout: protectedProcedure.mutation(async ({ ctx }) => {
+      const { COOKIE_NAME } = await import("@shared/const");
+      const { getSessionCookieOptions } = await import("./_core/cookies");
+      const cookieOptions = getSessionCookieOptions(ctx.req);
+      ctx.res.clearCookie(COOKIE_NAME, { ...cookieOptions, maxAge: 0 });
       return { success: true };
     }),
   }),
@@ -203,8 +207,8 @@ export const appRouter = router({
           await db.addMessage(input.conversationId, "user", input.content);
           
           const { checkContextSufficiency } = await import("./honestyGuardrail");
-          const msgHistory = await db.getMessages(input.conversationId);
-          const sufficiency = checkContextSufficiency(input.content, msgHistory);
+          const msgs = await db.getMessages(input.conversationId);
+          const sufficiency = checkContextSufficiency(input.content, msgs);
           
           if (!sufficiency.isSufficient) {
             const reply = sufficiency.missingInfo || "Preciso de mais informações para realizar esta tarefa corretamente.";
@@ -216,7 +220,7 @@ export const appRouter = router({
           
           const llmMessages: any[] = [
             { role: "system", content: SYSTEM_PROMPT },
-            ...msgHistory.map((m: any) => ({ role: m.role, content: m.content }))
+            ...msgs.map((m: any) => ({ role: m.role, content: m.content }))
           ];
 
           const stream = await invokeLLMStream({
@@ -225,13 +229,13 @@ export const appRouter = router({
           });
 
           const reader = (stream.body as ReadableStream).getReader();
-          let full = "";
+          let assistantResponse = "";
           while (true) {
             const { done, value } = await reader.read();
             if (done) break;
-            full += new TextDecoder().decode(value);
+            assistantResponse += new TextDecoder().decode(value);
           }
-          await db.addMessage(input.conversationId, "assistant", full);
+          await db.addMessage(input.conversationId, "assistant", assistantResponse);
           await db.addCredits(ctx.user.id, -1);
           
           return { success: true };

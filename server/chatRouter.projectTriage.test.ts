@@ -2,7 +2,7 @@ import { describe, expect, it } from "vitest";
 import {
   buildFreelancerProjectTriageRequest,
   getFreelancerProjectTriage,
-} from "./chatRouter";
+} from "./systemPrompt";
 
 describe("triagem determinística de projetos freelancer", () => {
   it("bloqueia uma redação tecnicamente completa que não informa prazo e aceite", () => {

@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { buildCreditBlockedPayload } from "./chatRouter";
+import { buildCreditBlockedPayload } from "./systemPrompt";
 
 describe("contrato de bloqueio por créditos", () => {
   it("informa ao cliente que o chat está bloqueado e preserva o saldo necessário", () => {

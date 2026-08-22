@@ -19,6 +19,7 @@
 - [x] Implementar Sandbox via GitHub Actions para modo agente executor
 - [x] Verificar e ajustar responsividade (Mobile/Desktop)
 - [x] Testar interface em diferentes viewports (iPhone, Android, Desktop)
+- [x] Corrigir bug de logout no servidor (limpeza de cookie app_session_id)
 
 ## Freelancer e Monetização
 - [x] Retomar propostas no 99Freelas (Projeto: TCC ABNT - Enviada R$ 40,00)

@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState } from "react";
+import { useLocation } from "wouter";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { ScrollArea } from "@/components/ui/scroll-area";
@@ -53,6 +54,7 @@ function formatRole(role: string) {
 }
 
 export default function ChatView({ conversationId }: { conversationId: number }) {
+  const [, setLocation] = useLocation();
   const [input, setInput] = useState("");
   const [messages, setMessages] = useState<DBMessage[]>([]);
   const [pendingContent, setPendingContent] = useState("");
@@ -327,7 +329,7 @@ export default function ChatView({ conversationId }: { conversationId: number })
                   size="sm"
                   variant="outline"
                   className="mt-2 border-amber-300/40 text-amber-100 hover:bg-amber-300/10 h-7 text-[10px]"
-                  onClick={() => { window.location.href = "/recharge"; }}
+                  onClick={() => { setLocation("/recharge"); }}
                 >
                   Recarregar créditos
                 </Button>

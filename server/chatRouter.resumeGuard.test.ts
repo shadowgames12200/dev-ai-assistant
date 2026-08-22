@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { buildResumeDataRequest, getMissingResumeData } from "./chatRouter";
+import { buildResumeDataRequest, getMissingResumeData } from "./systemPrompt";
 
 describe("barreira de currículo incompleto", () => {
   it("bloqueia uma versão final quando empresa, datas e escola não foram informadas", () => {

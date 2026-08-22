@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { getProfessionalServiceGate } from "./chatRouter";
+import { getProfessionalServiceGate } from "./systemPrompt";
 
 describe("guardas de escopo para serviços profissionais", () => {
   it("pede a fonte e o formato antes de prometer uma transcrição", () => {
