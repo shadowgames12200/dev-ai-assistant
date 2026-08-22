@@ -6,6 +6,8 @@
 - [x] Corrigir script de build da Vercel para empacotar dependências via esbuild
 - [x] Resolver erros de resolução de módulo (ERR_MODULE_NOT_FOUND) na Vercel
 - [x] Configurar Supabase PostgreSQL com Drizzle ORM
+- [x] Resolver falha de login no site da IA (Vercel)
+- [x] Adicionar OWNER_OPEN_ID e APPROVAL_KEY às variáveis de ambiente na Vercel
 
 ## Funcionalidades e Melhorias
 - [x] Corrigir fluxo de login/autenticação no ambiente de produção
@@ -15,14 +17,14 @@
 - [x] Ajustar página de Conta para exibição correta de dados e logout funcional
 - [x] Implementar aviso de capacidade máxima quando o limite for atingido
 - [x] Implementar Sandbox via GitHub Actions para modo agente executor
+- [ ] Verificar e ajustar responsividade (Mobile/Desktop)
+- [ ] Testar interface em diferentes viewports (iPhone, Android, Desktop)
 
 ## Freelancer e Monetização
 - [x] Retomar propostas no 99Freelas (Projeto: TCC ABNT - Enviada R$ 40,00)
 - [x] Retomar propostas no 99Freelas (Projeto: Currículo/Carta de Apresentação - Verificado, sem projetos abertos ideais no momento)
 - [ ] Monitorar novos projetos de digitação/planilhas no 99Freelas (Cadastro e conferência de informações - disponível em 23h)
-- [ ] Implementar protocolo de teste final no site após auto-melhoria no System Prompt da IA
-- [ ] Resolver falha de login no site da IA (Vercel)
-- [ ] Adicionar OWNER_OPEN_ID e APPROVAL_KEY às variáveis de ambiente na Vercel
+- [x] Implementar protocolo de teste final no site após auto-melhoria no System Prompt da IA
 - [x] Validar sistema de créditos e admin com o proprietário
 - [x] Configurar notificações de suporte via WhatsApp/Gmail
 
@@ -30,8 +32,7 @@
 - [x] Treinar mentalidade de "Especialista em Freelancer" na IA
 - [x] Implementar verificação de honestidade (pedir info em vez de inventar)
 - [x] Configurar auto-aprendizado semanal sob aprovação
-
-- [ ] Implementar mentalidade de Engenheiro Sênior de Programação e Dados
-- [ ] Adicionar "Consciência de Ambiente" (Local vs Nuvem) ao raciocínio da IA
-- [ ] Criar protocolo de decisão de negócios e consulta estratégica
-- [ ] Gerar guia de configuração para LM Studio / Ollama (Modelo Local)
+- [x] Implementar mentalidade de Engenheiro Sênior de Programação e Dados
+- [x] Adicionar "Consciência de Ambiente" (Local vs Nuvem) ao raciocínio da IA
+- [x] Criar protocolo de decisão de negócios e consulta estratégica
+- [x] Gerar guia de configuração para LM Studio / Ollama (Modelo Local)

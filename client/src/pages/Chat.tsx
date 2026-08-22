@@ -16,6 +16,7 @@ import {
   Coins,
   MoreVertical,
   UserRoundCog,
+  Menu,
 } from "lucide-react";
 import { trpc } from "@/lib/trpc";
 import { useAuth } from "@/_core/hooks/useAuth";
@@ -28,18 +29,20 @@ import {
   DropdownMenuItem,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
+import { useIsMobile } from "@/hooks/useMobile";
 
 export default function Chat() {
   const { user, logout } = useAuth();
   const [, setLocation] = useLocation();
   const utils = trpc.useUtils();
+  const isMobile = useIsMobile();
   const [conversations, setConversations] = useState<
     Array<{ id: number; title: string; updatedAt: Date }>
   >([]);
   const [selectedId, setSelectedId] = useState<number | null>(null);
   const [editingId, setEditingId] = useState<number | null>(null);
   const [editingTitle, setEditingTitle] = useState("");
-  const [sidebarOpen, setSidebarOpen] = useState(true);
+  const [sidebarOpen, setSidebarOpen] = useState(!isMobile);
   const renameRef = useRef<HTMLInputElement>(null);
 
   const { data: convs } = trpc.chat.conversations.list.useQuery(undefined, {
@@ -54,15 +57,24 @@ export default function Chat() {
   }, [convs]);
 
   useEffect(() => {
-    if (conversations.length > 0 && !selectedId) {
+    if (conversations.length > 0 && !selectedId && !isMobile) {
       setSelectedId(conversations[0].id);
     }
-  }, [conversations, selectedId]);
+  }, [conversations, selectedId, isMobile]);
+
+  useEffect(() => {
+    if (isMobile) {
+      setSidebarOpen(false);
+    } else {
+      setSidebarOpen(true);
+    }
+  }, [isMobile]);
 
   const createMutation = trpc.chat.conversations.create.useMutation({
     onSuccess: (data) => {
       utils.chat.conversations.list.invalidate();
       setSelectedId(data.id);
+      if (isMobile) setSidebarOpen(false);
     },
     onError: (err) => toast.error("Erro ao criar conversa: " + err.message),
   });
@@ -129,16 +141,32 @@ export default function Chat() {
   };
 
   return (
-    <div className="flex h-screen bg-[#0a0a0f] text-foreground overflow-hidden">
+    <div className="flex h-screen bg-[#0a0a0f] text-foreground overflow-hidden relative">
+      {/* Mobile Overlay */}
+      {isMobile && sidebarOpen && (
+        <div 
+          className="fixed inset-0 bg-black/50 z-40 backdrop-blur-sm"
+          onClick={() => setSidebarOpen(false)}
+        />
+      )}
+
       {/* Sidebar */}
       <aside
-        className={`${sidebarOpen ? "w-72" : "w-0"} shrink-0 border-r border-white/10 bg-[#0f0f16] flex flex-col transition-all duration-200 overflow-hidden`}
+        className={`
+          ${sidebarOpen ? (isMobile ? "fixed inset-y-0 left-0 z-50 w-72" : "w-72") : "w-0"} 
+          shrink-0 border-r border-white/10 bg-[#0f0f16] flex flex-col transition-all duration-300 overflow-hidden
+        `}
       >
         <div className="p-3 flex items-center justify-between border-b border-white/10">
           <div className="flex items-center gap-2 min-w-0">
             <Sparkles className="h-5 w-5 text-violet-400 shrink-0" />
             <span className="font-semibold truncate">DevAI Assistant</span>
           </div>
+          {isMobile && (
+            <Button variant="ghost" size="icon" onClick={() => setSidebarOpen(false)}>
+              <X className="h-4 w-4" />
+            </Button>
+          )}
         </div>
 
         <div className="p-3">
@@ -188,7 +216,10 @@ export default function Chat() {
                 className={`group flex items-center gap-1 rounded-lg px-2 py-2 cursor-pointer transition-colors ${
                   selectedId === c.id ? "bg-white/10" : "hover:bg-white/5"
                 }`}
-                onClick={() => setSelectedId(c.id)}
+                onClick={() => {
+                  setSelectedId(c.id);
+                  if (isMobile) setSidebarOpen(false);
+                }}
               >
                 <MessageSquare className="h-4 w-4 text-zinc-400 shrink-0" />
                 {editingId === c.id ? (
@@ -236,7 +267,7 @@ export default function Chat() {
                           size="icon"
                           aria-label={`Mais ações para ${c.title}`}
                           title="Mais ações"
-                          className="h-7 w-7 shrink-0 text-zinc-400 hover:text-white opacity-0 group-hover:opacity-100 focus:opacity-100 transition-opacity"
+                          className={`h-7 w-7 shrink-0 text-zinc-400 hover:text-white transition-opacity ${isMobile ? "opacity-100" : "opacity-0 group-hover:opacity-100 focus:opacity-100"}`}
                           onClick={(e) => e.stopPropagation()}
                         >
                           <MoreVertical className="h-4 w-4" />
@@ -326,42 +357,54 @@ export default function Chat() {
       </aside>
 
       {/* Main */}
-      <main className="flex-1 flex flex-col min-w-0">
-        <header className="h-12 border-b border-white/10 flex items-center justify-between px-3 shrink-0">
-          <Button
-            variant="ghost"
-            size="icon"
-            className="text-zinc-400"
-            onClick={() => setSidebarOpen((v) => !v)}
-          >
-            <span className="sr-only">Alternar painel</span>
-            <svg
-              xmlns="http://www.w3.org/2000/svg"
-              width="18"
-              height="18"
-              viewBox="0 0 24 24"
-              fill="none"
-              stroke="currentColor"
-              strokeWidth="2"
-              strokeLinecap="round"
-              strokeLinejoin="round"
+      <main className="flex-1 flex flex-col min-w-0 w-full relative">
+        <header className="h-12 border-b border-white/10 flex items-center justify-between px-3 shrink-0 bg-[#0a0a0f]/80 backdrop-blur-md sticky top-0 z-30">
+          <div className="flex items-center gap-2 min-w-0">
+            <Button
+              variant="ghost"
+              size="icon"
+              className="text-zinc-400 lg:hidden"
+              onClick={() => setSidebarOpen(true)}
             >
-              <path d="M3 6h18M3 12h18M3 18h18" />
-            </svg>
-          </Button>
-          <span className="text-sm font-medium truncate px-2">
-            {conversations.find((c) => c.id === selectedId)?.title ?? "DevAI Assistant"}
-          </span>
-          <div className="flex items-center gap-1.5 rounded-full border border-white/10 bg-white/[0.03] px-2 py-1 text-xs text-zinc-300">
+              <Menu className="h-5 w-5" />
+            </Button>
+            {!isMobile && (
+              <Button
+                variant="ghost"
+                size="icon"
+                className="text-zinc-400"
+                onClick={() => setSidebarOpen((v) => !v)}
+              >
+                <span className="sr-only">Alternar painel</span>
+                <svg
+                  xmlns="http://www.w3.org/2000/svg"
+                  width="18"
+                  height="18"
+                  viewBox="0 0 24 24"
+                  fill="none"
+                  stroke="currentColor"
+                  strokeWidth="2"
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                >
+                  <path d="M3 6h18M3 12h18M3 18h18" />
+                </svg>
+              </Button>
+            )}
+            <span className="text-sm font-medium truncate px-1">
+              {conversations.find((c) => c.id === selectedId)?.title ?? "DevAI Assistant"}
+            </span>
+          </div>
+          <div className="flex items-center gap-1.5 rounded-full border border-white/10 bg-white/[0.03] px-2 py-1 text-xs text-zinc-300 shrink-0">
             <Coins className="h-3.5 w-3.5 text-amber-300" />
             <span>{formatCreditLabel(credits)}</span>
           </div>
         </header>
-        <div className="flex-1 min-h-0">
+        <div className="flex-1 min-h-0 w-full">
           {selectedId ? (
             <ChatView conversationId={selectedId} />
           ) : (
-            <div className="flex items-center justify-center h-full text-zinc-500">
+            <div className="flex items-center justify-center h-full text-zinc-500 p-4 text-center">
               <p className="text-sm">
                 Selecione uma conversa ou crie uma nova para começar.
               </p>
