@@ -183,21 +183,21 @@ export default function Admin() {
                   <TableRow><TableCell colSpan={5} className="text-center py-8 text-zinc-500 text-xs">Carregando usuários...</TableCell></TableRow>
                 ) : (usersData || []).map((u: any) => (
                   <TableRow key={u.id} className="border-white/10 hover:bg-white/[0.02]">
-                    <TableCell className="font-medium text-xs truncate max-w-[120px]">{u.name || "Sem nome"}</TableCell>
-                    <TableCell className="text-zinc-400 text-xs truncate max-w-[150px]">{u.email}</TableCell>
-                    <TableCell>
+                    <TableCell className="font-medium text-xs min-w-[100px]">{u.name || "Sem nome"}</TableCell>
+                    <TableCell className="text-zinc-400 text-xs min-w-[150px] break-all">{u.email}</TableCell>
+                    <TableCell className="min-w-[80px]">
                       <span className={`text-[9px] uppercase tracking-wider px-2 py-0.5 rounded-full ${u.role === "admin" ? "bg-violet-500/20 text-violet-300" : "bg-zinc-500/20 text-zinc-400"}`}>
                         {u.role}
                       </span>
                     </TableCell>
-                    <TableCell className="text-violet-300 font-medium text-xs">{u.balance}</TableCell>
-                    <TableCell>
+                    <TableCell className="text-violet-300 font-medium text-xs min-w-[60px]">{u.balance}</TableCell>
+                    <TableCell className="min-w-[100px]">
                       <div className="flex gap-1.5">
-                        <Button size="icon" variant="outline" className="h-7 w-7" onClick={() => adjustMutation.mutate({ userId: u.id, amount: 50 })}>
-                          <Plus className="h-3 w-3" />
+                        <Button size="icon" variant="outline" className="h-8 w-8" onClick={() => adjustMutation.mutate({ userId: u.id, amount: 50 })}>
+                          <Plus className="h-4 w-4" />
                         </Button>
-                        <Button size="icon" variant="outline" className="h-7 w-7" onClick={() => adjustMutation.mutate({ userId: u.id, amount: -50 })}>
-                          <Minus className="h-3 w-3" />
+                        <Button size="icon" variant="outline" className="h-8 w-8" onClick={() => adjustMutation.mutate({ userId: u.id, amount: -50 })}>
+                          <Minus className="h-4 w-4" />
                         </Button>
                       </div>
                     </TableCell>

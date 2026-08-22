@@ -315,93 +315,57 @@ export default function Chat() {
           </div>
         </ScrollArea>
 
-        <div className="relative p-3 border-t border-white/10">
-          <details 
-            ref={accountMenuRef}
-            className="group relative" 
-            data-testid="account-menu"
-          >
-              <summary
-                aria-label="Abrir menu da conta"
-                className="flex list-none items-center gap-3 rounded-lg px-2 py-2 text-left transition-colors hover:bg-white/5 cursor-pointer [&::-webkit-details-marker]:hidden"
-                onClick={(e) => {
-                  // Prevenir o comportamento padrão do <summary> que é abrir/fechar o <details>
-                  // para termos controle total e evitar o fechamento rápido
-                  e.preventDefault();
-                  e.stopPropagation();
-                  const details = e.currentTarget.closest('details');
-                  if (details) {
-                    if (details.hasAttribute('open')) {
-                      details.removeAttribute('open');
-                    } else {
-                      // Fechar outros menus se houver, mas aqui só temos um
-                      details.setAttribute('open', '');
-                    }
-                  }
-                }}
+        <div className="p-3 border-t border-white/10">
+          <DropdownMenu>
+            <DropdownMenuTrigger asChild>
+              <Button
+                variant="ghost"
+                className="w-full flex items-center gap-3 px-2 py-6 h-auto hover:bg-white/5 transition-colors"
               >
-              <div className="h-8 w-8 rounded-full bg-violet-500/20 flex items-center justify-center shrink-0">
-                <span className="text-xs font-medium text-violet-300">
-                  {user?.name?.charAt(0).toUpperCase() ?? "U"}
-                </span>
-              </div>
-              <div className="flex-1 min-w-0">
-                <p className="text-sm font-medium truncate">{user?.name || "-"}</p>
-                <p className="text-xs text-zinc-500 truncate">
-                  {user?.email || "-"} {user?.role === "admin" && "(admin)"}
-                </p>
-              </div>
-            </summary>
-            <div
-              role="menu"
-              aria-label="Menu da conta"
-              className="absolute bottom-16 left-0 right-0 z-50 rounded-md border border-white/10 bg-[#191923] p-1 shadow-lg"
+                <div className="h-8 w-8 rounded-full bg-violet-500/20 flex items-center justify-center shrink-0">
+                  <span className="text-xs font-medium text-violet-300">
+                    {user?.name?.charAt(0).toUpperCase() ?? "U"}
+                  </span>
+                </div>
+                <div className="flex-1 min-w-0 text-left">
+                  <p className="text-sm font-medium truncate">{user?.name || "-"}</p>
+                  <p className="text-xs text-zinc-500 truncate">
+                    {user?.email || "-"} {user?.role === "admin" && "(admin)"}
+                  </p>
+                </div>
+              </Button>
+            </DropdownMenuTrigger>
+            <DropdownMenuContent
+              align="end"
+              side="top"
+              sideOffset={10}
+              className="w-64 bg-[#191923] border-white/10 p-1"
             >
-              <a
-                role="menuitem"
-                href="#"
-                onClick={(e) => { 
-                  e.preventDefault(); 
-                  const details = e.currentTarget.closest('details');
-                  if (details) details.removeAttribute('open');
-                  setLocation("/account"); 
-                }}
-                className="flex w-full items-center gap-2 rounded-sm px-2 py-2 text-left text-sm hover:bg-white/10"
+              <DropdownMenuItem
+                onClick={() => setLocation("/account")}
+                className="flex items-center gap-2 px-2 py-2 cursor-pointer hover:bg-white/10"
               >
                 <UserRoundCog className="h-4 w-4" />
                 Conta
-              </a>
+              </DropdownMenuItem>
               {user?.role === "admin" && (
-                <a
-                  role="menuitem"
-                  href="#"
-                  onClick={(e) => { 
-                    e.preventDefault(); 
-                    const details = e.currentTarget.closest('details');
-                    if (details) details.removeAttribute('open');
-                    setLocation("/admin"); 
-                  }}
-                  className="flex w-full items-center gap-2 rounded-sm px-2 py-2 text-left text-sm hover:bg-white/10"
+                <DropdownMenuItem
+                  onClick={() => setLocation("/admin")}
+                  className="flex items-center gap-2 px-2 py-2 cursor-pointer hover:bg-white/10"
                 >
                   <Settings className="h-4 w-4" />
                   Painel admin
-                </a>
+                </DropdownMenuItem>
               )}
-              <button
-                type="button"
-                role="menuitem"
-                onClick={(e) => {
-                  const details = e.currentTarget.closest('details');
-                  if (details) details.removeAttribute('open');
-                  logout();
-                }}
-                className="flex w-full items-center gap-2 rounded-sm px-2 py-2 text-left text-sm text-red-400 hover:bg-red-500/10"
+              <DropdownMenuItem
+                onClick={() => logout()}
+                className="flex items-center gap-2 px-2 py-2 cursor-pointer text-red-400 focus:text-red-400 hover:bg-red-500/10"
               >
                 <LogOut className="h-4 w-4" />
                 Sair
-              </button>
-            </div>
-          </details>
+              </DropdownMenuItem>
+            </DropdownMenuContent>
+          </DropdownMenu>
         </div>
       </aside>
 
@@ -414,11 +378,9 @@ export default function Chat() {
               size="icon"
               className="text-zinc-400 lg:hidden"
               onClick={(e) => {
-                // Parar propagação para evitar que o clique no botão de menu 
-                // seja capturado por elementos pai que possam fechar a barra
                 e.preventDefault();
                 e.stopPropagation();
-                setSidebarOpen(true);
+                setSidebarOpen((v) => !v);
               }}
             >
               <Menu className="h-5 w-5" />
