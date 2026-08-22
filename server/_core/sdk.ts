@@ -14,7 +14,7 @@ import type {
   GetUserInfoWithJwtRequest,
   GetUserInfoWithJwtResponse,
 } from "./types/manusTypes";
-// Utility function
+
 const isNonEmptyString = (value: unknown): value is string =>
   typeof value === "string" && value.length > 0;
 
@@ -76,7 +76,7 @@ class OAuthService {
 
 const createOAuthHttpClient = (): AxiosInstance =>
   axios.create({
-    baseURL: ENV.oAuthServerUrl,
+    baseURL: ENV.oAuthServerUrl || "http://localhost",
     timeout: AXIOS_TIMEOUT_MS,
   });
 
@@ -111,11 +111,6 @@ class SDKServer {
     return first ? first.toLowerCase() : null;
   }
 
-  /**
-   * Exchange OAuth authorization code for access token
-   * @example
-   * const tokenResponse = await sdk.exchangeCodeForToken(code, state);
-   */
   async exchangeCodeForToken(
     code: string,
     state: string
@@ -123,11 +118,6 @@ class SDKServer {
     return this.oauthService.getTokenByCode(code, state);
   }
 
-  /**
-   * Get user information using access token
-   * @example
-   * const userInfo = await sdk.getUserInfo(tokenResponse.accessToken);
-   */
   async getUserInfo(accessToken: string): Promise<GetUserInfoResponse> {
     const data = await this.oauthService.getUserInfoByToken({
       accessToken,
@@ -153,15 +143,10 @@ class SDKServer {
   }
 
   private getSessionSecret() {
-    const secret = ENV.cookieSecret;
+    const secret = ENV.cookieSecret || "dev-secret-key-12345";
     return new TextEncoder().encode(secret);
   }
 
-  /**
-   * Create a session token for a Manus user openId
-   * @example
-   * const sessionToken = await sdk.createSessionToken(userInfo.openId);
-   */
   async createSessionToken(
     openId: string,
     options: { expiresInMs?: number; name?: string } = {}
@@ -199,7 +184,6 @@ class SDKServer {
     cookieValue: string | undefined | null
   ): Promise<{ openId: string; appId: string; name: string } | null> {
     if (!cookieValue) {
-      // Visitantes deslogados são esperados na tela de login; não é erro operacional.
       return null;
     }
 
@@ -229,6 +213,9 @@ class SDKServer {
   async getUserInfoWithJwt(
     jwtToken: string
   ): Promise<GetUserInfoWithJwtResponse> {
+    if (!ENV.oAuthServerUrl) {
+      throw new Error("OAuth server not configured");
+    }
     const payload: GetUserInfoWithJwtRequest = {
       jwtToken,
       projectId: ENV.appId,
@@ -251,13 +238,9 @@ class SDKServer {
   }
 
   async authenticateRequest(req: Request): Promise<AuthenticatedUser> {
-    // 1. Prefer the session cookie (regular OAuth login).
     const cookies = this.parseCookies(req.headers.cookie);
     let sessionToken = cookies.get(COOKIE_NAME);
 
-    // 2. Fallback to the Authorization header (Preview auto-login via
-    //    sessionStorage), used when the browser blocks iframe cookies such as
-    //    Safari ITP, private browsing, or iOS/Android WebView.
     if (!sessionToken) {
       const authHeader = req.headers.authorization;
       if (typeof authHeader === "string" && authHeader.startsWith("Bearer ")) {
@@ -272,6 +255,7 @@ class SDKServer {
     }
 
     if (session.openId.startsWith(CRON_OPEN_ID_PREFIX)) {
+      if (!ENV.oAuthServerUrl) throw ForbiddenError("Cron requires OAuth server");
       const userInfo = await this.getUserInfoWithJwt(sessionToken ?? "");
       const taskUid = userInfo.taskUid ?? null;
       if (!taskUid) {
@@ -284,8 +268,14 @@ class SDKServer {
     const signedInAt = new Date();
     let user = await db.getUserByOpenId(sessionUserId);
 
-    // If user not in DB, sync from OAuth server automatically
-    if (!user) {
+    if (!user && session.openId.startsWith("local:")) {
+        // Para logins locais, se o usuário sumiu do DB mas a sessão é válida,
+        // tentamos recuperar pelo e-mail codificado no openId
+        const email = session.openId.replace("local:", "");
+        user = await db.getUserByEmail(email);
+    }
+
+    if (!user && ENV.oAuthServerUrl) {
       try {
         const userInfo = await this.getUserInfoWithJwt(sessionToken ?? "");
         await db.upsertUser({
@@ -298,7 +288,6 @@ class SDKServer {
         user = await db.getUserByOpenId(userInfo.openId);
       } catch (error) {
         console.error("[Auth] Failed to sync user from OAuth:", error);
-        throw ForbiddenError("Failed to sync user info");
       }
     }
 
@@ -317,7 +306,6 @@ class SDKServer {
 
 const CRON_OPEN_ID_PREFIX = "cron_";
 
-/** Result of `sdk.authenticateRequest`. Cron callbacks set `isCron=true` and `taskUid`; see `/home/ubuntu/skills/webdev-periodic-updates/SKILL.md`. */
 export type AuthenticatedUser = User & {
   taskUid?: string;
   isCron?: boolean;

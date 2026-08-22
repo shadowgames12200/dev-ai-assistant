@@ -2,17 +2,21 @@ import { drizzle } from "drizzle-orm/postgres-js";
 import postgres from "postgres";
 import * as schema from "../drizzle/schema";
 import { eq, and, desc, sql } from "drizzle-orm";
-import { randomUUID } from "crypto";
+import { ENV } from "./_core/env";
 
 // Singleton Connection
 let _dbInstance: any = null;
 
 export async function getDb() {
   if (!_dbInstance) {
-    if (!process.env.DATABASE_URL) {
+    const connectionString = ENV.databaseUrl;
+    if (!connectionString) {
       throw new Error("DATABASE_URL is not defined");
     }
-    const client = postgres(process.env.DATABASE_URL);
+    
+    const client = postgres(connectionString, {
+      prepare: false, // Necessário para Supabase Pooler
+    });
     _dbInstance = drizzle(client, { schema });
   }
   return _dbInstance;

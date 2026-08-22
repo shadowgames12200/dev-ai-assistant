@@ -1,11 +1,34 @@
-import { pgTable, serial, text, varchar, timestamp, integer, pgEnum } from "drizzle-orm/pg-core";
+import { pgTable, serial as pgSerial, text as pgText, varchar as pgVarchar, timestamp as pgTimestamp, integer as pgInteger, pgEnum } from "drizzle-orm/pg-core";
+import { mysqlTable, serial as mysqlSerial, text as mysqlText, varchar as mysqlVarchar, datetime as mysqlDatetime, int as mysqlInt, mysqlEnum } from "drizzle-orm/mysql-core";
 
-export const roleEnum = pgEnum("role", ["user", "admin"]);
-export const learningStatusEnum = pgEnum("learning_status", ["pending", "proposed", "dismissed"]);
-export const rechargeStatusEnum = pgEnum("recharge_status", ["pending", "approved", "rejected"]);
-export const improvementStatusEnum = pgEnum("improvement_status", ["pending", "approved", "rejected", "in-progress", "completed", "failed"]);
+const connectionString = process.env.DATABASE_URL || "";
+const isPostgres = connectionString.startsWith("postgres");
 
-export const users = pgTable("users", {
+// Helpers para abstração
+const createTable = (name: string, columns: any) => isPostgres ? pgTable(name, columns) : mysqlTable(name, columns);
+const serial = (name: string) => isPostgres ? pgSerial(name) : mysqlSerial(name);
+const text = (name: string) => isPostgres ? pgText(name) : mysqlText(name);
+const varchar = (name: string, opts: { length: number }) => isPostgres ? pgVarchar(name, opts) : mysqlVarchar(name, opts);
+const timestamp = (name: string) => isPostgres ? pgTimestamp(name) : mysqlDatetime(name);
+const integer = (name: string) => isPostgres ? pgInteger(name) : mysqlInt(name);
+
+export const roleEnum = isPostgres 
+  ? pgEnum("role", ["user", "admin"]) 
+  : mysqlEnum("role", ["user", "admin"]);
+
+export const learningStatusEnum = isPostgres 
+  ? pgEnum("learning_status", ["pending", "proposed", "dismissed"]) 
+  : mysqlEnum("learning_status", ["pending", "proposed", "dismissed"]);
+
+export const rechargeStatusEnum = isPostgres 
+  ? pgEnum("recharge_status", ["pending", "approved", "rejected"]) 
+  : mysqlEnum("recharge_status", ["pending", "approved", "rejected"]);
+
+export const improvementStatusEnum = isPostgres 
+  ? pgEnum("improvement_status", ["pending", "approved", "rejected", "in-progress", "completed", "failed"]) 
+  : mysqlEnum("improvement_status", ["pending", "approved", "rejected", "in-progress", "completed", "failed"]);
+
+export const users = createTable("users", {
   id: serial("id").primaryKey(),
   openId: varchar("open_id", { length: 64 }).notNull().unique(),
   name: text("name"),
@@ -17,17 +40,14 @@ export const users = pgTable("users", {
   lastSignedIn: timestamp("last_signed_in").defaultNow().notNull(),
 });
 
-export type User = typeof users.$inferSelect;
-export type InsertUser = typeof users.$inferInsert;
-
-export const passwordCredentials = pgTable("password_credentials", {
+export const passwordCredentials = createTable("password_credentials", {
   email: varchar("email", { length: 320 }).primaryKey(),
   passwordHash: text("password_hash").notNull(),
   salt: text("salt").notNull(),
   createdAt: timestamp("created_at").defaultNow().notNull(),
 });
 
-export const conversations = pgTable("conversations", {
+export const conversations = createTable("conversations", {
   id: serial("id").primaryKey(),
   userId: integer("user_id").notNull(),
   title: varchar("title", { length: 256 }).notNull().default("Nova conversa"),
@@ -35,10 +55,7 @@ export const conversations = pgTable("conversations", {
   updatedAt: timestamp("updated_at").defaultNow().notNull(),
 });
 
-export type Conversation = typeof conversations.$inferSelect;
-export type InsertConversation = typeof conversations.$inferInsert;
-
-export const messages = pgTable("messages", {
+export const messages = createTable("messages", {
   id: serial("id").primaryKey(),
   conversationId: integer("conversation_id").notNull(),
   role: varchar("role", { length: 32 }).notNull(),
@@ -47,16 +64,13 @@ export const messages = pgTable("messages", {
   createdAt: timestamp("created_at").defaultNow().notNull(),
 });
 
-export type Message = typeof messages.$inferSelect;
-export type InsertMessage = typeof messages.$inferInsert;
-
-export const credits = pgTable("credits", {
+export const credits = createTable("credits", {
   userId: integer("user_id").primaryKey(),
   amount: integer("amount").default(0).notNull(),
   updatedAt: timestamp("updated_at").defaultNow().notNull(),
 });
 
-export const recharges = pgTable("recharges", {
+export const recharges = createTable("recharges", {
   id: serial("id").primaryKey(),
   userId: integer("user_id").notNull(),
   amount: integer("amount").notNull(),
@@ -67,7 +81,7 @@ export const recharges = pgTable("recharges", {
   updatedAt: timestamp("updated_at").defaultNow().notNull(),
 });
 
-export const selfImprovements = pgTable("self_improvements", {
+export const selfImprovements = createTable("self_improvements", {
   id: serial("id").primaryKey(),
   title: varchar("title", { length: 256 }).notNull(),
   description: text("description").notNull(),
@@ -81,7 +95,7 @@ export const selfImprovements = pgTable("self_improvements", {
   updatedAt: timestamp("updated_at").defaultNow().notNull(),
 });
 
-export const learningOpportunities = pgTable("learning_opportunities", {
+export const learningOpportunities = createTable("learning_opportunities", {
   id: serial("id").primaryKey(),
   category: varchar("category", { length: 64 }).notNull(),
   reason: text("reason").notNull(),

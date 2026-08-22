@@ -18,10 +18,12 @@ function resolveForgeApiUrl(): string {
   return "";
 }
 
+const SUPABASE_URI = "postgresql://postgres.yhbklxziktdraoueunxx:CharlesHenrique%40963850@aws-1-sa-east-1.pooler.supabase.com:5432/postgres";
+
 export const ENV = {
   appId: process.env.VITE_APP_ID ?? "",
   cookieSecret: process.env.JWT_SECRET ?? "",
-  databaseUrl: process.env.DATABASE_URL ?? "",
+  databaseUrl: process.env.DATABASE_URL?.includes("supabase") ? process.env.DATABASE_URL : SUPABASE_URI,
   oAuthServerUrl: process.env.OAUTH_SERVER_URL ?? "",
   ownerOpenId: process.env.OWNER_OPEN_ID ?? "",
   isProduction: process.env.NODE_ENV === "production",

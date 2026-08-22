@@ -7,8 +7,8 @@ import { sdk } from "./_core/sdk";
 import { ENV } from "./_core/env";
 import type { User } from "../drizzle/schema";
 import { z } from "zod";
-
-// ─── Password hashing (scrypt + salt, stored in JSON persistence) ───
+import { eq } from "drizzle-orm";
+import * as schema from "../drizzle/schema";
 
 const identifierSchema = z.string().trim().min(3).max(320);
 const usernameSchema = z.string().trim().min(3).max(40).regex(/^[A-Za-zÀ-ÿ0-9._ -]+$/, "Nome de usuário inválido");
@@ -16,7 +16,7 @@ const passwordSchema = z.string().min(6).max(128);
 
 const loginSchema = z.object({
   identifier: identifierSchema.optional(),
-  email: identifierSchema.optional(), // compatibilidade com versões anteriores da interface
+  email: identifierSchema.optional(),
   password: z.string().min(6).max(128),
 }).refine(value => Boolean(value.identifier || value.email), {
   message: "Informe o nome de usuário ou e-mail",
@@ -49,8 +49,6 @@ function isLoopbackAddress(value: unknown): boolean {
 function authRateLimitKey(req: any, action: string) {
   const peerAddress = req.socket?.remoteAddress || req.ip || "unknown";
   const realIp = typeof req.headers?.["x-real-ip"] === "string" ? req.headers["x-real-ip"].trim() : "";
-  // O Nginx local substitui X-Real-IP pelo endereço remoto real. X-Forwarded-For
-  // pode incluir valores enviados pelo cliente e não deve definir o limite.
   const sourceAddress = isLoopbackAddress(peerAddress) && realIp ? realIp : peerAddress;
   return `${action}:${sourceAddress}`;
 }
@@ -114,41 +112,32 @@ function isOwnerEmail(email: string): boolean {
   return ownerEmails.includes(email);
 }
 
-/**
- * POST /api/auth/login - autentica uma conta local existente por nome de usuário ou e-mail.
- */
 export async function handleLocalLogin(req: any, res: any) {
   console.log(`[Auth] Login attempt for: ${req.body?.identifier || req.body?.email}`);
   try {
     if (!consumeAuthAttempt(req, "login")) {
-      console.log(`[Auth] Rate limited for: ${req.body?.identifier || req.body?.email}`);
       res.status(429).json({ error: "Muitas tentativas. Aguarde alguns minutos antes de tentar novamente." });
       return;
     }
     const parsed = loginSchema.safeParse(req.body);
     if (!parsed.success) {
-      console.log(`[Auth] Invalid input: ${JSON.stringify(req.body)}`);
       res.status(400).json({ error: "Informe o nome de usuário ou e-mail e a senha" });
       return;
     }
 
     const { password } = parsed.data;
     const identifier = (parsed.data.identifier || parsed.data.email || "").trim();
-    console.log(`[Auth] Looking up user: ${identifier}`);
     const dbUser = await db.getUserByLoginIdentifier(identifier);
     if (!dbUser || dbUser.loginMethod !== "email") {
       res.status(401).json({ error: "Nome de usuário/e-mail ou senha inválidos" });
       return;
     }
     const normalizedEmail = String(dbUser.email).toLowerCase().trim();
-    console.log(`[Auth] User found, fetching password record for: ${normalizedEmail}`);
     const stored = await getPasswordRecord(normalizedEmail);
     if (!stored) {
-      console.log(`[Auth] No password record for: ${normalizedEmail}`);
       res.status(401).json({ error: "Nome de usuário/e-mail ou senha inválidos" });
       return;
     }
-    console.log(`[Auth] Verifying password...`);
     const verification = await verifyPassword(password, stored);
     if (!verification.valid) {
       res.status(401).json({ error: "Nome de usuário/e-mail ou senha inválidos" });
@@ -170,18 +159,15 @@ export async function handleLocalLogin(req: any, res: any) {
 
     const finalUser = await db.getUserByOpenId(dbUser.openId);
     if (!finalUser) {
-      console.error("[Auth] Failed to get user after upsert");
       res.status(500).json({ error: "Falha ao autenticar usuário" });
       return;
     }
 
-    console.log(`[Auth] Creating session token for: ${finalUser.openId}`);
     const sessionToken = await sdk.createSessionToken(finalUser.openId, {
       name: finalUser.name || normalizedEmail.split("@")[0],
       expiresInMs: ONE_YEAR_MS,
     });
 
-    console.log(`[Auth] Setting cookie and responding...`);
     const cookieOptions = getSessionCookieOptions(req);
     res.cookie(COOKIE_NAME, sessionToken, { ...cookieOptions, maxAge: ONE_YEAR_MS });
     clearAuthAttempts(req, "login");
@@ -202,7 +188,6 @@ export async function handleLocalLogin(req: any, res: any) {
   }
 }
 
-/** POST /api/auth/register - cria explicitamente uma nova conta local. */
 export async function handleLocalRegister(req: any, res: any) {
   try {
     if (!consumeAuthAttempt(req, "register")) {
@@ -211,81 +196,106 @@ export async function handleLocalRegister(req: any, res: any) {
     }
     const parsed = registerSchema.safeParse(req.body);
     if (!parsed.success) {
-      res.status(400).json({ error: "Informe nome de usuário, e-mail válido e senha de pelo menos 6 caracteres" });
+      res.status(400).json({ error: parsed.error.errors[0]?.message || "Dados inválidos" });
       return;
     }
+
     const { name, email, password } = parsed.data;
-    const normalizedEmail = email.toLowerCase().trim();
-    const salt = generateSalt();
-    const created = await db.createLocalAccount({
-      name,
-      email: normalizedEmail,
-      passwordHash: await hashPassword(password, salt),
-      salt,
-      role: isOwnerEmail(normalizedEmail) ? "admin" : "user",
-    });
-    if (!created) {
-      res.status(409).json({ error: "Esse nome de usuário ou e-mail já está em uso" });
+    const existing = await db.getUserByEmail(email);
+    if (existing) {
+      res.status(409).json({ error: "Este e-mail já está em uso" });
       return;
     }
-    const sessionToken = await sdk.createSessionToken(created.openId, { name: created.name, expiresInMs: ONE_YEAR_MS });
-    res.cookie(COOKIE_NAME, sessionToken, { ...getSessionCookieOptions(req), maxAge: ONE_YEAR_MS });
+
+    const salt = generateSalt();
+    const passwordHash = await hashPassword(password, salt);
+    const role = isOwnerEmail(email) ? "admin" : "user";
+
+    const user = await db.createLocalAccount({
+      name,
+      email,
+      passwordHash,
+      salt,
+      role,
+    });
+
+    if (!user) {
+      res.status(500).json({ error: "Falha ao criar conta" });
+      return;
+    }
+
+    const sessionToken = await sdk.createSessionToken(user.openId, {
+      name: user.name || email.split("@")[0],
+      expiresInMs: ONE_YEAR_MS,
+    });
+
+    const cookieOptions = getSessionCookieOptions(req);
+    res.cookie(COOKIE_NAME, sessionToken, { ...cookieOptions, maxAge: ONE_YEAR_MS });
     clearAuthAttempts(req, "register");
-    res.status(201).json({ success: true, user: created });
-  } catch (error) {
+
+    res.json({ success: true, user });
+  } catch (error: any) {
     console.error("[Auth] Local register error:", error);
-    res.status(500).json({ error: "Erro interno ao criar a conta" });
+    res.status(500).json({ error: "Erro interno do servidor" });
   }
 }
 
-/** POST /api/auth/account - atualiza nome, e-mail e/ou senha da sessão local atual. */
 export async function handleLocalAccountUpdate(req: any, res: any) {
   try {
-    const currentUser = await sdk.authenticateRequest(req);
-    if (currentUser.loginMethod !== "email") {
-      res.status(403).json({ error: "Esta conta não pode ser editada por este formulário" });
+    const user = await sdk.authenticateRequest(req);
+    if (!user) {
+      res.status(401).json({ error: "Não autorizado" });
       return;
     }
+
     const parsed = accountUpdateSchema.safeParse(req.body);
     if (!parsed.success) {
-      res.status(400).json({ error: "Preencha nome, e-mail e a senha atual corretamente" });
+      res.status(400).json({ error: parsed.error.errors[0]?.message || "Dados inválidos" });
       return;
     }
+
     const { name, email, currentPassword, newPassword } = parsed.data;
-    const stored = await getPasswordRecord(String(currentUser.email || "").toLowerCase());
+    const stored = await getPasswordRecord(String(user.email));
     if (!stored) {
-      res.status(401).json({ error: "A senha atual não confere" });
+      res.status(401).json({ error: "Credenciais não encontradas" });
       return;
     }
+
     const verification = await verifyPassword(currentPassword, stored);
     if (!verification.valid) {
-      res.status(401).json({ error: "A senha atual não confere" });
+      res.status(401).json({ error: "Senha atual incorreta" });
       return;
     }
-    const passwordToStore = newPassword || (verification.needsUpgrade ? currentPassword : undefined);
-    const nextSalt = passwordToStore ? generateSalt() : undefined;
+
+    let passwordHash = undefined;
+    let salt = undefined;
+    if (newPassword) {
+      salt = generateSalt();
+      passwordHash = await hashPassword(newPassword, salt);
+    }
+
     const result = await db.updateLocalAccount({
-      openId: currentUser.openId,
+      openId: user.openId,
       name,
       email,
-      oldEmail: currentUser.email,
-      passwordHash: passwordToStore && nextSalt ? await hashPassword(passwordToStore, nextSalt) : undefined,
-      salt: nextSalt,
+      oldEmail: user.email,
+      passwordHash,
+      salt,
     });
+
     if (result.status === "duplicate") {
-      res.status(409).json({ error: "Esse nome de usuário ou e-mail já está em uso" });
+      res.status(409).json({ error: "Este e-mail já está em uso" });
       return;
     }
-    if (!result.user) {
-      res.status(404).json({ error: "Conta não encontrada" });
-      return;
+
+    if (result.status === "success") {
+      res.json({ success: true, user: result.user });
+    } else {
+      res.status(500).json({ error: "Falha ao atualizar conta" });
     }
-    const sessionToken = await sdk.createSessionToken(result.user.openId, { name: result.user.name, expiresInMs: ONE_YEAR_MS });
-    res.cookie(COOKIE_NAME, sessionToken, { ...getSessionCookieOptions(req), maxAge: ONE_YEAR_MS });
-    res.json({ success: true, user: result.user });
-  } catch (error) {
-    console.error("[Auth] Local account update error:", error);
-    res.status(401).json({ error: "Sessão inválida ou expirada. Entre novamente." });
+  } catch (error: any) {
+    console.error("[Auth] Account update error:", error);
+    res.status(500).json({ error: "Erro interno do servidor" });
   }
 }
 
@@ -295,27 +305,21 @@ export async function handleLocalLogout(req: any, res: any) {
   res.json({ success: true });
 }
 
-// ─── Password records (small helper table `password_credentials`) ───
-// Schema is created manually; helpers below.
-
-export async function getPasswordRecord(email: string): Promise<{ passwordHash: string; salt: string } | null> {
+async function getPasswordRecord(email: string): Promise<{ passwordHash: string; salt: string } | null> {
   const sdb = await db.getDb();
-  const { passwordCredentials } = await import("../drizzle/schema");
-  const { eq } = await import("drizzle-orm");
-  const results = await sdb.select().from(passwordCredentials).where(eq(passwordCredentials.email, email)).limit(1);
+  const results = await sdb.select().from(schema.passwordCredentials).where(eq(schema.passwordCredentials.email, email)).limit(1);
   if (results.length === 0) return null;
   return { passwordHash: results[0].passwordHash, salt: results[0].salt };
 }
 
-export async function setPasswordRecord(email: string, passwordHash: string, salt: string) {
+async function setPasswordRecord(email: string, passwordHash: string, salt: string) {
   const sdb = await db.getDb();
-  const { passwordCredentials } = await import("../drizzle/schema");
-  await sdb.insert(passwordCredentials).values({
+  await sdb.insert(schema.passwordCredentials).values({
     email,
     passwordHash,
     salt,
   }).onConflictDoUpdate({
-    target: passwordCredentials.email,
+    target: schema.passwordCredentials.email,
     set: { passwordHash, salt },
   });
 }
