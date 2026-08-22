@@ -37,3 +37,10 @@
 - [x] Adicionar "Consciência de Ambiente" (Local vs Nuvem) ao raciocínio da IA
 - [x] Criar protocolo de decisão de negócios e consulta estratégica
 - [x] Gerar guia de configuração para LM Studio / Ollama (Modelo Local)
+
+## Auditoria de produção e sincronização
+- [ ] Enviar o estado atual do projeto para o repositório GitHub solicitado pelo proprietário.
+- [ ] Verificar o status do deploy e os logs disponíveis na Vercel.
+- [ ] Auditar novamente o site em produção: login, menus, navegação, painel admin, conta, créditos e responsividade.
+- [ ] Registrar e corrigir qualquer falha encontrada durante a auditoria de produção.
+- [ ] Criar checkpoint final após validação e push.
