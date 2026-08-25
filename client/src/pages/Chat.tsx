@@ -20,7 +20,6 @@ import {
 } from "lucide-react";
 import { trpc } from "@/lib/trpc";
 import { useAuth } from "@/_core/hooks/useAuth";
-import { useLocation } from "wouter";
 import ChatView from "@/components/ChatView";
 import { formatCreditLabel } from "@/lib/credits";
 import {
@@ -33,7 +32,6 @@ import { useIsMobile } from "@/hooks/useMobile";
 
 export default function Chat() {
   const { user, logout } = useAuth();
-  const [, setLocation] = useLocation();
   const utils = trpc.useUtils();
   const isMobile = useIsMobile();
   const [conversations, setConversations] = useState<
@@ -291,7 +289,7 @@ export default function Chat() {
                 className="w-full justify-start gap-2 text-sm"
                 onClick={() => {
                   setAccountMenuOpen(false);
-                  setLocation("/account");
+                  window.location.assign("/account");
                 }}
               >
                 <UserRoundCog className="h-4 w-4" /> Conta
@@ -303,7 +301,7 @@ export default function Chat() {
                   className="w-full justify-start gap-2 text-sm"
                   onClick={() => {
                     setAccountMenuOpen(false);
-                    setLocation("/admin");
+                    window.location.assign("/admin");
                   }}
                 >
                   <Settings className="h-4 w-4" /> Painel admin
