@@ -292,7 +292,14 @@ export const appRouter = router({
       .input(z.object({ id: z.number(), approvalKey: z.string() }))
       .mutation(async ({ ctx, input }) => {
         if (ctx.user.role !== "admin") throw new TRPCError({ code: "FORBIDDEN" });
-        if (input.approvalKey !== (process.env.APPROVAL_KEY || "charlespaz")) {
+        const configuredApprovalKey = process.env.APPROVAL_KEY?.trim();
+        if (!configuredApprovalKey) {
+          throw new TRPCError({
+            code: "INTERNAL_SERVER_ERROR",
+            message: "APPROVAL_KEY não está configurada no servidor.",
+          });
+        }
+        if (input.approvalKey !== configuredApprovalKey) {
           throw new TRPCError({ code: "UNAUTHORIZED", message: "Chave de aprovação incorreta" });
         }
         

@@ -1,4 +1,3 @@
-```tsx
 import { useEffect, useRef, useState } from "react";
 import { useLocation } from "wouter";
 
@@ -604,4 +603,3 @@ export default function ChatView({
     </div>
   );
 }
-```

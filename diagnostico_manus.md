@@ -6,7 +6,7 @@
 - **Instabilidade da UI**: Menus fechando sozinhos devido a problemas de propagação de eventos e `flicker` no carregamento de estados.
 
 ## ✅ Ações Realizadas
-1. **Configuração Supabase**: Identificada a URI do Supabase (`postgresql://postgres.yhbklxziktdraoueunxx:CharlesHenrique%40963850@aws-1-sa-east-1.pooler.supabase.com:5432/postgres`).
+1. **Configuração Supabase**: Identificada a necessidade de configurar a URI do Supabase exclusivamente pela variável de ambiente `DATABASE_URL`.
 2. **Refatoração do DB**: O arquivo `server/db.ts` foi restaurado para usar PostgreSQL com suporte ao Supabase Pooler (`prepare: false`).
 3. **Correção de Enums**: Resolvido o problema de `TypeError: roleEnum is not a function` no schema do Drizzle.
 4. **Limpeza de Código**: Removidos helpers duplicados e arquivos temporários de diagnóstico.

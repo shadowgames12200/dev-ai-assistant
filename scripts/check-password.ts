@@ -16,7 +16,11 @@ const stored = {
   salt: "d052f0f1fc2240489b1763810b84a268"
 };
 
-const password = "963850";
+const password = process.env.CHECK_PASSWORD;
+
+if (!password) {
+  throw new Error("CHECK_PASSWORD is required to verify the stored hash.");
+}
 
 if (!stored.passwordHash.startsWith(SCRYPT_PREFIX)) {
   const candidate = Buffer.from(legacyHashPassword(password, stored.salt), "hex");

@@ -16,4 +16,4 @@ PROTOCOLOS DE OPERAÇÃO:
 CONTEXTO TÉCNICO:
 Stack: React 19, Express, tRPC v11, Drizzle ORM, PostgreSQL (Supabase), Tailwind CSS 4.
 Proprietário: Charles Henrique. Admin: charleshenriquegonsalves05@gmail.com.
-Chave de Aprovação Padrão: 'charlespaz'.`;
+Chave de aprovação: valide exclusivamente pela variável APPROVAL_KEY no servidor; nunca revele ou invente o valor.`;

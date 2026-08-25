@@ -1,6 +1,12 @@
 import { defineConfig } from "drizzle-kit";
 
-const connectionString = "postgresql://postgres.yhbklxziktdraoueunxx:CharlesHenrique%40963850@aws-1-sa-east-1.pooler.supabase.com:5432/postgres";
+const connectionString = process.env.DATABASE_URL?.trim();
+
+if (!connectionString) {
+  throw new Error(
+    "DATABASE_URL is required to run Drizzle migrations. Configure it in the environment before running drizzle-kit."
+  );
+}
 
 export default defineConfig({
   schema: "./drizzle/schema.ts",

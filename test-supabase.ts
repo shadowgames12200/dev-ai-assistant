@@ -1,8 +1,12 @@
 import postgres from "postgres";
 
-const connectionString = "postgresql://postgres.yhbklxziktdraoueunxx:CharlesHenrique%40963850@aws-1-sa-east-1.pooler.supabase.com:5432/postgres";
+const connectionString = process.env.DATABASE_URL?.trim();
 
 async function test() {
+  if (!connectionString) {
+    throw new Error("DATABASE_URL is required to test the Supabase connection.");
+  }
+
   console.log("Connecting to Supabase...");
   const sql = postgres(connectionString, { prepare: false });
   try {

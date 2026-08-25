@@ -1,7 +1,7 @@
 import { createHmac, randomBytes, scrypt } from "crypto";
 import postgres from "postgres";
 
-const connectionString = "postgresql://postgres.yhbklxziktdraoueunxx:CharlesHenrique%40963850@aws-1-sa-east-1.pooler.supabase.com:5432/postgres";
+const connectionString = process.env.DATABASE_URL?.trim();
 const SCRYPT_KEY_LENGTH = 64;
 const SCRYPT_OPTIONS = { N: 16_384, r: 8, p: 1, maxmem: 32 * 1024 * 1024 };
 const SCRYPT_PREFIX = "scrypt$";
@@ -21,9 +21,18 @@ async function hashPassword(password: string, salt: string): Promise<string> {
 }
 
 async function seed() {
+  if (!connectionString) {
+    throw new Error("DATABASE_URL is required to seed the admin account.");
+  }
+
   const sql = postgres(connectionString, { prepare: false });
-  const email = "charleshenriquegonsalves05@gmail.com";
-  const password = "963850";
+  const email = process.env.ADMIN_EMAIL?.trim();
+  const password = process.env.ADMIN_PASSWORD;
+  const name = process.env.ADMIN_NAME?.trim() || "Administrador";
+
+  if (!email || !password) {
+    throw new Error("ADMIN_EMAIL and ADMIN_PASSWORD are required to seed the admin account.");
+  }
   const salt = randomBytes(16).toString("hex");
   const passwordHash = await hashPassword(password, salt);
   const openId = `local:${email}`;
@@ -32,7 +41,7 @@ async function seed() {
     console.log("Seeding admin user...");
     await sql`
       INSERT INTO users (open_id, name, email, login_method, role)
-      VALUES (${openId}, 'Charles Henrique', ${email}, 'email', 'admin')
+      VALUES (${openId}, ${name}, ${email}, 'email', 'admin')
       ON CONFLICT (open_id) DO UPDATE SET role = 'admin'
     `;
 
