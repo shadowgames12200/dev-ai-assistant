@@ -2,6 +2,7 @@ import { Toaster } from "@/components/ui/sonner";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import NotFound from "@/pages/NotFound";
 import { Route, Switch } from "wouter";
+import { useEffect, type ReactNode } from "react";
 import ErrorBoundary from "./components/ErrorBoundary";
 import { ThemeProvider } from "./contexts/ThemeContext";
 import { useAuth } from "./_core/hooks/useAuth";
@@ -11,70 +12,86 @@ import Admin from "./pages/Admin";
 import Account from "./pages/Account";
 import Recharge from "./pages/Recharge";
 
-function Router() {
+function LoadingScreen() {
+  return (
+    <div className="flex items-center justify-center min-h-screen bg-[#0a0a0f]">
+      <div className="flex flex-col items-center gap-3">
+        <div className="h-8 w-8 animate-spin rounded-full border-2 border-violet-500/30 border-t-violet-400" />
+        <p className="text-sm text-zinc-500">Carregando...</p>
+      </div>
+    </div>
+  );
+}
+
+function LoginPage() {
   const { user, loading } = useAuth();
 
-  // Public route: login page
-  const LoginPage = () => {
-    if (user) {
-      window.location.href = "/chat";
-      return null;
+  useEffect(() => {
+    if (!loading && user) {
+      window.location.replace("/chat");
     }
-    return <Login />;
-  };
+  }, [loading, user]);
 
-  // Protected route wrapper: redirects to login when not authenticated
-  const Protected = ({ children }: { children: React.ReactNode }) => {
-    if (loading) {
-      return (
-        <div className="flex items-center justify-center min-h-screen bg-[#0a0a0f]">
-          <div className="flex flex-col items-center gap-3">
-            <div className="h-8 w-8 animate-spin rounded-full border-2 border-violet-500/30 border-t-violet-400" />
-            <p className="text-sm text-zinc-500">Carregando...</p>
-          </div>
-        </div>
-      );
-    }
-    if (!user) {
-      window.location.href = "/";
-      return null;
-    }
-    return <>{children}</>;
-  };
+  if (loading || user) return <LoadingScreen />;
+  return <Login />;
+}
 
-  const AccountPage = () => (
+function Protected({ children }: { children: ReactNode }) {
+  const { user, loading } = useAuth();
+
+  useEffect(() => {
+    if (!loading && !user) {
+      window.location.replace("/");
+    }
+  }, [loading, user]);
+
+  if (loading || !user) return <LoadingScreen />;
+  return <>{children}</>;
+}
+
+function ChatPage() {
+  return (
+    <Protected>
+      <Chat />
+    </Protected>
+  );
+}
+
+function AdminPage() {
+  return (
+    <Protected>
+      <Admin />
+    </Protected>
+  );
+}
+
+function AccountPage() {
+  return (
     <Protected>
       <Account />
     </Protected>
   );
+}
 
+function RechargePage() {
+  return (
+    <Protected>
+      <Recharge />
+    </Protected>
+  );
+}
+
+function Router() {
   return (
     <Switch>
-      <Route path={"/"} component={LoginPage} />
-      <Route path={"/login"} component={LoginPage} />
-      <Route path={"/chat"}>
-        <Protected>
-          <Chat />
-        </Protected>
-      </Route>
-      <Route path={"/admin"}>
-        <Protected>
-          <Admin />
-        </Protected>
-      </Route>
-      <Route path={"/approvals"}>
-        <Protected>
-          <Admin />
-        </Protected>
-      </Route>
+      <Route path="/" component={LoginPage} />
+      <Route path="/login" component={LoginPage} />
+      <Route path="/chat" component={ChatPage} />
+      <Route path="/admin" component={AdminPage} />
+      <Route path="/approvals" component={AdminPage} />
       <Route path="/account" component={AccountPage} />
-      <Route path="/recharge">
-        <Protected>
-          <Recharge />
-        </Protected>
-      </Route>
-      <Route path={"/404"} component={NotFound} />
-      {/* Final fallback route */}
+      <Route path="/recharge" component={RechargePage} />
+      <Route path="/404" component={NotFound} />
       <Route component={NotFound} />
     </Switch>
   );
