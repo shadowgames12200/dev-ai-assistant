@@ -212,10 +212,34 @@ const normalizeToolChoice = (
   return toolChoice;
 };
 
+const normalizeBaseUrl = (value: string): string =>
+  value.trim().replace(/\/+$/, "");
+
+const hasApiVersion = (value: string): boolean => {
+  try {
+    const pathname = new URL(value).pathname;
+    return /(?:^|\/)v\d+(?:beta)?(?:\/|$)/i.test(pathname) ||
+      /\/openai(?:\/|$)/i.test(pathname);
+  } catch {
+    return /(?:^|\/)v\d+(?:beta)?(?:\/|$)/i.test(value) ||
+      /\/openai(?:\/|$)/i.test(value);
+  }
+};
+
+const buildApiEndpoint = (baseUrl: string, resource: "chat/completions" | "models") => {
+  const base = normalizeBaseUrl(baseUrl);
+  if (base.endsWith(`/${resource}`)) return base;
+  const versionedBase = hasApiVersion(base) ? base : `${base}/v1`;
+  return `${versionedBase}/${resource}`;
+};
+
 const resolveApiUrl = () =>
-  ENV.forgeApiUrl && ENV.forgeApiUrl.trim().length > 0
-    ? `${ENV.forgeApiUrl.replace(/\/$/, "")}/v1/chat/completions`
-    : "https://forge.manus.im/v1/chat/completions";
+  buildApiEndpoint(
+    ENV.forgeApiUrl && ENV.forgeApiUrl.trim().length > 0
+      ? ENV.forgeApiUrl
+      : "https://forge.manus.im",
+    "chat/completions",
+  );
 
 const assertApiKey = () => {
   if (!ENV.forgeApiKey) {
@@ -495,7 +519,7 @@ export async function invokeLLMStream(
       // OpenAI supports GPT models
       return isGeminiModel(model) ? "gpt-4o-mini" : (model || "gpt-4o-mini");
     }
-    return model || "gemini-3.6-flash";
+    return model || "gemini-3-flash-preview";
   };
 
   let lastError: Error | null = null;
@@ -506,15 +530,18 @@ export async function invokeLLMStream(
         ? { ...payload, thinking: undefined, reasoning: undefined, model: getModelForProvider(provider) }
         : { ...payload, model: getModelForProvider(provider) };
 
-      const response = await fetchWithBackoff(provider.url + "/chat/completions", {
+      const response = await fetchWithBackoff(
+        buildApiEndpoint(provider.url, "chat/completions"),
+        {
         method: "POST",
         headers: {
           "content-type": "application/json",
           authorization: `Bearer ${provider.key}`,
           accept: shouldStream ? "text/event-stream" : "application/json",
         },
-        body: JSON.stringify(finalPayload),
-      });
+          body: JSON.stringify(finalPayload),
+        },
+      );
 
       if (response.ok) {
         if (provider.label !== "primary") {
@@ -544,6 +571,97 @@ export async function invokeLLMStream(
   throw lastError || new Error("All LLM providers failed");
 }
 
+const contentToText = (content: unknown): string => {
+  if (typeof content === "string") return content;
+  if (!Array.isArray(content)) return "";
+
+  return content
+    .map(part => {
+      if (typeof part === "string") return part;
+      if (part && typeof part === "object" && "text" in part) {
+        return typeof (part as { text?: unknown }).text === "string"
+          ? (part as { text: string }).text
+          : "";
+      }
+      return "";
+    })
+    .join("");
+};
+
+const extractChunkText = (value: any): string => {
+  const choice = value?.choices?.[0];
+  return contentToText(
+    choice?.delta?.content ??
+      choice?.message?.content ??
+      choice?.text ??
+      value?.content,
+  );
+};
+
+/**
+ * Reads both standard JSON completions and OpenAI-compatible SSE responses.
+ * Some configured providers ignore `stream: true` and return one JSON object,
+ * while others return `data:` events; both formats are accepted here.
+ */
+export async function readLLMStreamContent(response: Response): Promise<string> {
+  const raw = await response.text();
+  if (!raw.trim()) return "";
+
+  try {
+    const parsed = JSON.parse(raw);
+    const content = extractChunkText(parsed);
+    if (content) return content;
+  } catch {
+    // Continue with SSE/plain-text parsing below.
+  }
+
+  let accumulated = "";
+  let mode: "unknown" | "delta" | "cumulative" = "unknown";
+
+  for (const line of raw.split(/\r?\n/)) {
+    const trimmed = line.trim();
+    if (!trimmed.startsWith("data:")) continue;
+
+    const data = trimmed.slice("data:".length).trim();
+    if (!data || data === "[DONE]") continue;
+
+    let parsed: unknown;
+    try {
+      parsed = JSON.parse(data);
+    } catch {
+      continue;
+    }
+
+    const next = extractChunkText(parsed);
+    if (!next) continue;
+
+    let delta = next;
+    if (mode === "unknown") {
+      if (accumulated && next.startsWith(accumulated)) {
+        mode = "cumulative";
+        delta = next.slice(accumulated.length);
+      } else {
+        mode = "delta";
+      }
+    } else if (mode === "delta" && accumulated && next.startsWith(accumulated)) {
+      mode = "cumulative";
+      delta = next.slice(accumulated.length);
+    } else if (mode === "cumulative") {
+      if (next === accumulated) {
+        delta = "";
+      } else if (next.startsWith(accumulated)) {
+        delta = next.slice(accumulated.length);
+      } else {
+        mode = "delta";
+      }
+    }
+
+    accumulated += delta;
+  }
+
+  return accumulated || raw;
+}
+
 export type ModelInfo = {
   id: string;
   object: string;
@@ -559,9 +677,12 @@ export type ModelsResponse = {
 export async function listLLMModels(): Promise<ModelsResponse> {
   assertApiKey();
 
-  const url = ENV.forgeApiUrl && ENV.forgeApiUrl.trim().length > 0
-    ? `${ENV.forgeApiUrl.replace(/\/$/, "")}/v1/models`
-    : "https://forge.manus.im/v1/models";
+  const url = buildApiEndpoint(
+    ENV.forgeApiUrl && ENV.forgeApiUrl.trim().length > 0
+      ? ENV.forgeApiUrl
+      : "https://forge.manus.im",
+    "models",
+  );
 
   const response = await fetchWithBackoff(url, {
     headers: { authorization: `Bearer ${ENV.forgeApiKey}` },

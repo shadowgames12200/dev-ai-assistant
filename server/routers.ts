@@ -216,7 +216,7 @@ export const appRouter = router({
             return { success: true, warning: "insufficient_info" };
           }
 
-          const { invokeLLMStream } = await import("./_core/llm");
+          const { invokeLLMStream, readLLMStreamContent } = await import("./_core/llm");
           
           const llmMessages: any[] = [
             { role: "system", content: SYSTEM_PROMPT },
@@ -224,17 +224,11 @@ export const appRouter = router({
           ];
 
           const stream = await invokeLLMStream({
-            model: "gemini-3.6-flash",
+            model: "gemini-3-flash-preview",
             messages: llmMessages,
           });
 
-          const reader = (stream.body as ReadableStream).getReader();
-          let assistantResponse = "";
-          while (true) {
-            const { done, value } = await reader.read();
-            if (done) break;
-            assistantResponse += new TextDecoder().decode(value);
-          }
+          const assistantResponse = await readLLMStreamContent(stream);
           await db.addMessage(input.conversationId, "assistant", assistantResponse);
           await db.addCredits(ctx.user.id, -1);
           
