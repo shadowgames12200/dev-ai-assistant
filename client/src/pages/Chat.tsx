@@ -40,7 +40,7 @@ export default function Chat() {
   const [selectedId, setSelectedId] = useState<number | null>(null);
   const [editingId, setEditingId] = useState<number | null>(null);
   const [editingTitle, setEditingTitle] = useState("");
-  const [sidebarOpen, setSidebarOpen] = useState(false);
+  const [sidebarOpen, setSidebarOpen] = useState(() => !isMobile);
   const [accountMenuOpen, setAccountMenuOpen] = useState(false);
   const renameRef = useRef<HTMLInputElement>(null);
 
@@ -61,10 +61,6 @@ export default function Chat() {
     }
   }, [conversations, selectedId, isMobile]);
 
-  // Sincronizar estado inicial do sidebar com o dispositivo
-  useEffect(() => {
-    setSidebarOpen(!isMobile);
-  }, [isMobile]);
 
   const createMutation = trpc.chat.conversations.create.useMutation({
     onSuccess: (data) => {
@@ -140,9 +136,16 @@ export default function Chat() {
     <div className="flex h-screen bg-[#0a0a0f] text-foreground overflow-hidden relative">
       {/* Mobile Overlay */}
       {isMobile && sidebarOpen && (
-        <div 
-          className="fixed inset-0 bg-black/60 z-40 backdrop-blur-sm transition-opacity duration-300"
-          onClick={() => setSidebarOpen(false)}
+        <div
+          className="fixed inset-0 z-40 bg-black/60 backdrop-blur-sm transition-opacity duration-300"
+          data-testid="mobile-sidebar-backdrop"
+          aria-hidden="true"
+          onPointerDown={(event) => {
+            if (event.target === event.currentTarget) setSidebarOpen(false);
+          }}
+          onClick={(event) => {
+            if (event.target === event.currentTarget) setSidebarOpen(false);
+          }}
         />
       )}
 
@@ -152,6 +155,9 @@ export default function Chat() {
           ${sidebarOpen ? (isMobile ? "fixed inset-y-0 left-0 z-50 w-72" : "w-72") : (isMobile ? "fixed inset-y-0 left-0 z-50 w-0 -translate-x-full" : "w-0")} 
           shrink-0 border-r border-white/10 bg-[#0f0f16] flex flex-col transition-all duration-300 overflow-hidden
         `}
+        id="devai-navigation-sidebar"
+        data-testid="devai-navigation-sidebar"
+        aria-hidden={isMobile ? !sidebarOpen : undefined}
       >
         <div className="p-3 flex items-center justify-between border-b border-white/10">
           <div className="flex items-center gap-2 min-w-0">
@@ -159,7 +165,12 @@ export default function Chat() {
             <span className="font-semibold truncate">DevAI Assistant</span>
           </div>
           {isMobile && (
-            <Button variant="ghost" size="icon" onClick={() => setSidebarOpen(false)}>
+            <Button
+              variant="ghost"
+              size="icon"
+              aria-label="Fechar menu de navegação pela barra lateral"
+              onClick={() => setSidebarOpen(false)}
+            >
               <X className="h-4 w-4" />
             </Button>
           )}
@@ -351,9 +362,14 @@ export default function Chat() {
               variant="ghost"
               size="icon"
               className="text-zinc-400 lg:hidden"
+              aria-label={sidebarOpen ? "Fechar menu de navegação" : "Abrir menu de navegação"}
+              aria-expanded={sidebarOpen}
+              aria-controls="devai-navigation-sidebar"
+              onPointerDown={(e) => e.stopPropagation()}
               onClick={(e) => {
+                e.preventDefault();
                 e.stopPropagation();
-                setSidebarOpen((v) => !v);
+                setSidebarOpen(true);
               }}
             >
               <Menu className="h-5 w-5" />
