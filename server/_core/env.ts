@@ -1,19 +1,17 @@
-// Fallback para VM local: se BUILT_IN_FORGE_API_KEY não está disponível,
-// usar as keys diretas do .env (GEMINI_API_KEY > GROQ_API_KEY > OPENAI_API_KEY)
+// Prefer a directly configured provider when one is present. This keeps a
+// stale built-in Forge credential from shadowing the provider the app owner chose.
 function resolveForgeApiKey(): string {
-  if (process.env.BUILT_IN_FORGE_API_KEY) return process.env.BUILT_IN_FORGE_API_KEY;
-  // Local VM fallback: try Gemini first, then Groq, then OpenAI
-  if (process.env.GEMINI_API_KEY) return process.env.GEMINI_API_KEY;
   if (process.env.GROQ_API_KEY) return process.env.GROQ_API_KEY;
+  if (process.env.BUILT_IN_FORGE_API_KEY) return process.env.BUILT_IN_FORGE_API_KEY;
+  if (process.env.GEMINI_API_KEY) return process.env.GEMINI_API_KEY;
   if (process.env.OPENAI_API_KEY) return process.env.OPENAI_API_KEY;
   return "";
 }
 
 function resolveForgeApiUrl(): string {
-  if (process.env.BUILT_IN_FORGE_API_URL) return process.env.BUILT_IN_FORGE_API_URL;
-  // Local VM fallback: use Gemini-compatible endpoint
-  if (process.env.GEMINI_API_KEY) return "https://generativelanguage.googleapis.com/v1beta/openai";
   if (process.env.GROQ_API_KEY) return "https://api.groq.com/openai/v1";
+  if (process.env.BUILT_IN_FORGE_API_URL) return process.env.BUILT_IN_FORGE_API_URL;
+  if (process.env.GEMINI_API_KEY) return "https://generativelanguage.googleapis.com/v1beta/openai";
   if (process.env.OPENAI_API_KEY) return "https://api.openai.com/v1";
   return "";
 }
