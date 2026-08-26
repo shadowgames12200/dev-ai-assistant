@@ -510,9 +510,11 @@ export async function invokeLLMStream(
   // Gemini models only work on Gemini endpoint; use provider-appropriate models for fallbacks
   const isGeminiModel = (m: string | undefined) =>
     !!m && (m.toLowerCase().includes("gemini") || m.toLowerCase().startsWith("gemini"));
-  const getModelForProvider = (p: { label: string }): string => {
-    if (p.label === "groq") {
-      // Groq free tier available models (checked Aug 2026): openai/gpt-oss-20b (no thinking), groq/compound-mini
+  const isGroqEndpoint = (url: string) =>
+    url.toLowerCase().includes("api.groq.com/openai");
+  const getModelForProvider = (p: { label: string; url: string }): string => {
+    if (p.label === "groq" || isGroqEndpoint(p.url)) {
+      // Groq's OpenAI-compatible API uses provider-specific model IDs.
       return isGeminiModel(model) ? "openai/gpt-oss-20b" : (model || "openai/gpt-oss-20b");
     }
     if (p.label === "openai") {
