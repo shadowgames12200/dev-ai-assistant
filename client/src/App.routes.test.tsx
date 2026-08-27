@@ -1,6 +1,6 @@
 // @vitest-environment jsdom
 import { afterEach, describe, expect, it, vi } from "vitest";
-import { cleanup, render, screen } from "@testing-library/react";
+import { cleanup, render, screen, waitFor } from "@testing-library/react";
 
 const { authState } = vi.hoisted(() => ({
   authState: { user: null as any, loading: false },
@@ -15,6 +15,13 @@ vi.mock("@/pages/Login", () => ({
 }));
 
 vi.mock("@/components/ui/sonner", () => ({ Toaster: () => null }));
+vi.mock("@/lib/trpc", () => ({
+  trpc: {
+    auth: {
+      blockStatus: { useQuery: () => ({ data: { blocked: false }, isLoading: false }) },
+    },
+  },
+}));
 
 vi.mock("@/pages/Chat", () => ({ default: () => <div>Chat</div> }));
 vi.mock("@/pages/Admin", () => ({ default: () => <div>Admin</div> }));
@@ -46,5 +53,15 @@ describe("rotas de acesso", () => {
     render(<App />);
 
     expect(screen.getByText("Admin")).not.toBeNull();
+  });
+
+  it("redireciona usuário comum que tenta abrir /admin sem renderizar o painel", async () => {
+    authState.user = { id: 2, role: "user" };
+    window.history.pushState({}, "", "/admin");
+
+    render(<App />);
+
+    await waitFor(() => expect(screen.getByText("Chat")).not.toBeNull());
+    expect(screen.queryByText("Admin")).toBeNull();
   });
 });

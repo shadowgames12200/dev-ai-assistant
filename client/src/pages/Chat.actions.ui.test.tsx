@@ -99,6 +99,7 @@ describe("ações de conversa na barra lateral", () => {
     expect(screen.getByTestId("account-menu")).toHaveAttribute("data-state", "open");
     expect(screen.getByRole("menu", { name: "Menu da conta" })).toBeVisible();
     expect(screen.getByRole("menuitem", { name: "Conta" })).toBeVisible();
+    expect(screen.queryByRole("menuitem", { name: "Painel admin" })).toBeNull();
 
     fireEvent.click(screen.getByRole("menuitem", { name: "Sair" }));
     expect(logout).toHaveBeenCalledOnce();

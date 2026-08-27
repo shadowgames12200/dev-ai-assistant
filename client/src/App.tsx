@@ -1,7 +1,7 @@
 import { Toaster } from "@/components/ui/sonner";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import NotFound from "@/pages/NotFound";
-import { Route, Switch } from "wouter";
+import { Route, Switch, useLocation } from "wouter";
 import { useEffect, type ReactNode } from "react";
 import ErrorBoundary from "./components/ErrorBoundary";
 import { ThemeProvider } from "./contexts/ThemeContext";
@@ -11,6 +11,8 @@ import Chat from "./pages/Chat";
 import Admin from "./pages/Admin";
 import Account from "./pages/Account";
 import Recharge from "./pages/Recharge";
+import AccountBlocked from "./components/AccountBlocked";
+import { trpc } from "./lib/trpc";
 
 function LoadingScreen() {
   return (
@@ -25,6 +27,7 @@ function LoadingScreen() {
 
 function LoginPage() {
   const { user, loading } = useAuth();
+  const { data: blockStatus, isLoading: blockStatusLoading } = trpc.auth.blockStatus.useQuery(undefined, { retry: false });
 
   useEffect(() => {
     if (!loading && user) {
@@ -32,7 +35,9 @@ function LoginPage() {
     }
   }, [loading, user]);
 
-  if (loading || user) return <LoadingScreen />;
+  if (loading || blockStatusLoading) return <LoadingScreen />;
+  if (blockStatus?.blocked) return <AccountBlocked status={blockStatus} />;
+  if (user) return <LoadingScreen />;
   return <Login />;
 }
 
@@ -58,11 +63,16 @@ function ChatPage() {
 }
 
 function AdminPage() {
-  return (
-    <Protected>
-      <Admin />
-    </Protected>
-  );
+  const { user, loading } = useAuth();
+  const [, setLocation] = useLocation();
+
+  useEffect(() => {
+    if (!loading && !user) setLocation("/");
+    else if (!loading && user && user.role !== "admin") setLocation("/chat");
+  }, [loading, user, setLocation]);
+
+  if (loading || !user || user.role !== "admin") return <LoadingScreen />;
+  return <Admin />;
 }
 
 function AccountPage() {

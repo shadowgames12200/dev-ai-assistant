@@ -4,6 +4,8 @@ export const roleEnum = pgEnum("role", ["user", "admin"]);
 export const learningStatusEnum = pgEnum("learning_status", ["pending", "proposed", "dismissed"]);
 export const rechargeStatusEnum = pgEnum("recharge_status", ["pending", "approved", "rejected"]);
 export const improvementStatusEnum = pgEnum("improvement_status", ["pending", "approved", "rejected", "in-progress", "completed", "failed"]);
+export const accountStatusEnum = pgEnum("account_status", ["active", "temporarily_blocked", "blocked"]);
+export const abuseCaseStatusEnum = pgEnum("abuse_case_status", ["open", "confirmed", "dismissed", "resolved"]);
 
 export const users = pgTable("users", {
   id: serial("id").primaryKey(),
@@ -12,6 +14,9 @@ export const users = pgTable("users", {
   email: varchar("email", { length: 320 }),
   loginMethod: varchar("login_method", { length: 64 }).default("email"),
   role: roleEnum("role").default("user").notNull(),
+  accountStatus: accountStatusEnum("account_status").default("active").notNull(),
+  blockedUntil: timestamp("blocked_until"),
+  blockedReason: text("blocked_reason"),
   createdAt: timestamp("created_at").defaultNow().notNull(),
   updatedAt: timestamp("updated_at").defaultNow().notNull(),
   lastSignedIn: timestamp("last_signed_in").defaultNow().notNull(),
@@ -87,4 +92,17 @@ export const learningOpportunities = pgTable("learning_opportunities", {
   reason: text("reason").notNull(),
   status: learningStatusEnum("status").default("pending").notNull(),
   createdAt: timestamp("created_at").defaultNow().notNull(),
+});
+
+export const abuseCases = pgTable("abuse_cases", {
+  id: serial("id").primaryKey(),
+  userId: integer("user_id").notNull(),
+  status: abuseCaseStatusEnum("status").default("open").notNull(),
+  score: integer("score").notNull(),
+  signals: text("signals").notNull(),
+  temporaryUntil: timestamp("temporary_until"),
+  reviewNote: text("review_note"),
+  reviewedByUserId: integer("reviewed_by_user_id"),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+  reviewedAt: timestamp("reviewed_at"),
 });

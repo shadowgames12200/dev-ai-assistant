@@ -8,6 +8,7 @@ import { ENV } from "./_core/env";
 import type { User } from "../drizzle/schema";
 import { z } from "zod";
 import { eq } from "drizzle-orm";
+import { REGISTRATION_LIMIT_PER_SOURCE, buildBlockMessage, getAccountBlockState, getRegistrationCount, getSupportLinks, recordSuccessfulRegistration } from "./abuseProtection";
 import * as schema from "../drizzle/schema";
 
 const identifierSchema = z.string().trim().min(3).max(320);
@@ -145,6 +146,18 @@ export async function handleLocalLogin(req: any, res: any) {
       res.status(401).json({ error: "Nome de usuário/e-mail ou senha inválidos" });
       return;
     }
+
+    const blockState = getAccountBlockState(dbUser);
+    if (blockState.blocked) {
+      res.status(403).json({
+        error: buildBlockMessage(blockState),
+        code: "ACCOUNT_BLOCKED",
+        blockedUntil: blockState.until?.toISOString() ?? null,
+        support: getSupportLinks(),
+      });
+      return;
+    }
+
     if (verification.needsUpgrade) {
       const nextSalt = generateSalt();
       await setPasswordRecord(normalizedEmail, await hashPassword(password, nextSalt), nextSalt);
@@ -203,6 +216,14 @@ export async function handleLocalRegister(req: any, res: any) {
     }
 
     const { name, email, password } = parsed.data;
+    if (getRegistrationCount(req) >= REGISTRATION_LIMIT_PER_SOURCE) {
+      res.status(429).json({
+        error: "Não foi possível criar outra conta agora. Se você acredita que isso é um engano, solicite uma revisão pelo suporte.",
+        code: "ACCOUNT_CREATION_LIMIT",
+        support: getSupportLinks(),
+      });
+      return;
+    }
     const existing = await db.getUserByEmail(email);
     if (existing) {
       res.status(409).json({ error: "Este e-mail já está em uso" });
@@ -225,6 +246,8 @@ export async function handleLocalRegister(req: any, res: any) {
       res.status(500).json({ error: "Falha ao criar conta" });
       return;
     }
+
+    recordSuccessfulRegistration(req);
 
     const sessionToken = await sdk.createSessionToken(user.openId, {
       name: user.name || email.split("@")[0],

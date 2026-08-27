@@ -11,6 +11,7 @@ import * as db from "./db";
 import { SYSTEM_PROMPT } from "./systemPrompt";
 import { asUntrustedContent, isApprovalKeyValid, redactSensitiveText } from "./security";
 import { CHAT_REQUESTS_PER_WINDOW, enforceUserRateLimit, UPLOAD_REQUESTS_PER_WINDOW } from "./rateLimit";
+import { buildBlockMessage, getAccountBlockState, getSupportLinks, registerUserAbuseSignal, TEMPORARY_BLOCK_DURATION_MS } from "./abuseProtection";
 
 // Gerenciamento de capacidade simples
 let activeConnections = 0;
@@ -59,7 +60,17 @@ export const appRouter = router({
     me: protectedProcedure.query(({ ctx }) => {
       return ctx.user;
     }),
-    logout: protectedProcedure.mutation(async ({ ctx }) => {
+    blockStatus: publicProcedure.query(({ ctx }) => {
+      const state = ctx.user ? getAccountBlockState(ctx.user) : { blocked: false, permanent: false, until: null, reason: null };
+      return {
+        blocked: state.blocked,
+        permanent: state.permanent,
+        message: state.blocked ? buildBlockMessage(state) : null,
+        blockedUntil: state.until?.toISOString() ?? null,
+        support: state.blocked ? getSupportLinks() : null,
+      };
+    }),
+    logout: publicProcedure.mutation(async ({ ctx }) => {
       const { COOKIE_NAME } = await import("@shared/const");
       const { getSessionCookieOptions } = await import("./_core/cookies");
       const cookieOptions = getSessionCookieOptions(ctx.req);
@@ -92,6 +103,12 @@ export const appRouter = router({
           createdAt: u.createdAt,
           updatedAt: u.updatedAt,
           lastSignedIn: u.lastSignedIn,
+          accountStatus: (() => {
+            const state = getAccountBlockState(u);
+            return state.blocked ? (state.permanent ? "blocked" : "temporarily_blocked") : "active";
+          })(),
+          blockedUntil: getAccountBlockState(u).until,
+          blockedReason: u.blockedReason,
         });
       }
       return results;
@@ -223,6 +240,59 @@ export const appRouter = router({
           if (target) await db.deleteUserAccount(target.id);
         }
         return { success: true, deletedUserIds: userIds };
+      }),
+
+    abuseCases: adminProcedure.query(async () => db.getAbuseCases()),
+
+    blockUsers: adminProcedure
+      .input(z.object({
+        userIds: z.array(z.number().int().positive()).min(1).max(100),
+        reason: z.string().trim().min(3).max(500),
+        approvalKey: z.string().min(1).max(512),
+        confirmation: z.literal("BLOQUEAR CONTAS"),
+      }))
+      .mutation(async ({ ctx, input }) => {
+        requireOwnerConfiguration();
+        if (!isApprovalKeyValid(input.approvalKey)) {
+          throw new TRPCError({ code: "UNAUTHORIZED", message: "Senha de aprovação incorreta" });
+        }
+        const userIds = Array.from(new Set(input.userIds));
+        if (userIds.includes(ctx.user.id)) {
+          throw new TRPCError({ code: "FORBIDDEN", message: "A sessão administrativa em uso não pode ser bloqueada." });
+        }
+        const targets = await Promise.all(userIds.map(userId => db.getUserById(userId)));
+        if (targets.some(target => !target)) throw new TRPCError({ code: "NOT_FOUND", message: "Uma ou mais contas não foram encontradas." });
+        if (targets.some(target => target && isConfiguredOwner(target))) {
+          throw new TRPCError({ code: "FORBIDDEN", message: "A conta proprietária nunca pode ser bloqueada por esta ação." });
+        }
+        for (const target of targets) {
+          if (target) await db.permanentlyBlockUser(target.id, input.reason, ctx.user.id);
+        }
+        return { success: true, blockedUserIds: userIds };
+      }),
+
+    unblockUsers: adminProcedure
+      .input(z.object({
+        userIds: z.array(z.number().int().positive()).min(1).max(100),
+        note: z.string().trim().max(500).optional(),
+        approvalKey: z.string().min(1).max(512),
+        confirmation: z.literal("DESBLOQUEAR CONTAS"),
+      }))
+      .mutation(async ({ ctx, input }) => {
+        requireOwnerConfiguration();
+        if (!isApprovalKeyValid(input.approvalKey)) {
+          throw new TRPCError({ code: "UNAUTHORIZED", message: "Senha de aprovação incorreta" });
+        }
+        const userIds = Array.from(new Set(input.userIds));
+        const targets = await Promise.all(userIds.map(userId => db.getUserById(userId)));
+        if (targets.some(target => !target)) throw new TRPCError({ code: "NOT_FOUND", message: "Uma ou mais contas não foram encontradas." });
+        if (targets.some(target => target && isConfiguredOwner(target))) {
+          throw new TRPCError({ code: "FORBIDDEN", message: "A conta proprietária é protegida e não precisa de desbloqueio." });
+        }
+        for (const target of targets) {
+          if (target) await db.clearUserBlock(target.id, ctx.user.id, input.note);
+        }
+        return { success: true, unblockedUserIds: userIds };
       }),
   }),
 
@@ -366,7 +436,16 @@ export const appRouter = router({
           throw new TRPCError({ code: "NOT_FOUND", message: "Conversa não encontrada" });
         }
 
-        enforceUserRateLimit(ctx.user.id, "chat", CHAT_REQUESTS_PER_WINDOW);
+        try {
+          enforceUserRateLimit(ctx.user.id, "chat", CHAT_REQUESTS_PER_WINDOW);
+        } catch (error) {
+          const abuse = registerUserAbuseSignal(ctx.user.id, "chat_rate_limit");
+          if (abuse.shouldTemporarilyBlock && !isConfiguredOwner(ctx.user)) {
+            const until = new Date(Date.now() + TEMPORARY_BLOCK_DURATION_MS);
+            await db.temporarilyBlockUser(ctx.user.id, until, "Muitas requisições de chat em sequência.", abuse.count, abuse.signals).catch(() => undefined);
+          }
+          throw error;
+        }
 
         if (ctx.user.role !== "admin") {
           const balance = await db.getUserCredits(ctx.user.id);
@@ -497,7 +576,16 @@ export const appRouter = router({
           throw new TRPCError({ code: "NOT_FOUND", message: "Conversa não encontrada" });
         }
 
-        enforceUserRateLimit(ctx.user.id, "upload", UPLOAD_REQUESTS_PER_WINDOW);
+        try {
+          enforceUserRateLimit(ctx.user.id, "upload", UPLOAD_REQUESTS_PER_WINDOW);
+        } catch (error) {
+          const abuse = registerUserAbuseSignal(ctx.user.id, "upload_rate_limit");
+          if (abuse.shouldTemporarilyBlock && !isConfiguredOwner(ctx.user)) {
+            const until = new Date(Date.now() + TEMPORARY_BLOCK_DURATION_MS);
+            await db.temporarilyBlockUser(ctx.user.id, until, "Muitos uploads em sequência.", abuse.count, abuse.signals).catch(() => undefined);
+          }
+          throw error;
+        }
 
         const safeFileName = basename(input.fileName);
         if (safeFileName !== input.fileName || safeFileName.includes("..")) {

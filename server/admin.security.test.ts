@@ -44,6 +44,7 @@ const dbState = vi.hoisted(() => {
       [2, 25],
       [3, 50],
     ]),
+    abuseCases: [],
     users: new Map<number, any>([
       [owner.id, owner],
       [client.id, client],
@@ -62,6 +63,17 @@ const dbState = vi.hoisted(() => {
       return user;
     }),
     deleteUserAccount: vi.fn(async (id: number) => dbState.users.delete(id)),
+    permanentlyBlockUser: vi.fn(async (id: number, reason: string) => {
+      const user = dbState.users.get(id);
+      if (user) user.accountStatus = "blocked";
+      return user || null;
+    }),
+    clearUserBlock: vi.fn(async (id: number) => {
+      const user = dbState.users.get(id);
+      if (user) user.accountStatus = "active";
+      return user || null;
+    }),
+    getAbuseCases: vi.fn(async () => dbState.abuseCases),
   };
 });
 
@@ -92,6 +104,7 @@ describe("proteções administrativas", () => {
     dbState.users.set(1, dbState.owner);
     dbState.users.set(2, dbState.client);
     dbState.users.set(3, dbState.otherAdmin);
+    dbState.abuseCases.length = 0;
     vi.clearAllMocks();
   });
 
@@ -161,6 +174,27 @@ describe("proteções administrativas", () => {
     })).rejects.toMatchObject({ code: "FORBIDDEN" });
 
     expect(dbState.deleteUserAccount).not.toHaveBeenCalled();
+  });
+
+  it("bloqueia e desbloqueia uma conta selecionada com senha e frase próprias", async () => {
+    const appRouter = await getRouter();
+    const caller = appRouter.createCaller(context(dbState.owner));
+
+    await caller.admin.blockUsers({ userIds: [2], reason: "Abuso confirmado", approvalKey: "approval-test-key", confirmation: "BLOQUEAR CONTAS" });
+    expect(dbState.permanentlyBlockUser).toHaveBeenCalledWith(2, "Abuso confirmado", 1);
+    expect(dbState.client.accountStatus).toBe("blocked");
+
+    await caller.admin.unblockUsers({ userIds: [2], note: "Revisão aprovada", approvalKey: "approval-test-key", confirmation: "DESBLOQUEAR CONTAS" });
+    expect(dbState.clearUserBlock).toHaveBeenCalledWith(2, 1, "Revisão aprovada");
+    expect(dbState.client.accountStatus).toBe("active");
+  });
+
+  it("nunca permite bloquear a conta proprietária", async () => {
+    const appRouter = await getRouter();
+    const caller = appRouter.createCaller(context(dbState.owner));
+
+    await expect(caller.admin.blockUsers({ userIds: [1], reason: "Teste", approvalKey: "approval-test-key", confirmation: "BLOQUEAR CONTAS" })).rejects.toMatchObject({ code: "FORBIDDEN" });
+    expect(dbState.permanentlyBlockUser).not.toHaveBeenCalled();
   });
 
   it("promove uma conta selecionada somente após senha e confirmação", async () => {

@@ -33,10 +33,15 @@ export default function Admin() {
     enabled: user?.role === "admin",
   });
 
+  const { data: abuseCasesData } = trpc.admin.abuseCases.useQuery(undefined, {
+    enabled: user?.role === "admin",
+  });
+
   const [approvalKey, setApprovalKey] = useState("");
   const [selectedUserIds, setSelectedUserIds] = useState<number[]>([]);
   const [batchAmount, setBatchAmount] = useState("50");
   const [batchRole, setBatchRole] = useState<"admin" | "user">("admin");
+  const [blockReason, setBlockReason] = useState("Abuso de conta confirmado pelo administrador.");
   const listedUserIds = (usersData || []).map((u: any) => u.id);
   const allUsersSelected = listedUserIds.length > 0 && listedUserIds.every((id: number) => selectedUserIds.includes(id));
 
@@ -73,6 +78,26 @@ export default function Admin() {
       toast.success("Contas selecionadas excluídas.");
     },
     onError: (err: any) => toast.error("Erro ao excluir contas: " + err.message),
+  });
+
+  const blockUsersMutation = trpc.admin.blockUsers.useMutation({
+    onSuccess: () => {
+      utils.admin.listUsers.invalidate();
+      utils.admin.abuseCases.invalidate();
+      setSelectedUserIds([]);
+      toast.success("Contas bloqueadas e registradas para revisão.");
+    },
+    onError: (err: any) => toast.error("Erro ao bloquear contas: " + err.message),
+  });
+
+  const unblockUsersMutation = trpc.admin.unblockUsers.useMutation({
+    onSuccess: () => {
+      utils.admin.listUsers.invalidate();
+      utils.admin.abuseCases.invalidate();
+      setSelectedUserIds([]);
+      toast.success("Contas desbloqueadas.");
+    },
+    onError: (err: any) => toast.error("Erro ao desbloquear contas: " + err.message),
   });
 
   const askForConfirmation = (phrase: string) => window.prompt(`Digite exatamente ${phrase} para confirmar:`) === phrase;
@@ -121,6 +146,22 @@ export default function Admin() {
     deleteUsersMutation.mutate({ userIds: selectedUserIds, approvalKey, confirmation: "EXCLUIR CONTAS", ownerOverride: false });
   };
 
+  const runBatchBlock = () => {
+    if (selectedUserIds.length === 0) return toast.error("Selecione pelo menos uma conta.");
+    if (!blockReason.trim()) return toast.error("Informe o motivo do bloqueio.");
+    if (!approvalKey) return toast.error("Informe a senha de aprovação.");
+    if (!window.confirm("O bloqueio permanente impede login e uso da conta. Continuar?")) return;
+    if (!askForConfirmation("BLOQUEAR CONTAS")) return;
+    blockUsersMutation.mutate({ userIds: selectedUserIds, reason: blockReason.trim(), approvalKey, confirmation: "BLOQUEAR CONTAS" });
+  };
+
+  const runBatchUnblock = () => {
+    if (selectedUserIds.length === 0) return toast.error("Selecione pelo menos uma conta.");
+    if (!approvalKey) return toast.error("Informe a senha de aprovação.");
+    if (!askForConfirmation("DESBLOQUEAR CONTAS")) return;
+    unblockUsersMutation.mutate({ userIds: selectedUserIds, note: "Revisão manual concluída pelo administrador.", approvalKey, confirmation: "DESBLOQUEAR CONTAS" });
+  };
+
   const approveRechargeMutation = trpc.pix.approveRecharge.useMutation({
     onSuccess: () => {
       utils.pix.listPending.invalidate();
@@ -138,17 +179,7 @@ export default function Admin() {
     onError: (err) => toast.error("Erro ao aprovar melhoria: " + err.message),
   });
 
-  if (user && user.role !== "admin") {
-    return (
-      <div className="flex flex-col items-center justify-center min-h-screen gap-4 bg-[#0a0a0f] text-foreground p-4 text-center">
-        <p className="text-sm text-zinc-400">Acesso restrito a administradores.</p>
-        <Button variant="outline" onClick={() => setLocation("/chat")}>
-          <ArrowLeft className="h-4 w-4 mr-2" />
-          Voltar ao chat
-        </Button>
-      </div>
-    );
-  }
+  if (!user || user.role !== "admin") return null;
 
   return (
     <div className="min-h-screen bg-[#0a0a0f] text-foreground">
@@ -265,6 +296,12 @@ export default function Admin() {
                 placeholder="Créditos (+/-)"
                 className="h-9 bg-[#1e1e28] border-white/10 text-sm"
               />
+              <Input
+                value={blockReason}
+                onChange={(e) => setBlockReason(e.target.value)}
+                placeholder="Motivo do bloqueio"
+                className="h-9 bg-[#1e1e28] border-white/10 text-sm"
+              />
               <select
                 value={batchRole}
                 onChange={(e) => setBatchRole(e.target.value as "admin" | "user")}
@@ -279,6 +316,12 @@ export default function Admin() {
                 </Button>
                 <Button size="sm" variant="outline" onClick={runBatchRoleChange} disabled={setRolesMutation.isPending}>
                   <UserCog className="mr-1 h-4 w-4" />Aplicar papel
+                </Button>
+                <Button size="sm" variant="outline" onClick={runBatchBlock} disabled={blockUsersMutation.isPending}>
+                  <ShieldOff className="mr-1 h-4 w-4" />Bloquear
+                </Button>
+                <Button size="sm" variant="outline" onClick={runBatchUnblock} disabled={unblockUsersMutation.isPending}>
+                  <ShieldCheck className="mr-1 h-4 w-4" />Desbloquear
                 </Button>
                 <Button size="sm" variant="destructive" onClick={runBatchDelete} disabled={deleteUsersMutation.isPending}>
                   <Trash2 className="mr-1 h-4 w-4" />Excluir
@@ -323,6 +366,8 @@ export default function Admin() {
                         {u.isOwner ? "dono" : u.role}
                       </span>
                       {u.isOwner && <span className="ml-2 text-[10px] text-amber-300">protegido</span>}
+                      {u.accountStatus === "blocked" && <span className="ml-2 text-[10px] text-red-300">bloqueada</span>}
+                      {u.accountStatus === "temporarily_blocked" && <span className="ml-2 text-[10px] text-amber-300">bloqueio temporário</span>}
                     </TableCell>
                     <TableCell className="text-violet-300 font-medium text-xs">{u.balance}</TableCell>
                     <TableCell className="text-right">
@@ -340,6 +385,30 @@ export default function Admin() {
               </TableBody>
             </Table>
           </div>
+        </section>
+
+        <section className="rounded-lg border border-white/10 bg-white/[0.03] p-4 sm:p-5">
+          <div className="flex items-center gap-2 mb-2">
+            <ShieldOff className="h-4 w-4 text-amber-400" />
+            <h2 className="text-sm font-semibold">Casos de abuso e revisão</h2>
+          </div>
+          <p className="mb-4 text-xs leading-relaxed text-zinc-400">Bloqueios automáticos ficam temporários e aparecem aqui para análise. O bloqueio permanente só ocorre mediante ação administrativa confirmada.</p>
+          {(abuseCasesData?.length ?? 0) === 0 ? (
+            <p className="text-xs text-zinc-500">Nenhum caso registrado.</p>
+          ) : (
+            <div className="space-y-2">
+              {(abuseCasesData || []).map((abuseCase: any) => (
+                <article key={abuseCase.id} className="rounded-md border border-white/10 bg-black/20 p-3 text-xs">
+                  <div className="flex flex-wrap items-center justify-between gap-2">
+                    <span className="font-medium text-zinc-100">{abuseCase.userName || abuseCase.userEmail || `Usuário ${abuseCase.userId}`}</span>
+                    <span className="text-zinc-500">Caso #{abuseCase.id} · {abuseCase.status}</span>
+                  </div>
+                  <p className="mt-1 text-zinc-400">Pontuação: {abuseCase.score} · Conta: {abuseCase.accountStatus || "desconhecida"}</p>
+                  {abuseCase.reviewNote && <p className="mt-1 text-zinc-500">Nota: {abuseCase.reviewNote}</p>}
+                </article>
+              ))}
+            </div>
+          )}
         </section>
       </main>
     </div>

@@ -1,5 +1,6 @@
 import { NOT_ADMIN_ERR_MSG, UNAUTHED_ERR_MSG } from '@shared/const';
 import { initTRPC, TRPCError } from "@trpc/server";
+import { buildBlockMessage, getAccountBlockState } from "../abuseProtection";
 import superjson from "superjson";
 import type { TrpcContext } from "./context";
 
@@ -15,6 +16,14 @@ const requireUser = t.middleware(async opts => {
 
   if (!ctx.user) {
     throw new TRPCError({ code: "UNAUTHORIZED", message: UNAUTHED_ERR_MSG });
+  }
+
+  const blockState = getAccountBlockState(ctx.user);
+  if (blockState.blocked) {
+    throw new TRPCError({
+      code: "FORBIDDEN",
+      message: `ACCOUNT_BLOCKED:${buildBlockMessage(blockState)}`,
+    });
   }
 
   return next({

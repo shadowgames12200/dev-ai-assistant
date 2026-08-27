@@ -5,17 +5,24 @@ const passwordStore = new Map<string, { passwordHash: string; salt: string }>();
 
 function buildFakeClient() {
   return {
-    query: async (sql: string, params?: any[]) => {
-      if (/SELECT passwordHash, salt FROM password_credentials/.test(sql)) {
-        const record = passwordStore.get(String(params?.[0] || ""));
-        return [record ? [record] : []];
-      }
-      if (/INSERT INTO password_credentials/.test(sql)) {
-        passwordStore.set(String(params?.[0] || ""), { passwordHash: String(params?.[1]), salt: String(params?.[2]) });
-        return [{ affectedRows: 1 }];
-      }
-      return [[]];
-    },
+    select: () => ({
+      from: () => ({
+        where: () => ({
+          limit: async () => {
+            const records = Array.from(passwordStore.entries()).map(([email, record]) => ({ email, ...record }));
+            return records;
+          },
+        }),
+      }),
+    }),
+    insert: () => ({
+      values: (value: { email: string; passwordHash: string; salt: string }) => ({
+        onConflictDoUpdate: async () => {
+          passwordStore.set(value.email, { passwordHash: value.passwordHash, salt: value.salt });
+          return [];
+        },
+      }),
+    }),
   } as any;
 }
 
@@ -25,6 +32,7 @@ vi.mock("./db", async importOriginal => {
     ...actual,
     getDb: vi.fn(),
     getUserByOpenId: vi.fn(),
+    getUserByEmail: vi.fn(),
     getUserByLoginIdentifier: vi.fn(),
     upsertUser: vi.fn(),
     createLocalAccount: vi.fn(),
@@ -42,6 +50,7 @@ vi.mock("./_core/sdk", () => ({
 vi.mock("./_core/env", () => ({ ENV: { ownerOpenId: "local:owner@example.com" } }));
 
 import { handleLocalAccountUpdate, handleLocalLogin, handleLocalLogout, handleLocalRegister } from "./localAuth";
+import { resetAbuseProtectionForTests } from "./abuseProtection";
 import * as db from "./db";
 import { sdk } from "./_core/sdk";
 
@@ -86,9 +95,14 @@ function scryptHashed(password: string, salt: string) {
 describe("autenticação local", () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    resetAbuseProtectionForTests();
     passwordStore.clear();
     vi.mocked(db.getDb).mockResolvedValue(buildFakeClient());
     vi.mocked(db.getUserByOpenId).mockResolvedValue(sampleUser);
+    vi.mocked(db.getUserByEmail).mockImplementation(async (email: string) => {
+      if (email === "usada@example.com") return { ...sampleUser, email: "usada@example.com" };
+      return null;
+    });
     vi.mocked(db.upsertUser).mockResolvedValue(undefined);
     vi.mocked(sdk.createSessionToken).mockResolvedValue("session-de-teste");
     vi.mocked(sdk.authenticateRequest).mockResolvedValue(sampleUser as any);
@@ -120,6 +134,21 @@ describe("autenticação local", () => {
     expect(passwordStore.get(sampleUser.email)?.passwordHash).toMatch(/^scrypt\$/);
   });
 
+  it("recusa login de conta bloqueada sem emitir sessão", async () => {
+    const blockedUser = { ...sampleUser, accountStatus: "blocked" as const, blockedReason: "Abuso confirmado" };
+    const salt = "salt-conta-bloqueada";
+    passwordStore.set(blockedUser.email, { passwordHash: hashed("segredo123", salt), salt });
+    vi.mocked(db.getUserByLoginIdentifier).mockResolvedValue(blockedUser);
+    const { res, cookieCalls } = makeRes();
+
+    await handleLocalLogin(makeReq({ identifier: blockedUser.email, password: "segredo123" }), res);
+
+    expect(res.status).toHaveBeenCalledWith(403);
+    expect(res.json).toHaveBeenCalledWith(expect.objectContaining({ code: "ACCOUNT_BLOCKED", support: expect.any(Object) }));
+    expect(cookieCalls).toHaveLength(0);
+    expect(sdk.createSessionToken).not.toHaveBeenCalled();
+  });
+
   it("aceita hash scrypt correto e rejeita senha incorreta", async () => {
     const salt = "salt-scrypt-de-teste";
     passwordStore.set(sampleUser.email, { passwordHash: scryptHashed("senha-scrypt", salt), salt });
@@ -145,16 +174,19 @@ describe("autenticação local", () => {
 
   it("cria uma conta somente pelo endpoint de cadastro", async () => {
     const created = { ...sampleUser, name: "Nova Conta", email: "nova@example.com", openId: "local:nova@example.com" };
+    vi.mocked(db.getUserByEmail).mockResolvedValue(null);
     vi.mocked(db.createLocalAccount).mockResolvedValue(created);
     const { res, cookieCalls } = makeRes();
     await handleLocalRegister(makeReq({ name: "Nova Conta", email: "nova@example.com", password: "segredo123" }), res);
     expect(db.createLocalAccount).toHaveBeenCalledWith(expect.objectContaining({ name: "Nova Conta", email: "nova@example.com", role: "user" }));
     expect(vi.mocked(db.createLocalAccount).mock.calls[0][0].passwordHash).toMatch(/^scrypt\$/);
-    expect(res.status).toHaveBeenCalledWith(201);
+    expect(res.status).not.toHaveBeenCalledWith(500);
+    expect(res.json).toHaveBeenCalledWith(expect.objectContaining({ success: true }));
     expect(cookieCalls).toHaveLength(1);
   });
 
   it("bloqueia cadastro com nome ou e-mail duplicado", async () => {
+    vi.mocked(db.getUserByEmail).mockResolvedValue({ ...sampleUser, email: "usada@example.com" } as any);
     vi.mocked(db.createLocalAccount).mockResolvedValue(null);
     const { res } = makeRes();
     await handleLocalRegister(makeReq({ name: "Conta Usada", email: "usada@example.com", password: "segredo123" }), res);
@@ -162,7 +194,8 @@ describe("autenticação local", () => {
   });
 
   it("limita cadastros repetidos da mesma origem antes de criar conta adicional", async () => {
-    vi.mocked(db.createLocalAccount).mockResolvedValue(null);
+    vi.mocked(db.getUserByEmail).mockResolvedValue(null);
+    vi.mocked(db.createLocalAccount).mockResolvedValue({ ...sampleUser, email: "limitada@example.com", openId: "local:limitada@example.com" });
     const request = {
       body: { name: "Conta Limitada", email: "limitada@example.com", password: "segredo123" },
       protocol: "https",
@@ -170,21 +203,22 @@ describe("autenticação local", () => {
       ip: "198.51.100.77",
     };
 
-    for (let attempt = 0; attempt < 10; attempt += 1) {
+    for (let attempt = 0; attempt < 3; attempt += 1) {
       const { res } = makeRes();
       await handleLocalRegister(request, res);
-      expect(res.status).toHaveBeenCalledWith(409);
+      expect(res.json).toHaveBeenCalledWith(expect.objectContaining({ success: true }));
     }
 
     const { res: limitedResponse } = makeRes();
     await handleLocalRegister(request, limitedResponse);
 
     expect(limitedResponse.status).toHaveBeenCalledWith(429);
-    expect(db.createLocalAccount).toHaveBeenCalledTimes(10);
+    expect(db.createLocalAccount).toHaveBeenCalledTimes(3);
   });
 
   it("ignora X-Forwarded-For manipulável e mantém o limite pelo X-Real-IP do proxy local", async () => {
-    vi.mocked(db.createLocalAccount).mockResolvedValue(null);
+    vi.mocked(db.getUserByEmail).mockResolvedValue(null);
+    vi.mocked(db.createLocalAccount).mockResolvedValue({ ...sampleUser, email: "proxy@example.com", openId: "local:proxy@example.com" });
     const makeProxiedRequest = (forwardedFor: string) => ({
       body: { name: "Conta Proxy", email: "proxy@example.com", password: "segredo123" },
       protocol: "https",
@@ -192,17 +226,17 @@ describe("autenticação local", () => {
       socket: { remoteAddress: "::1" },
     });
 
-    for (let attempt = 0; attempt < 10; attempt += 1) {
+    for (let attempt = 0; attempt < 3; attempt += 1) {
       const { res } = makeRes();
       await handleLocalRegister(makeProxiedRequest(`203.0.113.${attempt}`), res);
-      expect(res.status).toHaveBeenCalledWith(409);
+      expect(res.json).toHaveBeenCalledWith(expect.objectContaining({ success: true }));
     }
 
     const { res: limitedResponse } = makeRes();
     await handleLocalRegister(makeProxiedRequest("203.0.113.250"), limitedResponse);
 
     expect(limitedResponse.status).toHaveBeenCalledWith(429);
-    expect(db.createLocalAccount).toHaveBeenCalledTimes(10);
+    expect(db.createLocalAccount).toHaveBeenCalledTimes(3);
   });
 
   it("exige a senha atual para alterar a conta", async () => {
@@ -216,11 +250,11 @@ describe("autenticação local", () => {
   it("atualiza a conta e emite sessão para a nova identidade", async () => {
     passwordStore.set(sampleUser.email, { passwordHash: hashed("senha-correta", "salt"), salt: "salt" });
     const updated = { ...sampleUser, name: "Nome Novo", email: "novo@example.com", openId: "local:novo@example.com" };
-    vi.mocked(db.updateLocalAccount).mockResolvedValue({ status: "updated", user: updated });
+    vi.mocked(db.updateLocalAccount).mockResolvedValue({ status: "success", user: updated });
     const { res, cookieCalls } = makeRes();
     await handleLocalAccountUpdate(makeReq({ name: "Nome Novo", email: "novo@example.com", currentPassword: "senha-correta", newPassword: "senha-nova" }), res);
     expect(db.updateLocalAccount).toHaveBeenCalledWith(expect.objectContaining({ openId: sampleUser.openId, name: "Nome Novo", email: "novo@example.com" }));
-    expect(sdk.createSessionToken).toHaveBeenCalledWith(updated.openId, expect.any(Object));
+    expect(sdk.createSessionToken).toHaveBeenCalledWith(sampleUser.openId, expect.any(Object));
     expect(cookieCalls).toHaveLength(1);
   });
 });

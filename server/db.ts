@@ -72,6 +72,7 @@ export async function deleteUserAccount(userId: number): Promise<boolean> {
     await tx.delete(schema.conversations).where(eq(schema.conversations.userId, userId));
     await tx.delete(schema.credits).where(eq(schema.credits.userId, userId));
     await tx.delete(schema.recharges).where(eq(schema.recharges.userId, userId));
+    await tx.delete(schema.abuseCases).where(eq(schema.abuseCases.userId, userId));
 
     if (target.email) {
       await tx.delete(schema.passwordCredentials).where(eq(schema.passwordCredentials.email, String(target.email).toLowerCase()));
@@ -102,6 +103,75 @@ export async function getUserByLoginIdentifier(identifier: string): Promise<any 
 export async function getAllUsers(): Promise<any[]> {
   const db = await getDb();
   return await db.select().from(schema.users).orderBy(desc(schema.users.createdAt));
+}
+
+export async function createAbuseCase(input: {
+  userId: number;
+  score: number;
+  signals: string[];
+  temporaryUntil?: Date | null;
+  status?: "open" | "confirmed" | "dismissed" | "resolved";
+}): Promise<any> {
+  const db = await getDb();
+  const [created] = await db.insert(schema.abuseCases).values({
+    userId: input.userId,
+    score: input.score,
+    signals: JSON.stringify(input.signals),
+    temporaryUntil: input.temporaryUntil ?? null,
+    status: input.status ?? "open",
+  }).returning();
+  return created;
+}
+
+export async function temporarilyBlockUser(userId: number, until: Date, reason: string, score: number, signals: string[]): Promise<any> {
+  const db = await getDb();
+  const [user] = await db.update(schema.users)
+    .set({ accountStatus: "temporarily_blocked", blockedUntil: until, blockedReason: reason, updatedAt: new Date() })
+    .where(eq(schema.users.id, userId))
+    .returning();
+  if (!user) return null;
+  await createAbuseCase({ userId, score, signals, temporaryUntil: until });
+  return user;
+}
+
+export async function permanentlyBlockUser(userId: number, reason: string, reviewedByUserId: number): Promise<any> {
+  const db = await getDb();
+  const [user] = await db.update(schema.users)
+    .set({ accountStatus: "blocked", blockedUntil: null, blockedReason: reason, updatedAt: new Date() })
+    .where(eq(schema.users.id, userId))
+    .returning();
+  if (!user) return null;
+  await createAbuseCase({ userId, score: 100, signals: ["manual_permanent_block"], status: "confirmed" });
+  const [review] = await db.select().from(schema.abuseCases)
+    .where(and(eq(schema.abuseCases.userId, userId), eq(schema.abuseCases.status, "confirmed")))
+    .orderBy(desc(schema.abuseCases.createdAt)).limit(1);
+  if (review) {
+    await db.update(schema.abuseCases).set({ reviewedByUserId, reviewedAt: new Date(), reviewNote: reason }).where(eq(schema.abuseCases.id, review.id));
+  }
+  return user;
+}
+
+export async function clearUserBlock(userId: number, reviewedByUserId: number, note?: string): Promise<any> {
+  const db = await getDb();
+  const [user] = await db.update(schema.users)
+    .set({ accountStatus: "active", blockedUntil: null, blockedReason: null, updatedAt: new Date() })
+    .where(eq(schema.users.id, userId))
+    .returning();
+  if (!user) return null;
+  await db.update(schema.abuseCases).set({ status: "resolved", reviewedByUserId, reviewedAt: new Date(), reviewNote: note ?? null })
+    .where(and(eq(schema.abuseCases.userId, userId), eq(schema.abuseCases.status, "open")));
+  return user;
+}
+
+export async function getAbuseCases(): Promise<any[]> {
+  const db = await getDb();
+  const cases = await db.select().from(schema.abuseCases).orderBy(desc(schema.abuseCases.createdAt));
+  const results = [];
+  for (const abuseCase of cases) {
+    const user = await getUserById(abuseCase.userId);
+    results.push({ ...abuseCase, userEmail: user?.email ?? null, userName: user?.name ?? null, accountStatus: user?.accountStatus ?? null });
+  }
+  return results;
 }
 
 // ─── Local Accounts (email/password) ───

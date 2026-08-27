@@ -9,6 +9,17 @@ import { trpc } from "@/lib/trpc";
 
 type AuthMode = "login" | "register";
 
+type BlockNotice = {
+  message: string;
+  code?: string;
+  blockedUntil?: string | null;
+  support?: {
+    whatsappUrl: string | null;
+    discordUrl: string | null;
+    email: string | null;
+  } | null;
+};
+
 export default function Login() {
   const [mode, setMode] = useState<AuthMode>("login");
   const [identifier, setIdentifier] = useState("");
@@ -17,6 +28,7 @@ export default function Login() {
   const [password, setPassword] = useState("");
   const [confirmPassword, setConfirmPassword] = useState("");
   const [loading, setLoading] = useState(false);
+  const [blockNotice, setBlockNotice] = useState<BlockNotice | null>(null);
   const [, setLocation] = useLocation();
   const utils = trpc.useUtils();
 
@@ -41,6 +53,7 @@ export default function Login() {
       }
     }
     setLoading(true);
+    setBlockNotice(null);
     try {
       const response = await fetch(mode === "login" ? "/api/auth/login" : "/api/auth/register", {
         method: "POST",
@@ -49,7 +62,12 @@ export default function Login() {
         body: JSON.stringify(mode === "login" ? { identifier, password } : { name, email, password }),
       });
       const data = await response.json().catch(() => ({}));
-      if (!response.ok) throw new Error(data.error || "Não foi possível concluir o acesso");
+      if (!response.ok) {
+        if (data.code === "ACCOUNT_BLOCKED" || data.code === "ACCOUNT_CREATION_LIMIT") {
+          setBlockNotice({ message: data.error || "Acesso temporariamente limitado.", code: data.code, blockedUntil: data.blockedUntil, support: data.support });
+        }
+        throw new Error(data.error || "Não foi possível concluir o acesso");
+      }
       await utils.auth.me.invalidate();
       toast.success(mode === "login" ? "Login realizado com sucesso." : "Conta criada com sucesso.");
       setLocation("/chat");
@@ -83,6 +101,18 @@ export default function Login() {
           {mode === "register" && <div className="space-y-2"><Label htmlFor="confirm-password" className="text-zinc-300">Confirmar senha</Label><Input id="confirm-password" type="password" placeholder="Repita sua senha" value={confirmPassword} onChange={(event) => setConfirmPassword(event.target.value)} required minLength={6} autoComplete="new-password" className="bg-[#1e1e28] text-white placeholder:text-zinc-500" /></div>}
           <Button type="submit" className="w-full bg-violet-600 text-white hover:bg-violet-500" disabled={loading}>{loading ? "Aguarde..." : mode === "login" ? "Entrar" : "Criar conta"}</Button>
         </form>
+        {blockNotice && (
+          <div role="alert" className="mt-5 space-y-3 rounded-lg border border-amber-500/30 bg-amber-500/10 p-4 text-sm text-amber-100">
+            <p className="font-medium">{blockNotice.message}</p>
+            {blockNotice.blockedUntil && <p className="text-xs text-amber-200/80">A revisão automática poderá ser concluída após {new Date(blockNotice.blockedUntil).toLocaleString("pt-BR")}.</p>}
+            <p className="text-xs text-amber-200/80">Se isso for um engano, solicite uma revisão pelo suporte.</p>
+            <div className="flex flex-wrap gap-2 text-xs">
+              {blockNotice.support?.whatsappUrl && <a className="rounded bg-green-600/80 px-3 py-2 text-white hover:bg-green-600" href={blockNotice.support.whatsappUrl} target="_blank" rel="noreferrer">WhatsApp</a>}
+              {blockNotice.support?.discordUrl && <a className="rounded bg-indigo-600/80 px-3 py-2 text-white hover:bg-indigo-600" href={blockNotice.support.discordUrl} target="_blank" rel="noreferrer">Discord</a>}
+              {blockNotice.support?.email && <a className="rounded bg-zinc-700 px-3 py-2 text-white hover:bg-zinc-600" href={`mailto:${blockNotice.support.email}`}>E-mail</a>}
+            </div>
+          </div>
+        )}
         <p className="mt-6 text-center text-xs text-zinc-500">{mode === "login" ? "Ainda não tem conta? Use a aba Cadastrar." : "Já possui uma conta? Use a aba Entrar."}</p>
       </section>
     </main>
