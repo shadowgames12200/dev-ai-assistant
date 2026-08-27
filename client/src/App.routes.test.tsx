@@ -2,8 +2,9 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { cleanup, render, screen, waitFor } from "@testing-library/react";
 
-const { authState } = vi.hoisted(() => ({
+const { authState, blockStatusState } = vi.hoisted(() => ({
   authState: { user: null as any, loading: false },
+  blockStatusState: { data: { blocked: false } as any, isLoading: false },
 }));
 
 vi.mock("@/_core/hooks/useAuth", () => ({
@@ -18,7 +19,7 @@ vi.mock("@/components/ui/sonner", () => ({ Toaster: () => null }));
 vi.mock("@/lib/trpc", () => ({
   trpc: {
     auth: {
-      blockStatus: { useQuery: () => ({ data: { blocked: false }, isLoading: false }) },
+      blockStatus: { useQuery: () => blockStatusState },
     },
   },
 }));
@@ -35,6 +36,8 @@ afterEach(() => {
   window.history.pushState({}, "", "/");
   authState.user = null;
   authState.loading = false;
+  blockStatusState.data = { blocked: false };
+  blockStatusState.isLoading = false;
 });
 
 describe("rotas de acesso", () => {
@@ -63,5 +66,23 @@ describe("rotas de acesso", () => {
 
     await waitFor(() => expect(screen.getByText("Chat")).not.toBeNull());
     expect(screen.queryByText("Admin")).toBeNull();
+  });
+
+  it("mantém uma sessão bloqueada na tela de bloqueio em vez de redirecionar para o chat", () => {
+    authState.user = { id: 3, role: "user" };
+    blockStatusState.data = {
+      blocked: true,
+      permanent: false,
+      message: "Conta bloqueada para revisão.",
+      blockedUntil: null,
+      support: null,
+    };
+    window.history.pushState({}, "", "/login");
+
+    render(<App />);
+
+    expect(screen.getByRole("alert")).not.toBeNull();
+    expect(screen.getByText("Conta bloqueada para revisão.")).not.toBeNull();
+    expect(screen.queryByText("Página de acesso local")).toBeNull();
   });
 });

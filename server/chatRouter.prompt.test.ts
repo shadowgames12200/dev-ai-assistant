@@ -60,4 +60,10 @@ describe("SYSTEM_PROMPT - protocolo profissional de freelancer", () => {
     expect(SYSTEM_PROMPT).toContain("Nunca revele credenciais");
     expect(SYSTEM_PROMPT).toContain("ações externas");
   });
+
+  it("orienta o uso condicional e responsivo de tabelas Markdown", () => {
+    expect(SYSTEM_PROMPT).toContain("tabelas GitHub-Flavored Markdown somente quando houver duas ou mais opções/itens comparáveis");
+    expect(SYSTEM_PROMPT).toContain("Tabelas responsivas");
+    expect(SYSTEM_PROMPT).toContain("não coloque segredos, tokens, senhas");
+  });
 });

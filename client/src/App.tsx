@@ -30,10 +30,10 @@ function LoginPage() {
   const { data: blockStatus, isLoading: blockStatusLoading } = trpc.auth.blockStatus.useQuery(undefined, { retry: false });
 
   useEffect(() => {
-    if (!loading && user) {
+    if (!loading && !blockStatusLoading && user && blockStatus?.blocked !== true) {
       window.location.replace("/chat");
     }
-  }, [loading, user]);
+  }, [loading, user, blockStatusLoading, blockStatus?.blocked]);
 
   if (loading || blockStatusLoading) return <LoadingScreen />;
   if (blockStatus?.blocked) return <AccountBlocked status={blockStatus} />;

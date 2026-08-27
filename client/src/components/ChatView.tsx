@@ -398,7 +398,7 @@ export default function ChatView({
                     )}
 
                     {isAssistant ? (
-                      <div>
+                      <div className="chat-markdown">
                         {isAgentMode &&
                           (msg as any).isPending && (
                             <div className="flex items-center gap-1.5 mb-2 text-xs font-medium text-amber-400">
