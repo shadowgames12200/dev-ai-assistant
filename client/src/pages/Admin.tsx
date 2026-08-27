@@ -369,7 +369,7 @@ export default function Admin() {
                       {u.accountStatus === "blocked" && <span className="ml-2 text-[10px] text-red-300">bloqueada</span>}
                       {u.accountStatus === "temporarily_blocked" && <span className="ml-2 text-[10px] text-amber-300">bloqueio temporário</span>}
                     </TableCell>
-                    <TableCell className="text-violet-300 font-medium text-xs">{u.balance}</TableCell>
+                    <TableCell className="text-violet-300 font-medium text-xs">{u.role === "admin" ? "Ilimitados" : u.balance}</TableCell>
                     <TableCell className="text-right">
                       <div className="flex gap-1.5 justify-end">
                         <Button size="icon" variant="outline" className="h-7 w-7 sm:h-8 sm:w-8" onClick={() => runSingleCredits(u.id, 50)}>

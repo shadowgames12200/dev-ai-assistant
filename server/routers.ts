@@ -82,7 +82,7 @@ export const appRouter = router({
   credits: router({
     me: protectedProcedure.query(async ({ ctx }) => {
       const balance = await db.getUserCredits(ctx.user.id);
-      return { balance };
+      return { balance, unlimited: ctx.user.role === "admin" };
     }),
   }),
 
