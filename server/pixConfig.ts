@@ -27,11 +27,17 @@ function requiredEnv(name: string): string {
   return value;
 }
 
-export function getPixConfig(): PixConfig {
+export function getPixPublicConfig(): Pick<PixConfig, "key" | "receiverName" | "city"> {
   return {
     key: requiredEnv("PIX_KEY"),
     receiverName: requiredEnv("PIX_RECEIVER_NAME"),
     city: requiredEnv("PIX_CITY"),
+  };
+}
+
+export function getPixConfig(): PixConfig {
+  return {
+    ...getPixPublicConfig(),
     ownerEmail: requiredEnv("OWNER_NOTIFICATION_EMAIL"),
     supportWhatsAppNumber: requiredEnv("SUPPORT_WHATSAPP_NUMBER"),
   };

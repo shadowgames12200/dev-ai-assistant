@@ -1,7 +1,7 @@
 import { useState } from "react";
 import { toast } from "sonner";
 import { useLocation } from "wouter";
-import { ShieldCheck, ShieldOff, ArrowLeft, Users, Plus, Minus, Coins, BrainCircuit, Lightbulb, Check, X, QrCode, Cpu } from "lucide-react";
+import { ShieldCheck, ShieldOff, ArrowLeft, Users, Plus, Minus, Coins, BrainCircuit, Lightbulb, Check, X, QrCode, Cpu, Trash2, UserCog } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import {
@@ -13,6 +13,7 @@ import {
   TableRow,
 } from "@/components/ui/table";
 import { trpc } from "@/lib/trpc";
+import { Checkbox } from "@/components/ui/checkbox";
 import { useAuth } from "@/_core/hooks/useAuth";
 
 export default function Admin() {
@@ -33,6 +34,11 @@ export default function Admin() {
   });
 
   const [approvalKey, setApprovalKey] = useState("");
+  const [selectedUserIds, setSelectedUserIds] = useState<number[]>([]);
+  const [batchAmount, setBatchAmount] = useState("50");
+  const [batchRole, setBatchRole] = useState<"admin" | "user">("admin");
+  const listedUserIds = (usersData || []).map((u: any) => u.id);
+  const allUsersSelected = listedUserIds.length > 0 && listedUserIds.every((id: number) => selectedUserIds.includes(id));
 
   const adjustMutation = trpc.admin.adjustCredits.useMutation({
     onSuccess: () => {
@@ -41,6 +47,79 @@ export default function Admin() {
     },
     onError: (err: any) => toast.error("Erro ao ajustar créditos: " + err.message),
   });
+
+  const adjustBatchMutation = trpc.admin.adjustCreditsBatch.useMutation({
+    onSuccess: () => {
+      utils.admin.listUsers.invalidate();
+      setSelectedUserIds([]);
+      toast.success("Créditos atualizados nas contas selecionadas.");
+    },
+    onError: (err: any) => toast.error("Erro ao ajustar créditos: " + err.message),
+  });
+
+  const setRolesMutation = trpc.admin.setRoles.useMutation({
+    onSuccess: () => {
+      utils.admin.listUsers.invalidate();
+      setSelectedUserIds([]);
+      toast.success("Papéis atualizados nas contas selecionadas.");
+    },
+    onError: (err: any) => toast.error("Erro ao alterar administradores: " + err.message),
+  });
+
+  const deleteUsersMutation = trpc.admin.deleteUsers.useMutation({
+    onSuccess: () => {
+      utils.admin.listUsers.invalidate();
+      setSelectedUserIds([]);
+      toast.success("Contas selecionadas excluídas.");
+    },
+    onError: (err: any) => toast.error("Erro ao excluir contas: " + err.message),
+  });
+
+  const askForConfirmation = (phrase: string) => window.prompt(`Digite exatamente ${phrase} para confirmar:`) === phrase;
+
+  const runSingleCredits = (userId: number, amount: number) => {
+    if (!approvalKey) return toast.error("Informe a senha de aprovação.");
+    if (!askForConfirmation("CONFIRMAR")) return;
+    adjustMutation.mutate({ userId, amount, approvalKey, confirmation: "CONFIRMAR" });
+  };
+
+  const runBatchCredits = (amount: number) => {
+    if (selectedUserIds.length === 0) return toast.error("Selecione pelo menos uma conta.");
+    if (!Number.isInteger(amount) || amount === 0) return toast.error("Informe uma quantidade inteira diferente de zero.");
+    if (!approvalKey) return toast.error("Informe a senha de aprovação.");
+    if (!askForConfirmation("CONFIRMAR")) return;
+    adjustBatchMutation.mutate({ userIds: selectedUserIds, amount, approvalKey, confirmation: "CONFIRMAR" });
+  };
+
+  const runBatchRoleChange = () => {
+    if (selectedUserIds.length === 0) return toast.error("Selecione pelo menos uma conta.");
+    if (!approvalKey) return toast.error("Informe a senha de aprovação.");
+    if (!askForConfirmation("CONFIRMAR")) return;
+
+    const ownerSelected = (usersData || []).some((account: any) => account.isOwner && selectedUserIds.includes(account.id));
+    if (ownerSelected && user?.id !== (usersData || []).find((account: any) => account.isOwner)?.id) {
+      return toast.error("Somente o proprietário pode alterar o próprio cargo.");
+    }
+    const ownerConfirmation = ownerSelected ? askForConfirmation("CONFIRMAR PROPRIETÁRIO") : undefined;
+    if (ownerSelected && !ownerConfirmation) return;
+
+    setRolesMutation.mutate({
+      userIds: selectedUserIds,
+      role: batchRole,
+      approvalKey,
+      confirmation: "CONFIRMAR",
+      ownerOverride: ownerSelected,
+      ownerConfirmation: ownerSelected ? "CONFIRMAR PROPRIETÁRIO" : undefined,
+    });
+  };
+
+  const runBatchDelete = () => {
+    if (selectedUserIds.length === 0) return toast.error("Selecione pelo menos uma conta.");
+    if (!approvalKey) return toast.error("Informe a senha de aprovação.");
+    if (!window.confirm("Isto excluirá definitivamente as contas selecionadas e seus dados. Continuar?")) return;
+    if (!askForConfirmation("EXCLUIR CONTAS")) return;
+    deleteUsersMutation.mutate({ userIds: selectedUserIds, approvalKey, confirmation: "EXCLUIR CONTAS", ownerOverride: false });
+  };
 
   const approveRechargeMutation = trpc.pix.approveRecharge.useMutation({
     onSuccess: () => {
@@ -163,14 +242,61 @@ export default function Admin() {
         </section>
 
         <section className="rounded-lg border border-white/10 bg-white/[0.03] p-4 sm:p-5">
-          <div className="flex items-center gap-2 mb-4">
-            <Users className="h-4 w-4 text-violet-400" />
-            <h2 className="text-sm font-semibold">Usuários Cadastrados</h2>
+          <div className="flex flex-col gap-3 mb-4">
+            <div className="flex items-center gap-2">
+              <Users className="h-4 w-4 text-violet-400" />
+              <h2 className="text-sm font-semibold">Usuários Cadastrados</h2>
+            </div>
+            <p className="text-xs leading-relaxed text-zinc-400">
+              Selecione uma ou várias contas. Toda ação administrativa exige a senha usada para aprovar auto‑melhorias e uma confirmação explícita.
+            </p>
+            <div className="grid gap-2 sm:grid-cols-2 lg:grid-cols-4">
+              <Input
+                type="password"
+                value={approvalKey}
+                onChange={(e) => setApprovalKey(e.target.value)}
+                placeholder="Senha de aprovação"
+                className="h-9 bg-[#1e1e28] border-white/10 text-sm"
+              />
+              <Input
+                type="number"
+                value={batchAmount}
+                onChange={(e) => setBatchAmount(e.target.value)}
+                placeholder="Créditos (+/-)"
+                className="h-9 bg-[#1e1e28] border-white/10 text-sm"
+              />
+              <select
+                value={batchRole}
+                onChange={(e) => setBatchRole(e.target.value as "admin" | "user")}
+                className="h-9 rounded-md border border-white/10 bg-[#1e1e28] px-3 text-sm text-zinc-100"
+              >
+                <option value="admin">Tornar admin</option>
+                <option value="user">Revogar admin</option>
+              </select>
+              <div className="flex flex-wrap gap-2">
+                <Button size="sm" variant="outline" onClick={() => runBatchCredits(Number(batchAmount) || 0)} disabled={adjustBatchMutation.isPending}>
+                  <Coins className="mr-1 h-4 w-4" />Aplicar créditos
+                </Button>
+                <Button size="sm" variant="outline" onClick={runBatchRoleChange} disabled={setRolesMutation.isPending}>
+                  <UserCog className="mr-1 h-4 w-4" />Aplicar papel
+                </Button>
+                <Button size="sm" variant="destructive" onClick={runBatchDelete} disabled={deleteUsersMutation.isPending}>
+                  <Trash2 className="mr-1 h-4 w-4" />Excluir
+                </Button>
+              </div>
+            </div>
           </div>
           <div className="overflow-x-auto rounded-md border border-white/10">
             <Table>
               <TableHeader className="bg-white/[0.02]">
                 <TableRow className="border-white/10 hover:bg-transparent">
+                  <TableHead className="text-zinc-400 text-xs py-3 w-10">
+                    <Checkbox
+                      aria-label="Selecionar todas as contas"
+                      checked={allUsersSelected}
+                      onCheckedChange={(checked) => setSelectedUserIds(checked === true ? listedUserIds : [])}
+                    />
+                  </TableHead>
                   <TableHead className="text-zinc-400 text-xs py-3">Nome</TableHead>
                   <TableHead className="text-zinc-400 text-xs py-3">Email</TableHead>
                   <TableHead className="text-zinc-400 text-xs py-3">Papel</TableHead>
@@ -180,23 +306,31 @@ export default function Admin() {
               </TableHeader>
               <TableBody>
                 {isLoading ? (
-                  <TableRow><TableCell colSpan={5} className="text-center py-8 text-zinc-500 text-xs">Carregando usuários...</TableCell></TableRow>
+                  <TableRow><TableCell colSpan={6} className="text-center py-8 text-zinc-500 text-xs">Carregando usuários...</TableCell></TableRow>
                 ) : (usersData || []).map((u: any) => (
                   <TableRow key={u.id} className="border-white/10 hover:bg-white/[0.02]">
+                    <TableCell className="w-10">
+                      <Checkbox
+                        aria-label={`Selecionar ${u.email || u.name || u.id}`}
+                        checked={selectedUserIds.includes(u.id)}
+                        onCheckedChange={(checked) => setSelectedUserIds((current) => checked === true ? Array.from(new Set([...current, u.id])) : current.filter((id) => id !== u.id))}
+                      />
+                    </TableCell>
                     <TableCell className="font-medium text-xs whitespace-nowrap">{u.name || "Sem nome"}</TableCell>
                     <TableCell className="text-zinc-400 text-xs min-w-[150px]">{u.email}</TableCell>
                     <TableCell>
                       <span className={`text-[9px] uppercase tracking-wider px-2 py-0.5 rounded-full ${u.role === "admin" ? "bg-violet-500/20 text-violet-300" : "bg-zinc-500/20 text-zinc-400"}`}>
-                        {u.role}
+                        {u.isOwner ? "dono" : u.role}
                       </span>
+                      {u.isOwner && <span className="ml-2 text-[10px] text-amber-300">protegido</span>}
                     </TableCell>
                     <TableCell className="text-violet-300 font-medium text-xs">{u.balance}</TableCell>
                     <TableCell className="text-right">
                       <div className="flex gap-1.5 justify-end">
-                        <Button size="icon" variant="outline" className="h-7 w-7 sm:h-8 sm:w-8" onClick={() => adjustMutation.mutate({ userId: u.id, amount: 50 })}>
+                        <Button size="icon" variant="outline" className="h-7 w-7 sm:h-8 sm:w-8" onClick={() => runSingleCredits(u.id, 50)}>
                           <Plus className="h-3 w-3 sm:h-4 sm:w-4" />
                         </Button>
-                        <Button size="icon" variant="outline" className="h-7 w-7 sm:h-8 sm:w-8" onClick={() => adjustMutation.mutate({ userId: u.id, amount: -50 })}>
+                        <Button size="icon" variant="outline" className="h-7 w-7 sm:h-8 sm:w-8" onClick={() => runSingleCredits(u.id, -50)}>
                           <Minus className="h-3 w-3 sm:h-4 sm:w-4" />
                         </Button>
                       </div>

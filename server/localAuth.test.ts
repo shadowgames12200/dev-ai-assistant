@@ -39,7 +39,7 @@ vi.mock("./_core/sdk", () => ({
   },
 }));
 
-vi.mock("./_core/env", () => ({ ENV: { ownerOpenId: "local:charleshenriquegonsalves05@gmail.com" } }));
+vi.mock("./_core/env", () => ({ ENV: { ownerOpenId: "local:owner@example.com" } }));
 
 import { handleLocalAccountUpdate, handleLocalLogin, handleLocalLogout, handleLocalRegister } from "./localAuth";
 import * as db from "./db";

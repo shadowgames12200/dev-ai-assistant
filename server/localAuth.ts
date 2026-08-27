@@ -1,5 +1,5 @@
 import { createHmac, randomBytes, scrypt, timingSafeEqual } from "crypto";
-import { COOKIE_NAME, ONE_YEAR_MS } from "../shared/const";
+import { COOKIE_NAME, SESSION_MAX_AGE_MS } from "../shared/const";
 import { ForbiddenError } from "../shared/_core/errors";
 import * as db from "./db";
 import { getSessionCookieOptions } from "./_core/cookies";
@@ -105,11 +105,13 @@ function generateSalt(): string {
 }
 
 function isOwnerEmail(email: string): boolean {
-  const ownerEmail = ENV.ownerOpenId?.startsWith("local:")
-    ? ENV.ownerOpenId.replace("local:", "")
-    : null;
-  const ownerEmails = ownerEmail ? [ownerEmail, "charleshenriquegonsalves05@gmail.com"] : ["charleshenriquegonsalves05@gmail.com"];
-  return ownerEmails.includes(email);
+  const configuredOwner = ENV.ownerOpenId.trim().toLowerCase();
+  if (!configuredOwner) return false;
+
+  const ownerEmail = configuredOwner.startsWith("local:")
+    ? configuredOwner.slice("local:".length)
+    : configuredOwner;
+  return ownerEmail === email.trim().toLowerCase();
 }
 
 export async function handleLocalLogin(req: any, res: any) {
@@ -153,7 +155,7 @@ export async function handleLocalLogin(req: any, res: any) {
       name: dbUser.name,
       email: normalizedEmail,
       loginMethod: "email",
-      role: dbUser.role || (isOwnerEmail(normalizedEmail) ? "admin" : "user"),
+      role: isOwnerEmail(normalizedEmail) ? "admin" : (dbUser.role || "user"),
       lastSignedIn: new Date(),
     });
 
@@ -165,11 +167,11 @@ export async function handleLocalLogin(req: any, res: any) {
 
     const sessionToken = await sdk.createSessionToken(finalUser.openId, {
       name: finalUser.name || normalizedEmail.split("@")[0],
-      expiresInMs: ONE_YEAR_MS,
+      expiresInMs: SESSION_MAX_AGE_MS,
     });
 
     const cookieOptions = getSessionCookieOptions(req);
-    res.cookie(COOKIE_NAME, sessionToken, { ...cookieOptions, maxAge: ONE_YEAR_MS });
+    res.cookie(COOKIE_NAME, sessionToken, { ...cookieOptions, maxAge: SESSION_MAX_AGE_MS });
     clearAuthAttempts(req, "login");
 
     res.json({
@@ -226,11 +228,11 @@ export async function handleLocalRegister(req: any, res: any) {
 
     const sessionToken = await sdk.createSessionToken(user.openId, {
       name: user.name || email.split("@")[0],
-      expiresInMs: ONE_YEAR_MS,
+      expiresInMs: SESSION_MAX_AGE_MS,
     });
 
     const cookieOptions = getSessionCookieOptions(req);
-    res.cookie(COOKIE_NAME, sessionToken, { ...cookieOptions, maxAge: ONE_YEAR_MS });
+    res.cookie(COOKIE_NAME, sessionToken, { ...cookieOptions, maxAge: SESSION_MAX_AGE_MS });
     clearAuthAttempts(req, "register");
 
     res.json({ success: true, user });
@@ -289,7 +291,16 @@ export async function handleLocalAccountUpdate(req: any, res: any) {
     }
 
     if (result.status === "success") {
-      res.json({ success: true, user: result.user });
+      const updatedUser = result.user && user.openId === ENV.ownerOpenId.trim()
+        ? { ...result.user, role: "admin" }
+        : result.user;
+      const sessionToken = await sdk.createSessionToken(user.openId, {
+        name: name || email.split("@")[0],
+        expiresInMs: SESSION_MAX_AGE_MS,
+      });
+      const cookieOptions = getSessionCookieOptions(req);
+      res.cookie(COOKIE_NAME, sessionToken, { ...cookieOptions, maxAge: SESSION_MAX_AGE_MS });
+      res.json({ success: true, user: updatedUser });
     } else {
       res.status(500).json({ error: "Falha ao atualizar conta" });
     }

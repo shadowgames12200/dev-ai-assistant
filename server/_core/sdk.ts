@@ -1,8 +1,9 @@
-import { AXIOS_TIMEOUT_MS, COOKIE_NAME, ONE_YEAR_MS, decodeOAuthState } from "@shared/const";
+import { AXIOS_TIMEOUT_MS, COOKIE_NAME, SESSION_MAX_AGE_MS, decodeOAuthState } from "@shared/const";
 import { ForbiddenError } from "@shared/_core/errors";
 import axios, { type AxiosInstance } from "axios";
 import { parse as parseCookieHeader } from "cookie";
 import type { Request } from "express";
+import { randomBytes } from "node:crypto";
 import { SignJWT, jwtVerify } from "jose";
 import type { User } from "../../drizzle/schema";
 import * as db from "../db";
@@ -17,6 +18,9 @@ import type {
 
 const isNonEmptyString = (value: unknown): value is string =>
   typeof value === "string" && value.length > 0;
+
+// Development sessions are intentionally invalidated whenever the process restarts.
+const DEV_SESSION_SECRET = randomBytes(32);
 
 export type SessionPayload = {
   openId: string;
@@ -143,8 +147,16 @@ class SDKServer {
   }
 
   private getSessionSecret() {
-    const secret = ENV.cookieSecret || "dev-secret-key-12345";
-    return new TextEncoder().encode(secret);
+    const secret = ENV.cookieSecret.trim();
+    if (secret.length >= 32) {
+      return new TextEncoder().encode(secret);
+    }
+
+    if (ENV.isProduction) {
+      throw new Error("JWT_SECRET must be configured with at least 32 characters in production");
+    }
+
+    return DEV_SESSION_SECRET;
   }
 
   async createSessionToken(
@@ -166,7 +178,7 @@ class SDKServer {
     options: { expiresInMs?: number } = {}
   ): Promise<string> {
     const issuedAt = Date.now();
-    const expiresInMs = options.expiresInMs ?? ONE_YEAR_MS;
+    const expiresInMs = options.expiresInMs ?? SESSION_MAX_AGE_MS;
     const expirationSeconds = Math.floor((issuedAt + expiresInMs) / 1000);
     const secretKey = this.getSessionSecret();
 
@@ -299,6 +311,10 @@ class SDKServer {
       openId: user.openId,
       lastSignedIn: signedInAt,
     });
+
+    if (ENV.ownerOpenId.trim() && user.openId === ENV.ownerOpenId.trim()) {
+      return { ...user, role: "admin" };
+    }
 
     return user;
   }

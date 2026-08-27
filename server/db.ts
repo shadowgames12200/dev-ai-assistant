@@ -37,6 +37,52 @@ export async function getUserByOpenId(openId: string): Promise<any | null> {
   return results[0] || null;
 }
 
+export async function getUserById(userId: number): Promise<any | null> {
+  const db = await getDb();
+  const results = await db.select().from(schema.users).where(eq(schema.users.id, userId)).limit(1);
+  return results[0] || null;
+}
+
+export async function updateUserRole(userId: number, role: "user" | "admin"): Promise<any | null> {
+  const db = await getDb();
+  const results = await db
+    .update(schema.users)
+    .set({ role, updatedAt: new Date() })
+    .where(eq(schema.users.id, userId))
+    .returning();
+  return results[0] || null;
+}
+
+/** Remove uma conta e seus dados dependentes sem tocar em outras contas. */
+export async function deleteUserAccount(userId: number): Promise<boolean> {
+  const db = await getDb();
+  const target = await getUserById(userId);
+  if (!target) return false;
+
+  await db.transaction(async (tx: any) => {
+    const userConversations = await tx
+      .select({ id: schema.conversations.id })
+      .from(schema.conversations)
+      .where(eq(schema.conversations.userId, userId));
+
+    for (const conversation of userConversations) {
+      await tx.delete(schema.messages).where(eq(schema.messages.conversationId, conversation.id));
+    }
+
+    await tx.delete(schema.conversations).where(eq(schema.conversations.userId, userId));
+    await tx.delete(schema.credits).where(eq(schema.credits.userId, userId));
+    await tx.delete(schema.recharges).where(eq(schema.recharges.userId, userId));
+
+    if (target.email) {
+      await tx.delete(schema.passwordCredentials).where(eq(schema.passwordCredentials.email, String(target.email).toLowerCase()));
+    }
+
+    await tx.delete(schema.users).where(eq(schema.users.id, userId));
+  });
+
+  return true;
+}
+
 export async function getUserByEmail(email: string): Promise<any | null> {
   const db = await getDb();
   const results = await db.select().from(schema.users).where(eq(schema.users.email, email)).limit(1);
@@ -130,6 +176,17 @@ export async function getConversations(userId: number): Promise<any[]> {
   return await db.select().from(schema.conversations).where(eq(schema.conversations.userId, userId)).orderBy(desc(schema.conversations.updatedAt));
 }
 
+/** Returns a conversation only when it belongs to the authenticated user. */
+export async function getConversationForUser(id: number, userId: number): Promise<any | null> {
+  const db = await getDb();
+  const results = await db
+    .select()
+    .from(schema.conversations)
+    .where(and(eq(schema.conversations.id, id), eq(schema.conversations.userId, userId)))
+    .limit(1);
+  return results[0] || null;
+}
+
 export async function deleteConversation(id: number, userId: number): Promise<void> {
   const db = await getDb();
   await db.delete(schema.conversations).where(and(eq(schema.conversations.id, id), eq(schema.conversations.userId, userId)));
@@ -141,7 +198,12 @@ export async function clearAllConversations(userId: number): Promise<void> {
 }
 
 // ─── Messages ───
-export async function addMessage(conversationId: number, role: string, content: string, metadata?: any): Promise<any> {
+export async function addMessage(conversationId: number, userId: number, role: string, content: string, metadata?: any): Promise<any> {
+  const conversation = await getConversationForUser(conversationId, userId);
+  if (!conversation) {
+    throw new Error("Conversation not found");
+  }
+
   const db = await getDb();
   const results = await db.insert(schema.messages).values({
     conversationId,
@@ -150,12 +212,20 @@ export async function addMessage(conversationId: number, role: string, content: 
     metadata: metadata ? JSON.stringify(metadata) : null,
   }).returning();
   
-  await db.update(schema.conversations).set({ updatedAt: new Date() }).where(eq(schema.conversations.id, conversationId));
+  await db
+    .update(schema.conversations)
+    .set({ updatedAt: new Date() })
+    .where(and(eq(schema.conversations.id, conversationId), eq(schema.conversations.userId, userId)));
   
   return results[0];
 }
 
-export async function getMessages(conversationId: number): Promise<any[]> {
+export async function getMessages(conversationId: number, userId: number): Promise<any[]> {
+  const conversation = await getConversationForUser(conversationId, userId);
+  if (!conversation) {
+    throw new Error("Conversation not found");
+  }
+
   const db = await getDb();
   return await db.select().from(schema.messages).where(eq(schema.messages.conversationId, conversationId)).orderBy(schema.messages.createdAt);
 }

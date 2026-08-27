@@ -1,4 +1,4 @@
-import { getPixConfig, type PixPackage } from "./pixConfig";
+import { getPixPublicConfig, type PixPackage } from "./pixConfig";
 
 const ALPHANUMERIC_PIX = /[^A-Z0-9 $%*+\-./:]/g;
 
@@ -32,7 +32,7 @@ function crc16Ccitt(payload: string): string {
 }
 
 export function buildStaticPixBrCode(pkg: PixPackage): string {
-  const config = getPixConfig();
+  const config = getPixPublicConfig();
   const key = normalizePixText(config.key, 77, "CHAVEPIX");
   const receiverName = normalizePixText(config.receiverName, 25, "RECEBEDOR");
   const city = normalizePixText(config.city, 15, "CIDADE");

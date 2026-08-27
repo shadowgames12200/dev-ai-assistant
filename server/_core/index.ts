@@ -41,12 +41,47 @@ if (ENV.oAuthServerUrl) {
 }
 
 // Autenticação local por conta e senha
-app.post("/api/auth/login", handleLocalLogin);
-app.post("/api/auth/register", handleLocalRegister);
-app.post("/api/auth/account", handleLocalAccountUpdate);
-app.post("/api/auth/logout", handleLocalLogout);
+app.post("/api/auth/login", requireTrustedMutationOrigin, handleLocalLogin);
+app.post("/api/auth/register", requireTrustedMutationOrigin, handleLocalRegister);
+app.post("/api/auth/account", requireTrustedMutationOrigin, handleLocalAccountUpdate);
+app.post("/api/auth/logout", requireTrustedMutationOrigin, handleLocalLogout);
 
-// tRPC API
+function requireTrustedMutationOrigin(req: express.Request, res: express.Response, next: express.NextFunction) {
+  if (!isTrustedMutationOrigin(req)) {
+    res.status(403).json({ error: "Origem não autorizada" });
+    return;
+  }
+  next();
+}
+
+function isTrustedMutationOrigin(req: express.Request): boolean {
+  const origin = req.get("origin");
+  const referer = req.get("referer");
+  if (!origin && !referer) return true;
+
+  const forwardedHost = req.get("x-forwarded-host");
+  const host = forwardedHost?.split(",")[0]?.trim() || req.get("host");
+  const allowedOrigins = new Set([
+    `https://${host}`,
+    `http://${host}`,
+    "https://dev-ai-assistant-puce.vercel.app",
+    process.env.APP_URL?.replace(/\/$/, ""),
+  ].filter(Boolean));
+
+  if (origin) return allowedOrigins.has(origin.replace(/\/$/, ""));
+  try {
+    return allowedOrigins.has(new URL(referer!).origin);
+  } catch {
+    return false;
+  }
+}
+
+// tRPC API. POST carrega mutações e é protegido contra origem cross-site.
+app.use("/api/trpc", (req, res, next) => {
+  if (req.method === "POST") return requireTrustedMutationOrigin(req, res, next);
+  next();
+});
+
 app.use(
   "/api/trpc",
   createExpressMiddleware({
