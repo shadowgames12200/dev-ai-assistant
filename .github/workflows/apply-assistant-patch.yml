@@ -1,0 +1,73 @@
+name: Aplicar melhorias preparadas
+
+
+
+on:
+
+  workflow_dispatch:
+  
+
+
+permissions:
+
+  contents: write
+  
+
+
+jobs:
+
+  apply-patch:
+  
+    runs-on: ubuntu-latest
+    
+    steps:
+    
+      - name: Baixar o repositório
+      
+        uses: actions/checkout@v4
+        
+        with:
+        
+          fetch-depth: 0
+          
+
+
+      - name: Aplicar patch enviado pelo proprietário
+      
+        run: |
+        
+          test -f assistant-fixes.patch
+          
+          git apply --index assistant-fixes.patch
+          
+          git config user.name "github-actions[bot]"
+          
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          
+          git rm assistant-fixes.patch
+          
+          git add -A
+          
+          git commit -m "Aplica melhorias da DevAI Assistant"
+          
+          git push origin HEAD:main
+          
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
