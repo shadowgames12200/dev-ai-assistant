@@ -5,6 +5,7 @@ import * as db from "./db";
 import { getSessionCookieOptions } from "./_core/cookies";
 import { sdk } from "./_core/sdk";
 import { ENV } from "./_core/env";
+import { TRIAL_AMOUNT } from "./_core/credits";
 import type { User } from "../drizzle/schema";
 import { z } from "zod";
 import { eq } from "drizzle-orm";
@@ -240,6 +241,7 @@ export async function handleLocalRegister(req: any, res: any) {
       passwordHash,
       salt,
       role,
+      initialCredits: TRIAL_AMOUNT,
     });
 
     if (!user) {
