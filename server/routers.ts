@@ -12,6 +12,7 @@ import { SYSTEM_PROMPT } from "./systemPrompt";
 import { asUntrustedContent, isApprovalKeyValid, redactSensitiveText } from "./security";
 import { CHAT_REQUESTS_PER_WINDOW, enforceUserRateLimit, UPLOAD_REQUESTS_PER_WINDOW } from "./rateLimit";
 import { buildBlockMessage, getAccountBlockState, getSupportLinks, registerUserAbuseSignal, TEMPORARY_BLOCK_DURATION_MS } from "./abuseProtection";
+import { startProjectSandbox } from "./projectSandbox";
 
 // Gerenciamento de capacidade simples
 let activeConnections = 0;
@@ -558,6 +559,22 @@ export const appRouter = router({
           return { success: true };
         } finally {
           activeConnections--;
+        }
+      }),
+  }),
+
+  sandbox: router({
+    start: protectedProcedure
+      .input(z.object({
+        sourceUrl: z.string().url().max(2_000),
+        sourceKind: z.enum(["repository", "archive", "file", "document"]),
+        task: z.string().trim().min(3).max(10_000),
+      }))
+      .mutation(async ({ input }) => {
+        try {
+          return await startProjectSandbox(input);
+        } catch (error: any) {
+          throw new TRPCError({ code: "BAD_REQUEST", message: error?.message || "Não foi possível iniciar a tarefa isolada." });
         }
       }),
   }),
