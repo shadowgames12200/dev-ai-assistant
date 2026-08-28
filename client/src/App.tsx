@@ -11,6 +11,7 @@ import Chat from "./pages/Chat";
 import Admin from "./pages/Admin";
 import Account from "./pages/Account";
 import Recharge from "./pages/Recharge";
+import SharedConversation from "./pages/SharedConversation";
 import AccountBlocked from "./components/AccountBlocked";
 import { trpc } from "./lib/trpc";
 
@@ -97,6 +98,7 @@ function Router() {
       <Route path="/" component={LoginPage} />
       <Route path="/login" component={LoginPage} />
       <Route path="/chat" component={ChatPage} />
+      <Route path="/share/:token" component={SharedConversation} />
       <Route path="/admin" component={AdminPage} />
       <Route path="/approvals" component={AdminPage} />
       <Route path="/account" component={AccountPage} />

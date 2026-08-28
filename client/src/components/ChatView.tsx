@@ -2,7 +2,9 @@ import { useEffect, useRef, useState } from "react";
 import { useLocation } from "wouter";
 
 import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
+import { Textarea } from "@/components/ui/textarea";
+import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { toast } from "sonner";
 import { Streamdown } from "streamdown";
@@ -17,6 +19,11 @@ import {
   Cpu,
   CircleAlert,
   Sparkles,
+  Share2,
+  Lock,
+  Globe2,
+  Link2,
+  Copy,
 } from "lucide-react";
 
 import { trpc } from "@/lib/trpc";
@@ -63,6 +70,9 @@ export default function ChatView({
   const [isStreaming, setIsStreaming] = useState(false);
   const [isAgentMode, setIsAgentMode] = useState(false);
   const [creditNotice, setCreditNotice] = useState<string | null>(null);
+  const [shareDialogOpen, setShareDialogOpen] = useState(false);
+  const [shareVisibility, setShareVisibility] = useState<"private" | "public">("private");
+  const [shareUrl, setShareUrl] = useState<string | null>(null);
 
   const [attachments, setAttachments] = useState<
     Array<{
@@ -77,12 +87,19 @@ export default function ChatView({
 
   const fileInputRef = useRef<HTMLInputElement>(null);
   const scrollRef = useRef<HTMLDivElement>(null);
-  const inputRef = useRef<HTMLInputElement>(null);
+  const inputRef = useRef<HTMLTextAreaElement>(null);
 
   const utils = trpc.useUtils();
 
   const sendMutation = trpc.chat.send.useMutation();
   const uploadMutation = trpc.upload.file.useMutation();
+  const shareMutation = trpc.chat.conversations.share.useMutation({
+    onSuccess: (data) => {
+      setShareUrl(data.url);
+      toast.success(shareVisibility === "public" ? "Link público criado." : "Compartilhamento privado criado.");
+    },
+    onError: (error) => toast.error(error.message),
+  });
 
   const {
     data: credits,
@@ -223,24 +240,6 @@ export default function ChatView({
     void streamResponse(conversationId, content);
   };
 
-  const handleKeyDown = (
-    e: React.KeyboardEvent<HTMLInputElement>
-  ) => {
-    if (e.key === "Enter") {
-      e.preventDefault();
-
-      if (!e.shiftKey) {
-        handleSend();
-      }
-    }
-  };
-
-  const handleInputChange = (
-    e: React.ChangeEvent<HTMLInputElement>
-  ) => {
-    setInput(e.target.value);
-  };
-
   const handleInputPointerDown = () => {
     if (!inputDisabled) {
       window.setTimeout(() => {
@@ -309,6 +308,22 @@ export default function ChatView({
 
       reader.readAsDataURL(file);
     });
+
+  const openShareDialog = () => {
+    setShareUrl(null);
+    setShareVisibility("private");
+    setShareDialogOpen(true);
+  };
+
+  const createShare = () => {
+    shareMutation.mutate({ conversationId, visibility: shareVisibility });
+  };
+
+  const copyShareUrl = async () => {
+    if (!shareUrl) return;
+    await navigator.clipboard.writeText(shareUrl);
+    toast.success("Link copiado.");
+  };
 
   const toggleAttachment = (id: number) => {
     setSelectedAttIds((prev) =>
@@ -412,6 +427,19 @@ export default function ChatView({
                         <Streamdown>
                           {msg.content}
                         </Streamdown>
+                        <div className="mt-3 flex items-center gap-1 border-t border-border/50 pt-2">
+                          <Button
+                            type="button"
+                            variant="ghost"
+                            size="sm"
+                            className="h-7 gap-1.5 px-2 text-xs text-muted-foreground hover:text-foreground"
+                            onClick={openShareDialog}
+                            aria-label="Compartilhar conversa"
+                          >
+                            <Share2 className="h-3.5 w-3.5" />
+                            Compartilhar
+                          </Button>
+                        </div>
                       </div>
                     ) : (
                       <p className="whitespace-pre-wrap">
@@ -558,13 +586,14 @@ export default function ChatView({
             onChange={handleFileSelect}
           />
 
-          <Input
+          <Textarea
             ref={inputRef}
-            type="text"
             value={input}
-            onChange={handleInputChange}
-            onKeyDown={handleKeyDown}
+            onChange={(e) => setInput(e.target.value)}
             onPointerDown={handleInputPointerDown}
+            enterKeyHint="enter"
+            inputMode="text"
+            rows={3}
             placeholder={
               isStreaming
                 ? "Aguarde a resposta..."
@@ -578,7 +607,7 @@ export default function ChatView({
             autoComplete="off"
             autoCorrect="on"
             spellCheck={true}
-            className="flex-1 bg-muted border-none focus-visible:ring-1 focus-visible:ring-violet-500"
+            className="flex-1 max-h-32 min-h-16 resize-none bg-muted border-none focus-visible:ring-1 focus-visible:ring-violet-500"
           />
 
           <Button
@@ -600,6 +629,45 @@ export default function ChatView({
           </Button>
         </form>
       </div>
+
+      <Dialog open={shareDialogOpen} onOpenChange={setShareDialogOpen}>
+        <DialogContent className="sm:max-w-md">
+          <DialogHeader>
+            <DialogTitle>Compartilhar</DialogTitle>
+            <DialogDescription>Escolha quem poderá visualizar esta conversa.</DialogDescription>
+          </DialogHeader>
+
+          <RadioGroup value={shareVisibility} onValueChange={(value) => setShareVisibility(value as "private" | "public")} className="gap-3">
+            <label className="flex cursor-pointer items-center gap-3 rounded-lg border p-3 transition-colors hover:bg-muted/60">
+              <RadioGroupItem value="private" id="share-private" />
+              <Lock className="h-5 w-5 text-muted-foreground" />
+              <span className="flex-1"><span className="block font-medium">Somente eu</span><span className="block text-xs text-muted-foreground">Visível apenas para você</span></span>
+            </label>
+            <label className="flex cursor-pointer items-center gap-3 rounded-lg border p-3 transition-colors hover:bg-muted/60">
+              <RadioGroupItem value="public" id="share-public" />
+              <Globe2 className="h-5 w-5 text-muted-foreground" />
+              <span className="flex-1"><span className="block font-medium">Acesso público</span><span className="block text-xs text-muted-foreground">Qualquer pessoa com o link pode visualizar</span></span>
+            </label>
+          </RadioGroup>
+
+          {shareUrl && (
+            <div className="flex items-center gap-2 rounded-lg border bg-muted/40 p-2">
+              <Link2 className="h-4 w-4 shrink-0 text-muted-foreground" />
+              <span className="min-w-0 flex-1 truncate text-xs text-muted-foreground">{shareUrl}</span>
+              <Button type="button" variant="ghost" size="icon" className="h-8 w-8 shrink-0" onClick={copyShareUrl} aria-label="Copiar link">
+                <Copy className="h-4 w-4" />
+              </Button>
+            </div>
+          )}
+
+          <DialogFooter>
+            <Button type="button" className="w-full gap-2" onClick={shareUrl ? copyShareUrl : createShare} disabled={shareMutation.isPending}>
+              {shareUrl ? <Copy className="h-4 w-4" /> : <Link2 className="h-4 w-4" />}
+              {shareMutation.isPending ? "Criando link..." : shareUrl ? "Copiar link" : "Compartilhe agora"}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }

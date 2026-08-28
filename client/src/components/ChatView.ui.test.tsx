@@ -17,6 +17,7 @@ vi.mock("@/lib/trpc", () => ({
         conversations: {
           messages: { fetch: vi.fn() },
           attachments: { invalidate: vi.fn() },
+        share: { mutate: vi.fn() },
         },
       },
       credits: { me: { invalidate: vi.fn() } },
@@ -27,6 +28,7 @@ vi.mock("@/lib/trpc", () => ({
       conversations: {
         messages: { useQuery: () => ({ data: mockData.messages }) },
         attachments: { useQuery: () => ({ data: mockData.attachments }) },
+        share: { useMutation: () => ({ mutate: vi.fn(), isPending: false }) },
       },
     },
     upload: {

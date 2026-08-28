@@ -53,6 +53,26 @@ CREATE TABLE IF NOT EXISTS "conversations" (
     "updated_at" TIMESTAMP DEFAULT NOW() NOT NULL
 );
 
+-- Tabela de Compartilhamentos
+DO $$ BEGIN
+    CREATE TYPE "share_visibility" AS ENUM('private', 'public');
+EXCEPTION
+    WHEN duplicate_object THEN null;
+END $$;
+
+CREATE TABLE IF NOT EXISTS "conversation_shares" (
+    "id" SERIAL PRIMARY KEY,
+    "conversation_id" INTEGER REFERENCES "conversations"("id") NOT NULL,
+    "user_id" INTEGER REFERENCES "users"("id") NOT NULL,
+    "token" VARCHAR(96) NOT NULL UNIQUE,
+    "visibility" "share_visibility" DEFAULT 'private' NOT NULL,
+    "created_at" TIMESTAMP DEFAULT NOW() NOT NULL,
+    "updated_at" TIMESTAMP DEFAULT NOW() NOT NULL,
+    "revoked_at" TIMESTAMP
+);
+
+CREATE INDEX IF NOT EXISTS "conversation_shares_token_idx" ON "conversation_shares" ("token");
+
 -- Tabela de Mensagens
 CREATE TABLE IF NOT EXISTS "messages" (
     "id" SERIAL PRIMARY KEY,

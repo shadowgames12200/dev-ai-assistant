@@ -66,4 +66,13 @@ describe("SYSTEM_PROMPT - protocolo profissional de freelancer", () => {
     expect(SYSTEM_PROMPT).toContain("Tabelas responsivas");
     expect(SYSTEM_PROMPT).toContain("não coloque segredos, tokens, senhas");
   });
+
+  it("prioriza a criação concreta de produtos próprios para a Kiwify", () => {
+    expect(SYSTEM_PROMPT).toContain("PRODUTOS DIGITAIS DO PRÓPRIO USUÁRIO");
+    expect(SYSTEM_PROMPT).toContain("vender na Kiwify");
+    expect(SYSTEM_PROMPT).toContain("entregue uma primeira versão concreta");
+    expect(SYSTEM_PROMPT).toContain("Crie o conteúdo completo");
+    expect(SYSTEM_PROMPT).toContain("Não prometa vendas");
+    expect(SYSTEM_PROMPT).toContain("no máximo uma pergunta opcional");
+  });
 });

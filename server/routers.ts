@@ -404,6 +404,19 @@ export const appRouter = router({
           }
           return db.getMessages(input.id, ctx.user.id);
         }),
+      share: protectedProcedure
+        .input(z.object({
+          conversationId: z.number().int().positive(),
+          visibility: z.enum(["private", "public"]),
+        }))
+        .mutation(async ({ ctx, input }) => {
+          const share = await db.createOrUpdateConversationShare(input.conversationId, ctx.user.id, input.visibility);
+          if (!share) throw new TRPCError({ code: "NOT_FOUND", message: "Conversa não encontrada" });
+          return {
+            visibility: share.visibility,
+            url: `${new URL(ctx.req.protocol + "://" + ctx.req.get("host")).origin}/share/${share.token}`,
+          };
+        }),
       attachments: protectedProcedure
         .input(z.object({ conversationId: z.number() }))
         .query(async ({ ctx, input }) => {
@@ -423,6 +436,21 @@ export const appRouter = router({
             .filter((meta: any) => meta.type === "attachment");
         }),
     }),
+    shared: publicProcedure
+      .input(z.object({ token: z.string().regex(/^[a-f0-9]{32}$/i) }))
+      .query(async ({ input }) => {
+        const result = await db.getPublicConversationShare(input.token);
+        if (!result) throw new TRPCError({ code: "NOT_FOUND", message: "Este compartilhamento não está disponível." });
+        return {
+          title: result.conversation.title,
+          messages: result.messages.map((message: any) => ({
+            id: message.id,
+            role: message.role,
+            content: message.content,
+            createdAt: message.createdAt,
+          })),
+        };
+      }),
     send: protectedProcedure
       .input(
         z.object({

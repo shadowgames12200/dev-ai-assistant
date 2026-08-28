@@ -6,6 +6,7 @@ export const rechargeStatusEnum = pgEnum("recharge_status", ["pending", "approve
 export const improvementStatusEnum = pgEnum("improvement_status", ["pending", "approved", "rejected", "in-progress", "completed", "failed"]);
 export const accountStatusEnum = pgEnum("account_status", ["active", "temporarily_blocked", "blocked"]);
 export const abuseCaseStatusEnum = pgEnum("abuse_case_status", ["open", "confirmed", "dismissed", "resolved"]);
+export const shareVisibilityEnum = pgEnum("share_visibility", ["private", "public"]);
 
 export const users = pgTable("users", {
   id: serial("id").primaryKey(),
@@ -42,6 +43,20 @@ export const conversations = pgTable("conversations", {
 
 export type Conversation = typeof conversations.$inferSelect;
 export type InsertConversation = typeof conversations.$inferInsert;
+
+export const conversationShares = pgTable("conversation_shares", {
+  id: serial("id").primaryKey(),
+  conversationId: integer("conversation_id").notNull(),
+  userId: integer("user_id").notNull(),
+  token: varchar("token", { length: 96 }).notNull().unique(),
+  visibility: shareVisibilityEnum("visibility").default("private").notNull(),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+  updatedAt: timestamp("updated_at").defaultNow().notNull(),
+  revokedAt: timestamp("revoked_at"),
+});
+
+export type ConversationShare = typeof conversationShares.$inferSelect;
+export type InsertConversationShare = typeof conversationShares.$inferInsert;
 
 export const messages = pgTable("messages", {
   id: serial("id").primaryKey(),

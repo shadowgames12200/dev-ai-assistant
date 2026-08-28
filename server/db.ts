@@ -1,5 +1,6 @@
 import { drizzle } from "drizzle-orm/postgres-js";
 import postgres from "postgres";
+import { randomUUID } from "node:crypto";
 import * as schema from "../drizzle/schema";
 import { eq, and, desc, sql } from "drizzle-orm";
 import { ENV } from "./_core/env";
@@ -69,6 +70,7 @@ export async function deleteUserAccount(userId: number): Promise<boolean> {
       await tx.delete(schema.messages).where(eq(schema.messages.conversationId, conversation.id));
     }
 
+    await tx.delete(schema.conversationShares).where(eq(schema.conversationShares.userId, userId));
     await tx.delete(schema.conversations).where(eq(schema.conversations.userId, userId));
     await tx.delete(schema.credits).where(eq(schema.credits.userId, userId));
     await tx.delete(schema.recharges).where(eq(schema.recharges.userId, userId));
@@ -269,12 +271,68 @@ export async function getConversationForUser(id: number, userId: number): Promis
 
 export async function deleteConversation(id: number, userId: number): Promise<void> {
   const db = await getDb();
-  await db.delete(schema.conversations).where(and(eq(schema.conversations.id, id), eq(schema.conversations.userId, userId)));
+  await db.transaction(async (tx: any) => {
+    await tx.delete(schema.conversationShares).where(and(eq(schema.conversationShares.conversationId, id), eq(schema.conversationShares.userId, userId)));
+    await tx.delete(schema.conversations).where(and(eq(schema.conversations.id, id), eq(schema.conversations.userId, userId)));
+  });
 }
 
 export async function clearAllConversations(userId: number): Promise<void> {
   const db = await getDb();
-  await db.delete(schema.conversations).where(eq(schema.conversations.userId, userId));
+  await db.transaction(async (tx: any) => {
+    const userConversations = await tx.select({ id: schema.conversations.id }).from(schema.conversations).where(eq(schema.conversations.userId, userId));
+    for (const conversation of userConversations) {
+      await tx.delete(schema.conversationShares).where(eq(schema.conversationShares.conversationId, conversation.id));
+    }
+    await tx.delete(schema.conversations).where(eq(schema.conversations.userId, userId));
+  });
+}
+
+export async function createOrUpdateConversationShare(
+  conversationId: number,
+  userId: number,
+  visibility: "private" | "public",
+): Promise<any> {
+  const db = await getDb();
+  const conversation = await getConversationForUser(conversationId, userId);
+  if (!conversation) return null;
+
+  const existing = await db.select().from(schema.conversationShares)
+    .where(and(eq(schema.conversationShares.conversationId, conversationId), eq(schema.conversationShares.userId, userId)))
+    .limit(1);
+
+  if (existing[0]) {
+    const [updated] = await db.update(schema.conversationShares)
+      .set({ visibility, updatedAt: new Date(), revokedAt: null })
+      .where(eq(schema.conversationShares.id, existing[0].id))
+      .returning();
+    return updated;
+  }
+
+  const [created] = await db.insert(schema.conversationShares).values({
+    conversationId,
+    userId,
+    token: randomUUID().replaceAll("-", ""),
+    visibility,
+  }).returning();
+  return created;
+}
+
+export async function getPublicConversationShare(token: string): Promise<{ share: any; conversation: any; messages: any[] } | null> {
+  const db = await getDb();
+  const [share] = await db.select().from(schema.conversationShares)
+    .where(and(eq(schema.conversationShares.token, token), eq(schema.conversationShares.visibility, "public"), sql`${schema.conversationShares.revokedAt} IS NULL`))
+    .limit(1);
+  if (!share) return null;
+
+  const [conversation] = await db.select().from(schema.conversations)
+    .where(eq(schema.conversations.id, share.conversationId)).limit(1);
+  if (!conversation) return null;
+
+  const sharedMessages = await db.select().from(schema.messages)
+    .where(eq(schema.messages.conversationId, share.conversationId))
+    .orderBy(schema.messages.createdAt);
+  return { share, conversation, messages: sharedMessages };
 }
 
 // ─── Messages ───
