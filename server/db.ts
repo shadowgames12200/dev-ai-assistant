@@ -178,25 +178,35 @@ export async function getAbuseCases(): Promise<any[]> {
 export async function createLocalAccount(account: any): Promise<any | null> {
   const db = await getDb();
   const openId = `local:${account.email}`;
-  
+  const initialCredits = Number(account.initialCredits);
+
   try {
-    // 1. Create User
-    await db.insert(schema.users).values({
-      openId,
-      name: account.name,
-      email: account.email,
-      loginMethod: "email",
-      role: account.role || "user",
-    });
+    return await db.transaction(async (tx: any) => {
+      const [user] = await tx.insert(schema.users).values({
+        openId,
+        name: account.name,
+        email: account.email,
+        loginMethod: "email",
+        role: account.role || "user",
+      }).returning();
 
-    // 2. Create Credentials
-    await db.insert(schema.passwordCredentials).values({
-      email: account.email,
-      passwordHash: account.passwordHash,
-      salt: account.salt,
-    });
+      if (!user) return null;
 
-    return await getUserByOpenId(openId);
+      await tx.insert(schema.passwordCredentials).values({
+        email: account.email,
+        passwordHash: account.passwordHash,
+        salt: account.salt,
+      });
+
+      if (Number.isInteger(initialCredits) && initialCredits > 0) {
+        await tx.insert(schema.credits).values({
+          userId: user.id,
+          amount: initialCredits,
+        });
+      }
+
+      return user;
+    });
   } catch (e) {
     console.error("[DB] Failed to create local account:", e);
     return null;
