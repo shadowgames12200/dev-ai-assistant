@@ -24,6 +24,7 @@ import {
   Globe2,
   Link2,
   Copy,
+  Download,
 } from "lucide-react";
 
 import { trpc } from "@/lib/trpc";
@@ -325,6 +326,19 @@ export default function ChatView({
     toast.success("Link copiado.");
   };
 
+  const downloadMessage = (message: DBMessage) => {
+    const blob = new Blob([message.content], { type: "text/markdown;charset=utf-8" });
+    const url = URL.createObjectURL(blob);
+    const anchor = document.createElement("a");
+    anchor.href = url;
+    anchor.download = `devai-resposta-${message.id}.md`;
+    document.body.appendChild(anchor);
+    anchor.click();
+    anchor.remove();
+    URL.revokeObjectURL(url);
+    toast.success("Resposta baixada em Markdown.");
+  };
+
   const toggleAttachment = (id: number) => {
     setSelectedAttIds((prev) =>
       prev.includes(id)
@@ -428,6 +442,18 @@ export default function ChatView({
                           {msg.content}
                         </Streamdown>
                         <div className="mt-3 flex items-center gap-1 border-t border-border/50 pt-2">
+                          <Button
+                            type="button"
+                            variant="ghost"
+                            size="sm"
+                            className="h-7 gap-1.5 px-2 text-xs text-muted-foreground hover:text-foreground"
+                            onClick={() => downloadMessage(msg)}
+                            aria-label="Baixar resposta em Markdown"
+                            title="Baixar resposta"
+                          >
+                            <Download className="h-3.5 w-3.5" />
+                            Baixar
+                          </Button>
                           <Button
                             type="button"
                             variant="ghost"

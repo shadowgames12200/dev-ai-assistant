@@ -9,6 +9,7 @@ import { buildStaticPixBrCode } from "./pixBrCode";
 import { getPixPackage, getPixPublicConfig, PIX_PACKAGES } from "./pixConfig";
 import * as db from "./db";
 import { SYSTEM_PROMPT } from "./systemPrompt";
+import { buildAssistantContext } from "./assistantOrchestrator";
 import { asUntrustedContent, isApprovalKeyValid, redactSensitiveText } from "./security";
 import { CHAT_REQUESTS_PER_WINDOW, enforceUserRateLimit, UPLOAD_REQUESTS_PER_WINDOW } from "./rateLimit";
 import { buildBlockMessage, getAccountBlockState, getSupportLinks, registerUserAbuseSignal, TEMPORARY_BLOCK_DURATION_MS } from "./abuseProtection";
@@ -556,9 +557,11 @@ export const appRouter = router({
           }
 
           const { invokeLLMStream, readLLMStreamContent } = await import("./_core/llm");
+          const { systemMessage: orchestratorMessage } = buildAssistantContext(input.content, msgs);
           
           const llmMessages: any[] = [
             { role: "system", content: SYSTEM_PROMPT },
+            { role: "system", content: orchestratorMessage },
             ...msgs.map((m: any) => {
               if (m.role === "assistant") {
                 return { role: "assistant", content: m.content };
